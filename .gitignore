@@ -55,3 +55,10 @@ cmd/promptsecret/promptsecret
 # Vim
 *.sw*
 Session.vim
+
+# Runtime
+testdata
+testlogs
+
+# Metadata
+STRUCTURE.md

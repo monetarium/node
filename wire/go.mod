@@ -12,3 +12,5 @@ require (
 	github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 )
+
+replace github.com/decred/dcrd/dcrutil/v4 => ../dcrutil

@@ -14,6 +14,18 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
 
+// CoinType represents the type of native coin in wire protocol messages.
+// This is defined in wire package to avoid import cycles with dcrutil.
+type CoinType uint8
+
+const (
+	// CoinTypeVAR represents Varta coins - the original mined cryptocurrency.
+	CoinTypeVAR CoinType = 0
+
+	// CoinTypeSKA represents Skarb coins - pre-emitted asset-backed tokens.
+	CoinTypeSKA CoinType = 1
+)
+
 const (
 	// TxVersion is the initial transaction version.
 	TxVersion uint16 = 1
@@ -328,6 +340,7 @@ func NewTxIn(prevOut *OutPoint, valueIn int64, signatureScript []byte) *TxIn {
 // TxOut defines a Decred transaction output.
 type TxOut struct {
 	Value    int64
+	CoinType CoinType
 	Version  uint16
 	PkScript []byte
 }
@@ -335,16 +348,24 @@ type TxOut struct {
 // SerializeSize returns the number of bytes it would take to serialize the
 // transaction output.
 func (t *TxOut) SerializeSize() int {
-	// Value 8 bytes + Version 2 bytes + serialized varint size for
+	// Value 8 bytes + CoinType 1 byte + Version 2 bytes + serialized varint size for
 	// the length of PkScript + PkScript bytes.
-	return 8 + 2 + VarIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
+	return 8 + 1 + 2 + VarIntSerializeSize(uint64(len(t.PkScript))) + len(t.PkScript)
 }
 
 // NewTxOut returns a new Decred transaction output with the provided
-// transaction value and public key script.
+// transaction value and public key script. For backward compatibility,
+// this defaults to VAR coin type.
 func NewTxOut(value int64, pkScript []byte) *TxOut {
+	return NewTxOutWithCoinType(value, CoinTypeVAR, pkScript)
+}
+
+// NewTxOutWithCoinType returns a new Decred transaction output with the provided
+// transaction value, coin type, and public key script.
+func NewTxOutWithCoinType(value int64, coinType CoinType, pkScript []byte) *TxOut {
 	return &TxOut{
 		Value:    value,
+		CoinType: coinType,
 		Version:  DefaultPkScriptVersion,
 		PkScript: pkScript,
 	}
@@ -1252,6 +1273,12 @@ func readTxOut(r io.Reader, pver uint32, version uint16, to *TxOut) error {
 	}
 	to.Value = int64(value)
 
+	coinType, err := binarySerializer.Uint8(r)
+	if err != nil {
+		return err
+	}
+	to.CoinType = CoinType(coinType)
+
 	to.Version, err = binarySerializer.Uint16(r, littleEndian)
 	if err != nil {
 		return err
@@ -1266,6 +1293,11 @@ func readTxOut(r io.Reader, pver uint32, version uint16, to *TxOut) error {
 // output (TxOut) to w.
 func writeTxOut(w io.Writer, pver uint32, version uint16, to *TxOut) error {
 	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
+	if err != nil {
+		return err
+	}
+
+	err = binarySerializer.PutUint8(w, uint8(to.CoinType))
 	if err != nil {
 		return err
 	}
