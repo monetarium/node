@@ -230,7 +230,7 @@ func NewAddressPubKeyEd25519(scriptVersion uint16, pubKey Ed25519PublicKey,
 
 // NewAddressPubKeySchnorrSecp256k1Raw returns an address that represents a
 // payment destination which imposes an encumbrance that requires a valid
-// EC-Schnorr-DCR signature for a specific secp256k1 public key.
+// EC-Schnorr-VAR signature for a specific secp256k1 public key.
 //
 // The provided public key MUST be a valid secp256k1 public key serialized in
 // the _compressed_ format or an error will be returned.
@@ -257,7 +257,7 @@ func NewAddressPubKeySchnorrSecp256k1Raw(scriptVersion uint16,
 }
 
 // NewAddressPubKeySchnorrSecp256k1 returns an address that represents a payment
-// destination which imposes an encumbrance that requires a valid EC-Schnorr-DCR
+// destination which imposes an encumbrance that requires a valid EC-Schnorr-VAR
 // signature for a specific secp256k1 public key.
 //
 // See NewAddressPubKeySchnorrSecp256k1Raw for a variant that accepts the public
@@ -338,7 +338,7 @@ func NewAddressPubKeyHashEd25519(scriptVersion uint16, pkHash []byte,
 // NewAddressPubKeyHashSchnorrSecp256k1 returns an address that represents a
 // payment destination which imposes an encumbrance that requires a secp256k1
 // public key in the _compressed_ format that hashes to the provided public key
-// hash along with a valid EC-Schnorr-DCR signature for that public key.
+// hash along with a valid EC-Schnorr-VAR signature for that public key.
 //
 // For version 0 scripts, the provided public key hash must be 20 bytes and is
 // expected to be the Hash160 of the associated secp256k1 public key serialized

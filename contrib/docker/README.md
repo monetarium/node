@@ -51,22 +51,22 @@ concrete value.
    **IMPORTANT: This MUST be run from the main directory of the dcrd code repo.**
 
    ```sh
-   $ DCRD_IMAGE_NAME="yourusername/dcrd"
-   $ docker build -t "${DCRD_IMAGE_NAME}" -f contrib/docker/Dockerfile .
+   $ VARD_IMAGE_NAME="yourusername/dcrd"
+   $ docker build -t "${VARD_IMAGE_NAME}" -f contrib/docker/Dockerfile .
    ```
 
-   To build a specific `git` tag or branch, the `DCRD_BUILD_TAG` argument can be specified.  The argument is optional and defaults to `master`.
+   To build a specific `git` tag or branch, the `VARD_BUILD_TAG` argument can be specified.  The argument is optional and defaults to `master`.
 
    ```
-    $ docker build --build-arg DCRD_BUILD_TAG=release-v1.x.x \
-        -t "${DCRD_IMAGE_NAME}" -f contrib/docker/Dockerfile .
+    $ docker build --build-arg VARD_BUILD_TAG=release-v1.x.x \
+        -t "${VARD_IMAGE_NAME}" -f contrib/docker/Dockerfile .
    ```
 
-    By default, the `DCRD_BUILD_TAG` will also specify the tag or branch of the `dcrctl` utility to be built, as well.  It is feasible that `dcrctl` and `dcrd` don't use the same tags; if that's the case then the `DCRCTL_BUILD_TAG` can be used (on its own or alongside `DCRD_BUILD_TAG`):
+    By default, the `VARD_BUILD_TAG` will also specify the tag or branch of the `dcrctl` utility to be built, as well.  It is feasible that `dcrctl` and `dcrd` don't use the same tags; if that's the case then the `VARCTL_BUILD_TAG` can be used (on its own or alongside `VARD_BUILD_TAG`):
 
    ```
-    $ docker build --build-arg DCRCTL_BUILD_TAG=release-v1.x.x \
-        -t "${DCRD_IMAGE_NAME}" -f contrib/docker/Dockerfile .
+    $ docker build --build-arg VARCTL_BUILD_TAG=release-v1.x.x \
+        -t "${VARD_IMAGE_NAME}" -f contrib/docker/Dockerfile .
    ```
 
 2. Create a data volume and change its ownership to the user id of the user
@@ -85,19 +85,19 @@ concrete value.
    make it easy to reference later and exposing its peer-to-peer port:
 
    ```sh
-   $ DCRD_MAINNET_P2P_PORT=9108
-   $ DCRD_CONTAINER_NAME="dcrd"
+   $ VARD_MAINNET_P2P_PORT=9108
+   $ VARD_CONTAINER_NAME="dcrd"
    $ docker run -d --read-only \
-     --name "${DCRD_CONTAINER_NAME}" \
+     --name "${VARD_CONTAINER_NAME}" \
      -v decred-data:/home/decred \
-     -p ${DCRD_MAINNET_P2P_PORT}:${DCRD_MAINNET_P2P_PORT} \
-     "${DCRD_IMAGE_NAME}" --altdnsnames "${DCRD_CONTAINER_NAME}"
+     -p ${VARD_MAINNET_P2P_PORT}:${VARD_MAINNET_P2P_PORT} \
+     "${VARD_IMAGE_NAME}" --altdnsnames "${VARD_CONTAINER_NAME}"
    ```
 
 4. View the output logs of `dcrd` with the docker logs command:
 
    ```sh
-   $ docker logs "${DCRD_CONTAINER_NAME}"
+   $ docker logs "${VARD_CONTAINER_NAME}"
    ```
 
 5. Don't forget to configure any host and network firewalls to allow access to
@@ -108,13 +108,13 @@ concrete value.
 ### Querying `dcrd` with `dcrctl` Inside the Running Container
 
 ```sh
-$ docker exec "${DCRD_CONTAINER_NAME}" dcrctl getblockchaininfo
+$ docker exec "${VARD_CONTAINER_NAME}" dcrctl getblockchaininfo
 ```
 
 ### Showing available `dcrctl` Commands Inside the Running Container
 
 ```sh
-$ docker exec "${DCRD_CONTAINER_NAME}" dcrctl -l
+$ docker exec "${VARD_CONTAINER_NAME}" dcrctl -l
 ```
 
 **TIP:** The `dcrctl` utility interfaces with both `dcrd` and `dcrwallet`.
@@ -124,8 +124,8 @@ commands listed under "Chain Server Commands" are available.
 ### Starting and Stopping the Container
 
 ```sh
-$ docker stop -t 60 "${DCRD_CONTAINER_NAME}"
-$ docker start "${DCRD_CONTAINER_NAME}"
+$ docker stop -t 60 "${VARD_CONTAINER_NAME}"
+$ docker start "${VARD_CONTAINER_NAME}"
 ```
 
 ## Container Environment Variables
@@ -134,12 +134,12 @@ $ docker start "${DCRD_CONTAINER_NAME}"
   The directory where data is stored inside the container.  This typically does
   not need to be changed.
 
-- `DCRD_NO_FILE_LOGGING` (Default: `true`):  
+- `VARD_NO_FILE_LOGGING` (Default: `true`):  
   Controls whether or not dcrd additionally logs to files under `DECRED_DATA`.
   Logging is only done via stdout by default in the container since that is
   standard practice for containers.
 
-- `DCRD_ALT_DNSNAMES` (Default: None):  
+- `VARD_ALT_DNSNAMES` (Default: None):  
   Adds alternate server DNS names to the server certificate that is automtically
   generated for the RPC server.  This is important when attempting to access the
   RPC from external sources because TLS is required and clients verify the
@@ -196,7 +196,7 @@ ephemeral, this can lead to authentication failures for remote clients.
 
 **IMPORTANT**: For this reason, it is _HIGHLY_ recommended to start the
 container with a stable name and to provide that container name via either the
-`--altdnsnames` CLI parameter or the `DCRD_ALT_DNSNAMES` environment variable to
+`--altdnsnames` CLI parameter or the `VARD_ALT_DNSNAMES` environment variable to
 prevent authentication failures from remote clients.
 
 For example, assuming the environment variables and configuration matches what
@@ -205,10 +205,10 @@ was outlined in the quick start section, running the container with the
 
 ```sh
 $ docker run -d --read-only \
-  --name "${DCRD_CONTAINER_NAME}" \
+  --name "${VARD_CONTAINER_NAME}" \
   -v decred-data:/home/decred \
-  -p ${DCRD_MAINNET_P2P_PORT}:${DCRD_MAINNET_P2P_PORT} \
-  "${DCRD_IMAGE_NAME}" --altdnsnames "${DCRD_CONTAINER_NAME}"
+  -p ${VARD_MAINNET_P2P_PORT}:${VARD_MAINNET_P2P_PORT} \
+  "${VARD_IMAGE_NAME}" --altdnsnames "${VARD_CONTAINER_NAME}"
 ```
 
 ## Usage
@@ -228,13 +228,13 @@ in the quick start section, the following example allows obtaining information
 about the state of the blockchain:
 
 ```sh
-$ docker exec "${DCRD_CONTAINER_NAME}" dcrctl getblockchaininfo
+$ docker exec "${VARD_CONTAINER_NAME}" dcrctl getblockchaininfo
 ```
 
 A list of available `dcrctl` commands may be obtained as follows:
 
 ```sh
-$ docker exec "${DCRD_CONTAINER_NAME}" dcrctl -l
+$ docker exec "${VARD_CONTAINER_NAME}" dcrctl -l
 ```
 
 **TIP:** The `dcrctl` utility interfaces with both `dcrd` and `dcrwallet`.
@@ -254,9 +254,9 @@ technique by running `dcrctl` in a separate container while joining the network
 of the running `dcrd` container instance:
 
 ```sh
-$ docker run --rm --network container:"${DCRD_CONTAINER_NAME}" --read-only \
+$ docker run --rm --network container:"${VARD_CONTAINER_NAME}" --read-only \
   -v decred-data:/home/decred \
-  "${DCRD_IMAGE_NAME}" dcrctl getblockchaininfo
+  "${VARD_IMAGE_NAME}" dcrctl getblockchaininfo
 ```
 
 ### Interacting via RPC with a User-Defined Docker Network
@@ -287,14 +287,14 @@ user-defined network configured to talk to the remote `dcrd` RPC server:
 $ docker network create decred
 $ docker run -d --read-only \
   --network decred \
-  --name "${DCRD_CONTAINER_NAME}" \
+  --name "${VARD_CONTAINER_NAME}" \
   -v decred-data:/home/decred \
-  -p ${DCRD_MAINNET_P2P_PORT}:${DCRD_MAINNET_P2P_PORT} \
-  "${DCRD_IMAGE_NAME}" --altdnsnames "${DCRD_CONTAINER_NAME}"
+  -p ${VARD_MAINNET_P2P_PORT}:${VARD_MAINNET_P2P_PORT} \
+  "${VARD_IMAGE_NAME}" --altdnsnames "${VARD_CONTAINER_NAME}"
 $ docker run --rm --read-only \
   --network decred \
   -v decred-data:/home/decred \
-  "${DCRD_IMAGE_NAME}" dcrctl --rpcserver "${DCRD_CONTAINER_NAME}" getblockchaininfo
+  "${VARD_IMAGE_NAME}" dcrctl --rpcserver "${VARD_CONTAINER_NAME}" getblockchaininfo
 ```
 
 ### Accessing the RPC Server from Remote Services Outside of a Docker Network
@@ -326,13 +326,13 @@ credentials and RPC certificate from the data volume, and then making a call via
 # host machine in order to access it from machines other than the host
 # machine.  In other words, without the '127.0.0.1:' prefix that binds it
 # to localhost.
-$ DCRD_MAINNET_RPC_PORT=9109
+$ VARD_MAINNET_RPC_PORT=9109
 $ docker run -d --read-only \
-  --name "${DCRD_CONTAINER_NAME}" \
+  --name "${VARD_CONTAINER_NAME}" \
   -v decred-data:/home/decred \
-  -p ${DCRD_MAINNET_P2P_PORT}:${DCRD_MAINNET_P2P_PORT} \
-  -p 127.0.0.1:${DCRD_MAINNET_RPC_PORT}:${DCRD_MAINNET_RPC_PORT} \
-  "${DCRD_IMAGE_NAME}" --altdnsnames "${DCRD_CONTAINER_NAME}"
+  -p ${VARD_MAINNET_P2P_PORT}:${VARD_MAINNET_P2P_PORT} \
+  -p 127.0.0.1:${VARD_MAINNET_RPC_PORT}:${VARD_MAINNET_RPC_PORT} \
+  "${VARD_IMAGE_NAME}" --altdnsnames "${VARD_CONTAINER_NAME}"
 
 # Acquire credentials from the data volume and issue RPC via curl.
 #
@@ -344,7 +344,7 @@ $ dcrdrpcpass=$(sudo cat "${DECRED_DATA_VOLUME}/.dcrd/dcrd.conf" | grep rpcpass=
 $ sudo curl --cacert "${DECRED_DATA_VOLUME}/.dcrd/rpc.cert" \
   --user "${dcrdrpcuser}:${dcrdrpcpass}" \
   --data-binary '{"jsonrpc":"1.0","id":"1","method":"getbestblock","params":[]}' \
-  https://127.0.0.1:${DCRD_MAINNET_RPC_PORT}
+  https://127.0.0.1:${VARD_MAINNET_RPC_PORT}
 ```
 
 ## Troubleshooting / Common Issues
@@ -395,7 +395,7 @@ recreated with the appropriate authorized IP addresses and/or DNS names.
 
 The easiest way to accomplish this is to delete the certificate pair from the
 data volume and run a new container instance of `dcrd` with either the
-`--altdnsnames` CLI parameter or the `DCRD_ALT_DNSNAMES` environment variable so
+`--altdnsnames` CLI parameter or the `VARD_ALT_DNSNAMES` environment variable so
 a new certificate pair is automatically generated with the new values.
 
 For example:
@@ -404,10 +404,10 @@ For example:
 $ DECRED_DATA_VOLUME=$(docker volume inspect decred-data -f '{{.Mountpoint}}')
 $ sudo rm "${DECRED_DATA_VOLUME}"/.dcrd/rpc.{cert,key}
 $ docker run -d --read-only \
-     --name "${DCRD_CONTAINER_NAME}" \
+     --name "${VARD_CONTAINER_NAME}" \
      -v decred-data:/home/decred \
-     -p ${DCRD_MAINNET_P2P_PORT}:${DCRD_MAINNET_P2P_PORT} \
-     "${DCRD_IMAGE_NAME}" --altdnsnames "${DCRD_CONTAINER_NAME}" \
+     -p ${VARD_MAINNET_P2P_PORT}:${VARD_MAINNET_P2P_PORT} \
+     "${VARD_IMAGE_NAME}" --altdnsnames "${VARD_CONTAINER_NAME}" \
      --altdnsnames example.com
 ```
 

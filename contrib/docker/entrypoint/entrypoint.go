@@ -77,7 +77,7 @@ func main() {
 	args = args[1:]
 	switch arg0 {
 	case "dcrd":
-		if !convertsToFalse(os.Getenv("DCRD_NO_FILE_LOGGING")) {
+		if !convertsToFalse(os.Getenv("VARD_NO_FILE_LOGGING")) {
 			args = append(args, "--nofilelogging")
 		}
 		args = append(args, fmt.Sprintf("--appdata=%s", dcrdAppData))

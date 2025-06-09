@@ -72,7 +72,7 @@ Application Options:
 	                             (default: P-256)
 	    --altdnsnames            Specify additional dns names to use when
 	                             generating the rpc server certificate
-	                             [supports DCRD_ALT_DNSNAMES environment variable]
+	                             [supports VARD_ALT_DNSNAMES environment variable]
 	    --notls                  Disable TLS for the RPC server -- NOTE: This is
 	                             only allowed if the RPC server is bound to
 	                             localhost
@@ -137,7 +137,7 @@ Application Options:
 	                             periodically with new releases. Don't use a
 	                             different hash unless you understand the
 	                             implications. Set to 0 to disable
-	    --minrelaytxfee=         The minimum transaction fee in DCR/kB to be
+	    --minrelaytxfee=         The minimum transaction fee in VAR/kB to be
 	                             considered a non-zero fee (default: 0.0001)
 	    --limitfreerelay=        DEPRECATED: This behavior is no longer available
 	                             and this option will be removed in a future

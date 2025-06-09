@@ -31,7 +31,7 @@ const (
 	STPubKeyEd25519
 
 	// STPubKeySchnorrSecp256k1 identifies a standard script that imposes an
-	// encumbrance that requires a valid EC-Schnorr-DCRv0 signature for a
+	// encumbrance that requires a valid EC-Schnorr-VARv0 signature for a
 	// specific secp256k1 public key.
 	//
 	// This is commonly referred to as a pay-to-pubkey-schnorr-secp256k1 script.
@@ -54,7 +54,7 @@ const (
 
 	// STPubKeyHashSchnorrSecp256k1 identifies a standard script that imposes an
 	// encumbrance that requires a secp256k1 public key that hashes to a
-	// specific value along with a valid EC-Schnorr-DCRv0 signature for that
+	// specific value along with a valid EC-Schnorr-VARv0 signature for that
 	// public key.
 	//
 	// This is commonly referred to as a pay-to-pubkey-hash-schnorr-secp256k1

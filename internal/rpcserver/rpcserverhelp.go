@@ -22,7 +22,7 @@ var helpDescsEnUS = map[string]string{
 		"The levelspec can either a debug level or of the form:\n" +
 		"<subsystem>=<level>,<subsystem2>=<level2>,...\n" +
 		"The valid debug levels are trace, debug, info, warn, error, and critical.\n" +
-		"The valid subsystems are AMGR, ADXR, BCDB, DCRD, CHAN, DISC, PEER, RPCS, SCRP, SRVR, SYNC, and TXMP.\n" +
+		"The valid subsystems are AMGR, ADXR, BCDB, VARD, CHAN, DISC, PEER, RPCS, SCRP, SRVR, SYNC, and TXMP.\n" +
 		"Finally the keyword 'show' will return a list of the available subsystems.",
 	"debuglevel-levelspec":   "The debug level(s) to use or the keyword 'show'",
 	"debuglevel--condition0": "levelspec!=show",
@@ -135,7 +135,7 @@ var helpDescsEnUS = map[string]string{
 	"scriptpubkeyresult-version":   "The script version",
 
 	// Vout help.
-	"vout-value":        "The amount in DCR",
+	"vout-value":        "The amount in VAR",
 	"vout-n":            "The index of this transaction output",
 	"vout-version":      "The version of the public key script",
 	"vout-scriptPubKey": "The public key script used to pay coins as a JSON object",
@@ -473,7 +473,7 @@ var helpDescsEnUS = map[string]string{
 	"infochainresult-proxy":           "The proxy used by the server",
 	"infochainresult-difficulty":      "The current target difficulty",
 	"infochainresult-testnet":         "Whether or not server is using testnet",
-	"infochainresult-relayfee":        "The minimum relay fee for transactions in DCR/KB",
+	"infochainresult-relayfee":        "The minimum relay fee for transactions in VAR/KB",
 	"infochainresult-errors":          "Any current errors",
 	"infochainresult-txindex":         "Whether or not server has transaction index enabled",
 
@@ -653,7 +653,7 @@ var helpDescsEnUS = map[string]string{
 	// GetTxOutResult help.
 	"gettxoutresult-bestblock":     "The block hash that contains the transaction output",
 	"gettxoutresult-confirmations": "The number of confirmations",
-	"gettxoutresult-value":         "The transaction amount in DCR",
+	"gettxoutresult-value":         "The transaction amount in VAR",
 	"gettxoutresult-scriptPubKey":  "The public key script used to pay coins as a JSON object",
 	"gettxoutresult-coinbase":      "Whether or not the transaction is a coinbase",
 
@@ -847,7 +847,7 @@ var helpDescsEnUS = map[string]string{
 	"estimatesmartfee--synopsis":     "Returns the estimated fee using the historical fee data in dcr/kb.",
 	"estimatesmartfee-confirmations": "Estimate the fee rate a transaction requires so that it is mined in up to this number of blocks.",
 	"estimatesmartfee-mode":          "The only supported mode for the moment is 'conservative'.",
-	"estimatesmartfeeresult-feerate": "The Estimated fee rate (in DCR/KB).",
+	"estimatesmartfeeresult-feerate": "The Estimated fee rate (in VAR/KB).",
 	"estimatesmartfeeresult-errors":  "Unused.",
 	"estimatesmartfeeresult-blocks":  "The block number where the estimate was found.",
 
@@ -873,12 +873,12 @@ var helpDescsEnUS = map[string]string{
 	"ticketbucket-number":     "Bucket number.",
 
 	// TicketFeeInfo help.
-	"ticketfeeinfo--synopsis":            "Get various information about ticket fees from the mempool, blocks, and difficulty windows (units: DCR/kB)",
+	"ticketfeeinfo--synopsis":            "Get various information about ticket fees from the mempool, blocks, and difficulty windows (units: VAR/kB)",
 	"ticketfeeinfo-blocks":               "The number of blocks, starting from the chain tip and descending, to return fee information about",
 	"ticketfeeinfo-windows":              "The number of difficulty windows to return ticket fee information about",
-	"ticketfeeinforesult-feeinfomempool": "Ticket fee information for all tickets in the mempool (units: DCR/kB)",
-	"ticketfeeinforesult-feeinfoblocks":  "Ticket fee information for a given list of blocks descending from the chain tip (units: DCR/kB)",
-	"ticketfeeinforesult-feeinfowindows": "Ticket fee information for a window period where the stake difficulty was the same (units: DCR/kB)",
+	"ticketfeeinforesult-feeinfomempool": "Ticket fee information for all tickets in the mempool (units: VAR/kB)",
+	"ticketfeeinforesult-feeinfoblocks":  "Ticket fee information for a given list of blocks descending from the chain tip (units: VAR/kB)",
+	"ticketfeeinforesult-feeinfowindows": "Ticket fee information for a window period where the stake difficulty was the same (units: VAR/kB)",
 
 	"feeinfomempool-number": "Number of transactions in the mempool",
 	"feeinfomempool-min":    "Minimum transaction fee in the mempool",

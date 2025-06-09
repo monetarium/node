@@ -112,7 +112,7 @@ var runServiceCommand func(string) error
 type config struct {
 	// General application behavior.
 	ShowVersion      bool   `short:"V" long:"version" description:"Display version information and exit"`
-	HomeDir          string `short:"A" long:"appdata" description:"Path to application home directory" env:"DCRD_APPDATA"`
+	HomeDir          string `short:"A" long:"appdata" description:"Path to application home directory" env:"VARD_APPDATA"`
 	ConfigFile       string `short:"C" long:"configfile" description:"Path to configuration file"`
 	DataDir          string `short:"b" long:"datadir" description:"Directory to store data"`
 	LogDir           string `long:"logdir" description:"Directory to log output"`
@@ -141,7 +141,7 @@ type config struct {
 	RPCCert              string   `long:"rpccert" description:"File containing the certificate file"`
 	RPCKey               string   `long:"rpckey" description:"File containing the certificate key"`
 	TLSCurve             string   `long:"tlscurve" description:"Curve to use when generating TLS keypairs"`
-	AltDNSNames          []string `long:"altdnsnames" description:"Specify additional DNS names to use when generating the RPC server certificate" env:"DCRD_ALT_DNSNAMES" env-delim:","`
+	AltDNSNames          []string `long:"altdnsnames" description:"Specify additional DNS names to use when generating the RPC server certificate" env:"VARD_ALT_DNSNAMES" env-delim:","`
 	DisableTLS           bool     `long:"notls" description:"Disable TLS for the RPC server -- NOTE: This is only allowed if the RPC server is bound to localhost"`
 	RPCMaxClients        int      `long:"rpcmaxclients" description:"Max number of RPC clients for standard connections"`
 	RPCMaxWebsockets     int      `long:"rpcmaxwebsockets" description:"Max number of RPC websocket connections"`
@@ -186,7 +186,7 @@ type config struct {
 	AssumeValid    string `long:"assumevalid" description:"Hash of an assumed valid block.  Defaults to the hard-coded assumed valid block that is updated periodically with new releases.  Don't use a different hash unless you understand the implications.  Set to 0 to disable"`
 
 	// Relay and mempool policy.
-	MinRelayTxFee    float64 `long:"minrelaytxfee" description:"The minimum transaction fee in DCR/kB to be considered a non-zero fee"`
+	MinRelayTxFee    float64 `long:"minrelaytxfee" description:"The minimum transaction fee in VAR/kB to be considered a non-zero fee"`
 	FreeTxRelayLimit float64 `long:"limitfreerelay" description:"DEPRECATED: This behavior is no longer available and this option will be removed in a future version of the software"`
 	NoRelayPriority  bool    `long:"norelaypriority" description:"DEPRECATED: This behavior is no longer available and this option will be removed in a future version of the software"`
 	MaxOrphanTxs     int     `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`

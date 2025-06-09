@@ -355,7 +355,7 @@ func (addr *AddressPubKeyEd25519V0) SerializedPubKey() []byte {
 
 // AddressPubKeySchnorrSecp256k1V0 specifies an address that represents a
 // payment destination which imposes an encumbrance that requires a valid
-// EC-Schnorr-DCRv0 signature for a specific secp256k1 public key.
+// EC-Schnorr-VARv0 signature for a specific secp256k1 public key.
 //
 // This is commonly referred to as pay-to-pubkey-schnorr-secp256k1.
 type AddressPubKeySchnorrSecp256k1V0 struct {
@@ -371,7 +371,7 @@ var _ AddressPubKeyHasher = (*AddressPubKeySchnorrSecp256k1V0)(nil)
 
 // NewAddressPubKeySchnorrSecp256k1V0Raw returns an address that represents a
 // payment destination which imposes an encumbrance that requires a valid
-// EC-Schnorr-DCRv0 signature for a specific secp256k1 public key using version
+// EC-Schnorr-VARv0 signature for a specific secp256k1 public key using version
 // 0 scripts.
 //
 // The provided public key MUST be a valid secp256k1 public key serialized in
@@ -418,7 +418,7 @@ func NewAddressPubKeySchnorrSecp256k1V0Raw(serializedPubKey []byte,
 
 // NewAddressPubKeySchnorrSecp256k1V0 returns an address that represents a
 // payment destination which imposes an encumbrance that requires a valid
-// EC-Schnorr-DCRv0 signature for a specific secp256k1 public key using version
+// EC-Schnorr-VARv0 signature for a specific secp256k1 public key using version
 // 0 scripts.
 //
 // See NewAddressPubKeySchnorrSecp256k1V0Raw for a variant that accepts the public
@@ -805,7 +805,7 @@ func (addr *AddressPubKeyHashEd25519V0) Hash160() *[ripemd160.Size]byte {
 // AddressPubKeyHashSchnorrSecp256k1V0 specifies address that represents a
 // payment destination which imposes an encumbrance that requires a secp256k1
 // public key in the _compressed_ format that hashes to the given public key
-// hash along with a valid EC-Schnorr-DCRv0 signature for that public key.
+// hash along with a valid EC-Schnorr-VARv0 signature for that public key.
 //
 // This is commonly referred to as pay-to-pubkey-hash-schnorr-secp256k1.
 type AddressPubKeyHashSchnorrSecp256k1V0 struct {
@@ -821,7 +821,7 @@ var _ Hash160er = (*AddressPubKeyHashSchnorrSecp256k1V0)(nil)
 // NewAddressPubKeyHashSchnorrSecp256k1V0 returns an address that represents a
 // payment destination which imposes an encumbrance that requires a secp256k1
 // public key in the _compressed_ format that hashes to the provided public key
-// hash along with a valid EC-Schnorr-DCRv0 signature for that public key using
+// hash along with a valid EC-Schnorr-VARv0 signature for that public key using
 // version 0 scripts.
 //
 // The provided public key hash must be 20 bytes and is expected to be the

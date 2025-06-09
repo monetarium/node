@@ -463,7 +463,7 @@ func decompressScript(compressedPkScript []byte) []byte {
 // While this is simply exchanging one uint64 for another, the resulting value
 // for typical amounts has a much smaller magnitude which results in fewer bytes
 // when encoded as variable length quantity.  For example, consider the amount
-// of 0.1 DCR which is 10000000 atoms.  Encoding 10000000 as a VLQ would take
+// of 0.1 VAR which is 10000000 atoms.  Encoding 10000000 as a VLQ would take
 // 4 bytes while encoding the compressed value of 8 as a VLQ only takes 1 byte.
 //
 // Essentially the compression is achieved by splitting the value into an
@@ -482,14 +482,14 @@ func decompressScript(compressedPkScript []byte) []byte {
 //
 // Example encodings:
 // (The numbers in parenthesis are the number of bytes when serialized as a VLQ)
-//            0 (1) -> 0        (1)           *  0.00000000 DCR
-//         1000 (2) -> 4        (1)           *  0.00001000 DCR
-//        10000 (2) -> 5        (1)           *  0.00010000 DCR
-//     12345678 (4) -> 111111101(4)           *  0.12345678 DCR
-//     50000000 (4) -> 48       (1)           *  0.50000000 DCR
-//    100000000 (4) -> 9        (1)           *  1.00000000 DCR
-//    500000000 (5) -> 49       (1)           *  5.00000000 DCR
-//   1000000000 (5) -> 10       (1)           * 10.00000000 DCR
+//            0 (1) -> 0        (1)           *  0.00000000 VAR
+//         1000 (2) -> 4        (1)           *  0.00001000 VAR
+//        10000 (2) -> 5        (1)           *  0.00010000 VAR
+//     12345678 (4) -> 111111101(4)           *  0.12345678 VAR
+//     50000000 (4) -> 48       (1)           *  0.50000000 VAR
+//    100000000 (4) -> 9        (1)           *  1.00000000 VAR
+//    500000000 (5) -> 49       (1)           *  5.00000000 VAR
+//   1000000000 (5) -> 10       (1)           * 10.00000000 VAR
 // -----------------------------------------------------------------------------
 
 // compressTxOutAmount compresses the passed amount according to the domain

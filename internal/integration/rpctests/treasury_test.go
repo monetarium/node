@@ -292,7 +292,7 @@ func TestTreasury(t *testing.T) {
 
 	// Send funds to outputs we control so we can spend it on TAdds.
 	nbTAddPrevOuts := 3
-	taddInAmt := dcrutil.Amount(1e8) // 1 DCR
+	taddInAmt := dcrutil.Amount(1e8) // 1 VAR
 	taddPrevOuts := make([]*wire.OutPoint, nbTAddPrevOuts)
 	for i := 0; i < nbTAddPrevOuts; i++ {
 		txOut := newTxOut(int64(taddInAmt), p2pkhScriptVer, p2pkhScript)
@@ -326,7 +326,7 @@ func TestTreasury(t *testing.T) {
 	// address we know how to redeem.
 	expiry := standalone.CalcTSpendExpiry(targetHeight+1, tvi, mul)
 	tspendFee := dcrutil.Amount(5190)
-	tspendAmount := dcrutil.Amount(7e8) // 7 DCR
+	tspendAmount := dcrutil.Amount(7e8) // 7 VAR
 	payouts := []tspendPayout{
 		{address: p2pkhAddr, amount: tspendAmount},
 		{address: p2shAddr, amount: tspendAmount},

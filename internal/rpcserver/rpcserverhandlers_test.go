@@ -1794,7 +1794,7 @@ func defaultMockFeeEstimator() *testFeeEstimator {
 // *testLogManager.
 func defaultMockLogManager() *testLogManager {
 	return &testLogManager{
-		supportedSubsystems: []string{"DCRD", "PEER", "RPCS"},
+		supportedSubsystems: []string{"VARD", "PEER", "RPCS"},
 	}
 }
 

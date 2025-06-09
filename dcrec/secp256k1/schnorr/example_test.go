@@ -13,7 +13,7 @@ import (
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
 )
 
-// This example demonstrates signing a message with the EC-Schnorr-DCRv0 scheme
+// This example demonstrates signing a message with the EC-Schnorr-VARv0 scheme
 // using a secp256k1 private key that is first parsed from raw bytes and
 // serializing the generated signature.
 func ExampleSign() {
@@ -48,7 +48,7 @@ func ExampleSign() {
 	// Signature Verified? true
 }
 
-// This example demonstrates verifying an EC-Schnorr-DCRv0 signature against a
+// This example demonstrates verifying an EC-Schnorr-VARv0 signature against a
 // public key that is first parsed from raw bytes.  The signature is also parsed
 // from raw bytes.
 func ExampleSignature_Verify() {

@@ -27,8 +27,8 @@ database and redownload the chain.
 
 The default setting for the policy which specifies the minimum transaction fee
 rate that will be accepted and relayed to the rest of the network has been
-reduced to 0.0001 DCR/kB (10,000 atoms/kB) from the previous value of 0.001
-DCR/kB (100,000 atoms/kB).
+reduced to 0.0001 VAR/kB (10,000 atoms/kB) from the previous value of 0.001
+VAR/kB (100,000 atoms/kB).
 
 Transactions should not attempt to use the reduced fee rate until the majority
 of the network has upgraded to this release as otherwise the transactions will
@@ -163,7 +163,7 @@ All commits since the last release may be viewed on GitHub [here](https://github
 - stake: Correct comment in connectNode ([decred/dcrd#1325](https://github.com/decred/dcrd/pull/1325))
 - txscript: Update comments for removal of flags ([decred/dcrd#1336](https://github.com/decred/dcrd/pull/1336))
 - docs: Update docs for versioned modules ([decred/dcrd#1391](https://github.com/decred/dcrd/pull/1391))
-- mempool: Correct min relay tx fee comment to DCR ([decred/dcrd#1396](https://github.com/decred/dcrd/pull/1396))
+- mempool: Correct min relay tx fee comment to VAR ([decred/dcrd#1396](https://github.com/decred/dcrd/pull/1396))
 
 ### Developer-related package and module changes:
 

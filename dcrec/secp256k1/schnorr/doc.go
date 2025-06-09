@@ -7,7 +7,7 @@ Package schnorr provides custom Schnorr signing and verification via secp256k1.
 
 This package provides data structures and functions necessary to produce and
 verify deterministic canonical Schnorr signatures using a custom scheme named
-EC-Schnorr-DCRv0 that is described herein.  The signatures and implementation
+EC-Schnorr-VARv0 that is described herein.  The signatures and implementation
 are optimized specifically for the secp256k1 curve.  See
 https://www.secg.org/sec2-v2.pdf for details on the secp256k1 standard.
 
@@ -56,7 +56,7 @@ insight into the design decisions made are discussed further in the README.md
 file.
 
 Consequently, this package implements a custom Schnorr-based signature scheme
-named EC-Schnorr-DCRv0 suitable for use in Decred.
+named EC-Schnorr-VARv0 suitable for use in Decred.
 
 The following provides a high-level overview of the key design features of the
 scheme:
@@ -70,7 +70,7 @@ scheme:
   - Uses RFC6979 to obviate the need for an entropy source at signing time
   - Produces deterministic signatures for a given message and private key pair
 
-# EC-Schnorr-DCRv0 Specification
+# EC-Schnorr-VARv0 Specification
 
 See the README.md file for the specific details of the signing and verification
 algorithm as well as the signature serialization format.
@@ -79,7 +79,7 @@ algorithm as well as the signature serialization format.
 
 It is worth noting that there are some additional optimizations and
 modifications that have been identified since the introduction of
-EC-Schnorr-DCRv0 that can be made to further harden security for multi-party and
+EC-Schnorr-VARv0 that can be made to further harden security for multi-party and
 threshold signature use cases as well provide the opportunity for faster
 signature verification with a sufficiently optimized implementation.
 

@@ -9,7 +9,7 @@ Package schnorr provides custom Schnorr signing and verification via secp256k1.
 
 This package provides data structures and functions necessary to produce and
 verify deterministic canonical Schnorr signatures using a custom scheme named
-`EC-Schnorr-DCRv0` that is described herein.  The signatures and implementation
+`EC-Schnorr-VARv0` that is described herein.  The signatures and implementation
 are optimized specifically for the secp256k1 curve.  See
 https://www.secg.org/sec2-v2.pdf for details on the secp256k1 standard.
 
@@ -58,7 +58,7 @@ discussed further in the Design section along with providing some insight into
 the design decisions made.
 
 Consequently, this package implements a custom Schnorr-based signature scheme
-named `EC-Schnorr-DCRv0` suitable for use in Decred.
+named `EC-Schnorr-VARv0` suitable for use in Decred.
 
 The following provides a high-level overview of the key design features of the
 scheme:
@@ -85,7 +85,7 @@ pp.161-174, 1991 (`Sc91`).  There are other variants not covered here as well.
 
 Further, each of these schemes have various disadvantages that are discussed
 more in the following sections which make them unsuitable for use with Decred.
-Consequently, Decred makes use of a custom scheme named `EC-Schnorr-DCRv0`.
+Consequently, Decred makes use of a custom scheme named `EC-Schnorr-VARv0`.
 
 That said, the various schemes are all fairly simple variations which involve
 using an agreed upon elliptic curve with generator `G`, and hash function `hash`
@@ -116,7 +116,7 @@ point `R`, respectively):
 | EC-FSDSA         |  d*G   | hash(R.x ∥ R.y ∥ m) | R.x ∥ R.y | k - d*e          |
 | EC-Schnorr-v2.0  |  d*G   | hash(m ∥ R.x)       | e         | k - d*e          |
 | EC-Schnorr-v2.10 | -d*G   | hash(R.x ∥ R.y ∥ m) | e         | k + d*e          |
-| EC-Schnorr-DCRv0 |  d*G   | hash(R.x ∥ m)       | R.x       | k - d*e          |
+| EC-Schnorr-VARv0 |  d*G   | hash(R.x ∥ m)       | R.x       | k - d*e          |
 
 Notice the main differences are:
 
@@ -177,7 +177,7 @@ coordinate, in cases where the full point `R` must be known to verifiers, some
 additional semantics are required to correctly identify which one is the correct
 one.
 
-While there are various methods, the choice made for `EC-Schnorr-DCRv0` is to
+While there are various methods, the choice made for `EC-Schnorr-VARv0` is to
 enforce the `y` coordinate to be even which can be efficiently accomplished at
 signing time by negating the nonce in the case it is odd and it does not involve
 adding an additional byte in the signature to specify the oddness.  This is
@@ -217,13 +217,13 @@ the signature scheme choosing whether or not to flip the sign on the public key
 
 The only option among the covered standardization attempts that returns
 signatures pairs in the `(R, s)` form uses the `s = k - d*e` variant, so that
-variant is chosen for `EC-Schnorr-DCRv0` as well.
+variant is chosen for `EC-Schnorr-VARv0` as well.
 
 ## Future Design Considerations
 
 It is worth noting that there are some additional optimizations and
 modifications that have been identified since the introduction of
-`EC-Schnorr-DCRv0` that can be made to further harden security for multi-party
+`EC-Schnorr-VARv0` that can be made to further harden security for multi-party
 and threshold signature use cases as well provide the opportunity for faster
 signature verification with a sufficiently optimized implementation.
 
@@ -232,11 +232,11 @@ to the signature scheme would invalidate existing uses.  Therefore changes in
 this regard will need to come in the form of a v1 signature scheme and be
 accompanied by the necessary consensus updates.
 
-## EC-Schnorr-DCRv0 Specification
+## EC-Schnorr-VARv0 Specification
 
-### EC-Schnorr-DCRv0 Signing Algorithm
+### EC-Schnorr-VARv0 Signing Algorithm
 
-The algorithm for producing an EC-Schnorr-DCRv0 signature is as follows:
+The algorithm for producing an EC-Schnorr-VARv0 signature is as follows:
 
 G = curve generator
 n = curve order
@@ -258,9 +258,9 @@ r, s = signature
 9. s = k - e*d mod n
 10. Return (r, s)
 
-### EC-Schnorr-DCRv0 Verification Algorithm
+### EC-Schnorr-VARv0 Verification Algorithm
 
-The algorithm for verifying an EC-Schnorr-DCRv0 signature is as follows:
+The algorithm for verifying an EC-Schnorr-VARv0 signature is as follows:
 
 G = curve generator
 n = curve order
@@ -280,7 +280,7 @@ r, s = signature
 9. Fail if R.y is odd
 10. Verified if R.x == r
 
-### EC-Schnorr-DCRv0 Signature Serialization Format
+### EC-Schnorr-VARv0 Signature Serialization Format
 
 The serialization format consists of the two components of the signature, `R.x`
 (the `x` coordinate of the point `R`) and `s`, each serialized as a padded
@@ -302,7 +302,7 @@ their usage.
 
 ## Acknowledgements
 
-The EC-Schnorr-DCRv0 scheme is partly based on work that was ongoing in the
+The EC-Schnorr-VARv0 scheme is partly based on work that was ongoing in the
 Bitcoin community at the time it was implemented along with the following
 standardization attempts:
 
@@ -320,12 +320,12 @@ Use the standard go tooling for working with modules to incorporate it.
 ## Examples
 
 * [Sign Message](https://pkg.go.dev/github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr#example-package-SignMessage)  
-  Demonstrates signing a message with the EC-Schnorr-DCRv0 scheme using a
+  Demonstrates signing a message with the EC-Schnorr-VARv0 scheme using a
   secp256k1 private key that is first parsed from raw bytes and serializing the
   generated signature.
 
 * [Verify Signature](https://pkg.go.dev/github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr#example-Signature.Verify)  
-  Demonstrates verifying an EC-Schnorr-DCRv0 signature against a public key that
+  Demonstrates verifying an EC-Schnorr-VARv0 signature against a public key that
   is first parsed from raw bytes.  The signature is also parsed from raw bytes.
 
 ## License

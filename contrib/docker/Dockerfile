@@ -32,8 +32,8 @@ RUN adduser \
 
 # Build dcrd and other commands it provides.
 WORKDIR /go/src/github.com/decred/dcrd
-ARG DCRD_BUILD_TAG=master
-RUN git clone --branch ${DCRD_BUILD_TAG} -c advice.detachedHead=false https://github.com/decred/dcrd . && \
+ARG VARD_BUILD_TAG=master
+RUN git clone --branch ${VARD_BUILD_TAG} -c advice.detachedHead=false https://github.com/decred/dcrd . && \
     CGO_ENABLED=0 GOOS=linux \
     go install -trimpath -tags safe,netgo,timetzdata \
       -ldflags="-s -w" \
@@ -41,8 +41,8 @@ RUN git clone --branch ${DCRD_BUILD_TAG} -c advice.detachedHead=false https://gi
 
 # Build dcrctl.
 WORKDIR /go/src/github.com/decred/dcrctl
-ARG DCRCTL_BUILD_TAG=${DCRD_BUILD_TAG}
-RUN git clone --branch ${DCRCTL_BUILD_TAG} -c advice.detachedHead=false https://github.com/decred/dcrctl . && \
+ARG VARCTL_BUILD_TAG=${VARD_BUILD_TAG}
+RUN git clone --branch ${VARCTL_BUILD_TAG} -c advice.detachedHead=false https://github.com/decred/dcrctl . && \
     CGO_ENABLED=0 GOOS=linux \
     go install -trimpath -tags safe,netgo -ldflags="-s -w"
 
@@ -64,7 +64,7 @@ RUN upx -9 /go/bin/*
 # Minimal scratch-based environment.
 FROM scratch
 ENV DECRED_DATA=/home/decred
-ENV DCRD_NO_FILE_LOGGING=true
+ENV VARD_NO_FILE_LOGGING=true
 COPY --from=builder /etc/passwd /etc/passwd
 COPY --from=builder /etc/group /etc/group
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
