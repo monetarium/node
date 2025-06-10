@@ -1273,11 +1273,39 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 		return nil, txRuleError(ErrCoinbase, str)
 	}
 
+	// SKA emission transactions must not be accepted directly to mempool.
+	// They are only valid when included in blocks at emission height.
+	if blockchain.IsSKAEmissionTransaction(msgTx) {
+		str := fmt.Sprintf("transaction %v is an SKA emission transaction "+
+			"and cannot be accepted to mempool", txHash)
+		return nil, txRuleError(ErrInvalid, str)
+	}
+
 	// Get the current height of the main chain.  A standalone transaction
 	// will be mined into the next block at best, so its height is at least
 	// one more than the current height.
 	bestHeight := mp.cfg.BestHeight()
 	nextBlockHeight := bestHeight + 1
+
+	// Check if transaction has SKA outputs and validate SKA is active
+	hasSKAOutputs := false
+	for _, txOut := range msgTx.TxOut {
+		if txOut.CoinType == wire.CoinTypeSKA {
+			hasSKAOutputs = true
+			break
+		}
+	}
+
+	// If transaction has SKA outputs, ensure SKA is active
+	if hasSKAOutputs {
+		// Check if SKA is active for next block height  
+		if nextBlockHeight < mp.cfg.ChainParams.SKAActivationHeight {
+			str := fmt.Sprintf("transaction %v has SKA outputs but SKA is not "+
+				"active until block %d (next block height %d)", 
+				txHash, mp.cfg.ChainParams.SKAActivationHeight, nextBlockHeight)
+			return nil, txRuleError(ErrInvalid, str)
+		}
+	}
 
 	// Don't accept transactions that will be expired as of the next block.
 	if blockchain.IsExpired(tx, nextBlockHeight) {
@@ -1609,8 +1637,33 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	// - Votes
 	isTreasuryAdd := isTreasuryEnabled && txType == stake.TxTypeTAdd
 	serializedSize := int64(msgTx.SerializeSize())
-	minFee := calcMinRequiredTxRelayFee(serializedSize,
-		mp.cfg.Policy.MinRelayTxFee)
+	
+	// Determine minimum fee based on transaction coin types
+	var minFee int64
+	if hasSKAOutputs {
+		// For transactions with SKA outputs, use SKA fee calculation
+		// We need to determine the primary coin type for fee calculation
+		primaryCoinType := wire.CoinTypeVAR // Default to VAR
+		
+		// If transaction has majority SKA outputs, use SKA fee rules
+		skaOutputCount := 0
+		for _, txOut := range msgTx.TxOut {
+			if txOut.CoinType == wire.CoinTypeSKA {
+				skaOutputCount++
+			}
+		}
+		if skaOutputCount > len(msgTx.TxOut)/2 {
+			primaryCoinType = wire.CoinTypeSKA
+		}
+		
+		minFee = calcMinRequiredTxRelayFeeForCoinType(serializedSize, 
+			primaryCoinType, mp.cfg.Policy.MinRelayTxFee, mp.cfg.ChainParams)
+	} else {
+		// Standard VAR transaction fee calculation
+		minFee = calcMinRequiredTxRelayFee(serializedSize,
+			mp.cfg.Policy.MinRelayTxFee)
+	}
+	
 	if txFee < minFee && (txType == stake.TxTypeRegular || isTicket ||
 		isTreasuryAdd || isTSpend) {
 
@@ -1635,8 +1688,27 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	// sure the current fee is sensible.  If people would like to avoid this
 	// check then they can AllowHighFees = true
 	if !allowHighFees {
-		maxFee := calcMinRequiredTxRelayFee(serializedSize*maxRelayFeeMultiplier,
-			mp.cfg.Policy.MinRelayTxFee)
+		var maxFee int64
+		if hasSKAOutputs {
+			// Use same logic as minimum fee calculation for consistency
+			primaryCoinType := wire.CoinTypeVAR
+			skaOutputCount := 0
+			for _, txOut := range msgTx.TxOut {
+				if txOut.CoinType == wire.CoinTypeSKA {
+					skaOutputCount++
+				}
+			}
+			if skaOutputCount > len(msgTx.TxOut)/2 {
+				primaryCoinType = wire.CoinTypeSKA
+			}
+			
+			maxFee = calcMinRequiredTxRelayFeeForCoinType(serializedSize*maxRelayFeeMultiplier,
+				primaryCoinType, mp.cfg.Policy.MinRelayTxFee, mp.cfg.ChainParams)
+		} else {
+			maxFee = calcMinRequiredTxRelayFee(serializedSize*maxRelayFeeMultiplier,
+				mp.cfg.Policy.MinRelayTxFee)
+		}
+		
 		if txFee > maxFee {
 			str := fmt.Sprintf("transaction %v has %v fee which is above the "+
 				"allowHighFee check threshold amount of %v", txHash,

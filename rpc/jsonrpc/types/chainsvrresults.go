@@ -719,5 +719,6 @@ type Vout struct {
 	Value        float64            `json:"value"`
 	N            uint32             `json:"n"`
 	Version      uint16             `json:"version"`
+	CoinType     uint8              `json:"cointype"`
 	ScriptPubKey ScriptPubKeyResult `json:"scriptPubKey"`
 }

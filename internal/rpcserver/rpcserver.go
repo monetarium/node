@@ -723,6 +723,18 @@ func (s *Server) messageToHex(msg wire.Message) (string, error) {
 func newTxOut(amount int64, pkScriptVer uint16, pkScript []byte) *wire.TxOut {
 	return &wire.TxOut{
 		Value:    amount,
+		CoinType: wire.CoinTypeVAR, // Default to VAR for backward compatibility
+		Version:  pkScriptVer,
+		PkScript: pkScript,
+	}
+}
+
+// newTxOutWithCoinType returns a new transaction output with the given parameters
+// including coin type support.
+func newTxOutWithCoinType(amount int64, coinType wire.CoinType, pkScriptVer uint16, pkScript []byte) *wire.TxOut {
+	return &wire.TxOut{
+		Value:    amount,
+		CoinType: coinType,
 		Version:  pkScriptVer,
 		PkScript: pkScript,
 	}
@@ -1284,6 +1296,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params,
 		vout.N = uint32(i)
 		vout.Value = dcrutil.Amount(v.Value).ToCoin()
 		vout.Version = v.Version
+		vout.CoinType = uint8(v.CoinType)
 		voutSPK.Addresses = encodedAddrs
 		voutSPK.Asm = disbuf
 		voutSPK.Hex = hex.EncodeToString(v.PkScript)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/blockchain/stake/v5"
+	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/internal/blockchain"
 	"github.com/decred/dcrd/txscript/v4"
@@ -92,6 +93,34 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee dcrutil.Amoun
 	}
 
 	return minFee
+}
+
+// calcMinRequiredSKATxRelayFee returns the minimum SKA transaction fee required for a
+// transaction with the passed serialized size to be accepted into the memory
+// pool and relayed. SKA transactions may have different fee requirements.
+func calcMinRequiredSKATxRelayFee(serializedSize int64, minRelayTxFee dcrutil.Amount) int64 {
+	// For now, SKA transactions use the same fee calculation as VAR transactions.
+	// This could be modified in the future to have different fee structures.
+	return calcMinRequiredTxRelayFee(serializedSize, minRelayTxFee)
+}
+
+// calcMinRequiredTxRelayFeeForCoinType returns the minimum transaction fee for the
+// specified coin type.
+func calcMinRequiredTxRelayFeeForCoinType(serializedSize int64, coinType wire.CoinType, 
+	minRelayTxFee dcrutil.Amount, chainParams *chaincfg.Params) int64 {
+	switch coinType {
+	case wire.CoinTypeVAR:
+		return calcMinRequiredTxRelayFee(serializedSize, minRelayTxFee)
+	case wire.CoinTypeSKA:
+		// Use SKA-specific minimum relay fee if available, otherwise use VAR fee
+		if chainParams.SKAMinRelayTxFee > 0 {
+			return calcMinRequiredSKATxRelayFee(serializedSize, dcrutil.Amount(chainParams.SKAMinRelayTxFee))
+		}
+		return calcMinRequiredSKATxRelayFee(serializedSize, minRelayTxFee)
+	default:
+		// Default to VAR fee calculation for unknown coin types
+		return calcMinRequiredTxRelayFee(serializedSize, minRelayTxFee)
+	}
 }
 
 // checkInputsStandard performs a series of checks on a transaction's inputs
