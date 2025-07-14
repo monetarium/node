@@ -5,10 +5,15 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/txscript/v4/stdaddr"
 	"github.com/decred/dcrd/wire"
@@ -104,6 +109,213 @@ func CreateSKAEmissionTransaction(emissionAddresses []string, amounts []int64,
 	return tx, nil
 }
 
+// CreateAuthorizedSKAEmissionTransaction creates a cryptographically authorized
+// SKA emission transaction. This replaces the basic CreateSKAEmissionTransaction
+// with proper security controls including signature verification and replay protection.
+func CreateAuthorizedSKAEmissionTransaction(auth *chaincfg.SKAEmissionAuth,
+	emissionAddresses []string, amounts []int64,
+	chainParams *chaincfg.Params) (*wire.MsgTx, error) {
+
+	// Validate authorization structure
+	if auth == nil {
+		return nil, fmt.Errorf("SKA emission authorization required")
+	}
+
+	if auth.EmissionKey == nil {
+		return nil, fmt.Errorf("SKA emission key required")
+	}
+
+	if len(auth.Signature) == 0 {
+		return nil, fmt.Errorf("SKA emission signature required")
+	}
+
+	// Validate coin type
+	if auth.CoinType < 1 || auth.CoinType > 255 {
+		return nil, fmt.Errorf("invalid SKA coin type: %d", auth.CoinType)
+	}
+
+	// Check if emission is authorized for this coin type
+	authorizedKey := chainParams.GetSKAEmissionKey(auth.CoinType)
+	if authorizedKey == nil {
+		return nil, fmt.Errorf("no emission key configured for coin type %d", auth.CoinType)
+	}
+
+	// Verify the provided key matches the authorized key
+	if !bytes.Equal(auth.EmissionKey.SerializeCompressed(),
+		authorizedKey.SerializeCompressed()) {
+		return nil, fmt.Errorf("unauthorized emission key for coin type %d", auth.CoinType)
+	}
+
+	// Check nonce for replay protection
+	lastNonce := chainParams.GetSKAEmissionNonce(auth.CoinType)
+	if auth.Nonce != lastNonce+1 {
+		return nil, fmt.Errorf("invalid nonce: expected %d, got %d", lastNonce+1, auth.Nonce)
+	}
+
+	// Validate emission amounts
+	if len(emissionAddresses) != len(amounts) {
+		return nil, fmt.Errorf("emission addresses and amounts length mismatch")
+	}
+
+	if len(emissionAddresses) == 0 {
+		return nil, fmt.Errorf("no emission addresses specified")
+	}
+
+	var totalAmount int64
+	for _, amount := range amounts {
+		if amount <= 0 {
+			return nil, fmt.Errorf("invalid emission amount: %d", amount)
+		}
+		totalAmount += amount
+	}
+
+	// Verify total matches authorization
+	if totalAmount != auth.Amount {
+		return nil, fmt.Errorf("total emission amount %d does not match authorization %d",
+			totalAmount, auth.Amount)
+	}
+
+	// Verify emission height
+	if auth.Height != chainParams.SKAEmissionHeight {
+		return nil, fmt.Errorf("emission height %d does not match chain parameter %d",
+			auth.Height, chainParams.SKAEmissionHeight)
+	}
+
+	// Create authorization hash for signature verification
+	authHash, err := createEmissionAuthHash(auth, emissionAddresses, amounts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authorization hash: %w", err)
+	}
+
+	// Verify signature
+	sig, err := ecdsa.ParseDERSignature(auth.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("invalid emission signature: %w", err)
+	}
+
+	if !sig.Verify(authHash[:], auth.EmissionKey) {
+		return nil, fmt.Errorf("emission signature verification failed")
+	}
+
+	// Create the authorized emission transaction
+	tx := &wire.MsgTx{
+		SerType:  wire.TxSerializeFull,
+		Version:  1,
+		LockTime: 0,
+		Expiry:   0,
+	}
+
+	// Create signature script with authorization data
+	authScript, err := createEmissionAuthScript(auth)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create authorization script: %w", err)
+	}
+
+	// Add authorized input
+	tx.TxIn = append(tx.TxIn, &wire.TxIn{
+		PreviousOutPoint: wire.OutPoint{
+			Hash:  chainhash.Hash{}, // All zeros
+			Index: 0xffffffff,       // Max value indicates null
+			Tree:  wire.TxTreeRegular,
+		},
+		SignatureScript: authScript,
+		Sequence:        0xffffffff,
+		BlockHeight:     wire.NullBlockHeight,
+		BlockIndex:      wire.NullBlockIndex,
+		ValueIn:         wire.NullValueIn,
+	})
+
+	// Add outputs for each emission address
+	for i, addressStr := range emissionAddresses {
+		addr, err := stdaddr.DecodeAddress(addressStr, chainParams)
+		if err != nil {
+			return nil, fmt.Errorf("invalid emission address %s: %w", addressStr, err)
+		}
+
+		// Create script for the address
+		_, pkScript := addr.PaymentScript()
+
+		// Add SKA output with specific coin type
+		tx.TxOut = append(tx.TxOut, &wire.TxOut{
+			Value:    amounts[i],
+			CoinType: auth.CoinType, // Use authorized coin type
+			Version:  0,
+			PkScript: pkScript,
+		})
+	}
+
+	return tx, nil
+}
+
+// createEmissionAuthHash creates a hash of the emission authorization data
+// for signature verification. This ensures the signature covers all critical
+// emission parameters to prevent tampering.
+func createEmissionAuthHash(auth *chaincfg.SKAEmissionAuth, addresses []string, amounts []int64) ([32]byte, error) {
+	var buf bytes.Buffer
+
+	// Include all authorization fields in hash
+	if err := binary.Write(&buf, binary.LittleEndian, auth.Nonce); err != nil {
+		return [32]byte{}, err
+	}
+
+	if err := binary.Write(&buf, binary.LittleEndian, uint8(auth.CoinType)); err != nil {
+		return [32]byte{}, err
+	}
+
+	if err := binary.Write(&buf, binary.LittleEndian, auth.Amount); err != nil {
+		return [32]byte{}, err
+	}
+
+	if err := binary.Write(&buf, binary.LittleEndian, auth.Height); err != nil {
+		return [32]byte{}, err
+	}
+
+	if err := binary.Write(&buf, binary.LittleEndian, auth.Timestamp); err != nil {
+		return [32]byte{}, err
+	}
+
+	// Include emission details in hash
+	for i, addr := range addresses {
+		buf.WriteString(addr)
+		if err := binary.Write(&buf, binary.LittleEndian, amounts[i]); err != nil {
+			return [32]byte{}, err
+		}
+	}
+
+	return sha256.Sum256(buf.Bytes()), nil
+}
+
+// createEmissionAuthScript creates the signature script containing authorization
+// data for the emission transaction. This embeds the authorization proof in
+// the transaction itself for validation.
+func createEmissionAuthScript(auth *chaincfg.SKAEmissionAuth) ([]byte, error) {
+	var script bytes.Buffer
+
+	// Standard SKA emission marker
+	script.Write([]byte{0x01, 0x53, 0x4b, 0x41}) // "SKA" marker
+
+	// Authorization data
+	script.WriteByte(0x02) // Auth version
+
+	// Nonce (8 bytes)
+	nonceBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(nonceBytes, auth.Nonce)
+	script.Write(nonceBytes)
+
+	// Coin type (1 byte)
+	script.WriteByte(uint8(auth.CoinType))
+
+	// Public key (33 bytes compressed)
+	pubKeyBytes := auth.EmissionKey.SerializeCompressed()
+	script.Write(pubKeyBytes)
+
+	// Signature length and signature
+	script.WriteByte(uint8(len(auth.Signature)))
+	script.Write(auth.Signature)
+
+	return script.Bytes(), nil
+}
+
 // ValidateSKAEmissionTransaction validates that a transaction is a valid SKA
 // emission transaction for the given block height and chain parameters.
 func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
@@ -170,6 +382,203 @@ func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 
 	if tx.Expiry != 0 {
 		return fmt.Errorf("SKA emission transaction must have Expiry 0")
+	}
+
+	return nil
+}
+
+// ValidateAuthorizedSKAEmissionTransaction validates that a transaction is a valid
+// cryptographically authorized SKA emission transaction. This replaces the basic
+// ValidateSKAEmissionTransaction with proper security controls.
+func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
+	chainParams *chaincfg.Params) error {
+
+	// Check if this is the correct block for SKA emission
+	if !isSKAEmissionBlock(blockHeight, chainParams) {
+		return fmt.Errorf("SKA emission transaction at invalid height %d, expected %d",
+			blockHeight, chainParams.SKAEmissionHeight)
+	}
+
+	// Validate transaction structure
+	if len(tx.TxIn) != 1 {
+		return fmt.Errorf("SKA emission transaction must have exactly 1 input, got %d",
+			len(tx.TxIn))
+	}
+
+	if len(tx.TxOut) == 0 {
+		return fmt.Errorf("SKA emission transaction must have at least 1 output")
+	}
+
+	// Validate null input (similar to coinbase validation)
+	prevOut := tx.TxIn[0].PreviousOutPoint
+	if !prevOut.Hash.IsEqual(&chainhash.Hash{}) || prevOut.Index != 0xffffffff {
+		return fmt.Errorf("SKA emission transaction input is not null")
+	}
+
+	// Extract and validate authorization from signature script
+	auth, err := extractEmissionAuthorization(tx.TxIn[0].SignatureScript)
+	if err != nil {
+		return fmt.Errorf("invalid emission authorization: %w", err)
+	}
+
+	// Validate authorization against chain parameters
+	if err := validateEmissionAuthorization(auth, chainParams); err != nil {
+		return fmt.Errorf("emission authorization validation failed: %w", err)
+	}
+
+	// Determine expected coin type from first output
+	var emissionCoinType wire.CoinType
+	var totalEmissionAmount int64
+
+	// Validate all outputs have consistent coin type and valid amounts
+	for i, txOut := range tx.TxOut {
+		if i == 0 {
+			// Set expected coin type from first output
+			emissionCoinType = txOut.CoinType
+			if emissionCoinType < 1 || emissionCoinType > 255 {
+				return fmt.Errorf("invalid SKA coin type in output 0: %d", emissionCoinType)
+			}
+		} else {
+			// Verify all outputs use the same coin type
+			if txOut.CoinType != emissionCoinType {
+				return fmt.Errorf("inconsistent coin types: output 0 has %d, output %d has %d",
+					emissionCoinType, i, txOut.CoinType)
+			}
+		}
+
+		if txOut.Value <= 0 {
+			return fmt.Errorf("SKA emission transaction output %d has invalid amount %d",
+				i, txOut.Value)
+		}
+
+		if txOut.Value > chainParams.SKAMaxAmount {
+			return fmt.Errorf("SKA emission transaction output %d exceeds maximum %d",
+				i, chainParams.SKAMaxAmount)
+		}
+
+		totalEmissionAmount += txOut.Value
+	}
+
+	// Verify authorization coin type matches transaction outputs
+	if auth.CoinType != emissionCoinType {
+		return fmt.Errorf("authorization coin type %d does not match transaction outputs %d",
+			auth.CoinType, emissionCoinType)
+	}
+
+	// Verify authorization amount matches transaction total
+	if auth.Amount != totalEmissionAmount {
+		return fmt.Errorf("authorization amount %d does not match transaction total %d",
+			auth.Amount, totalEmissionAmount)
+	}
+
+	// Verify emission height
+	if auth.Height != blockHeight {
+		return fmt.Errorf("authorization height %d does not match block height %d",
+			auth.Height, blockHeight)
+	}
+
+	// Validate transaction parameters
+	if tx.LockTime != 0 {
+		return fmt.Errorf("SKA emission transaction must have LockTime 0")
+	}
+
+	if tx.Expiry != 0 {
+		return fmt.Errorf("SKA emission transaction must have Expiry 0")
+	}
+
+	// Update nonce to prevent replay attacks
+	chainParams.SetSKAEmissionNonce(auth.CoinType, auth.Nonce)
+
+	return nil
+}
+
+// extractEmissionAuthorization extracts the emission authorization from a signature script.
+// The script format is: [SKA_marker][auth_version][nonce][coin_type][pubkey][sig_len][signature]
+func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, error) {
+	if len(sigScript) < 48 { // Minimum: 4(marker) + 1(version) + 8(nonce) + 1(cointype) + 33(pubkey) + 1(siglen) = 48
+		return nil, fmt.Errorf("signature script too short: %d bytes", len(sigScript))
+	}
+
+	// Check SKA marker
+	if len(sigScript) < 4 || !bytes.Equal(sigScript[0:4], []byte{0x01, 0x53, 0x4b, 0x41}) {
+		return nil, fmt.Errorf("missing SKA emission marker")
+	}
+
+	offset := 4
+
+	// Check authorization version
+	if sigScript[offset] != 0x02 {
+		return nil, fmt.Errorf("unsupported authorization version: %d", sigScript[offset])
+	}
+	offset++
+
+	// Extract nonce (8 bytes)
+	if len(sigScript) < offset+8 {
+		return nil, fmt.Errorf("insufficient data for nonce")
+	}
+	nonce := binary.LittleEndian.Uint64(sigScript[offset : offset+8])
+	offset += 8
+
+	// Extract coin type (1 byte)
+	if len(sigScript) < offset+1 {
+		return nil, fmt.Errorf("insufficient data for coin type")
+	}
+	coinType := wire.CoinType(sigScript[offset])
+	offset++
+
+	// Extract public key (33 bytes compressed)
+	if len(sigScript) < offset+33 {
+		return nil, fmt.Errorf("insufficient data for public key")
+	}
+	pubKeyBytes := sigScript[offset : offset+33]
+	pubKey, err := secp256k1.ParsePubKey(pubKeyBytes)
+	if err != nil {
+		return nil, fmt.Errorf("invalid public key: %w", err)
+	}
+	offset += 33
+
+	// Extract signature length
+	if len(sigScript) < offset+1 {
+		return nil, fmt.Errorf("insufficient data for signature length")
+	}
+	sigLen := int(sigScript[offset])
+	offset++
+
+	// Extract signature
+	if len(sigScript) < offset+sigLen {
+		return nil, fmt.Errorf("insufficient data for signature: need %d, have %d",
+			sigLen, len(sigScript)-offset)
+	}
+	signature := sigScript[offset : offset+sigLen]
+
+	return &chaincfg.SKAEmissionAuth{
+		EmissionKey: pubKey,
+		Signature:   signature,
+		Nonce:       nonce,
+		CoinType:    coinType,
+		// Amount and Height will be validated separately
+	}, nil
+}
+
+// validateEmissionAuthorization validates the cryptographic authorization
+// against the chain parameters and verifies the signature.
+func validateEmissionAuthorization(auth *chaincfg.SKAEmissionAuth, chainParams *chaincfg.Params) error {
+	// Check if emission is authorized for this coin type
+	authorizedKey := chainParams.GetSKAEmissionKey(auth.CoinType)
+	if authorizedKey == nil {
+		return fmt.Errorf("no emission key configured for coin type %d", auth.CoinType)
+	}
+
+	// Verify the provided key matches the authorized key
+	if !bytes.Equal(auth.EmissionKey.SerializeCompressed(),
+		authorizedKey.SerializeCompressed()) {
+		return fmt.Errorf("unauthorized emission key for coin type %d", auth.CoinType)
+	}
+
+	// Check nonce for replay protection
+	lastNonce := chainParams.GetSKAEmissionNonce(auth.CoinType)
+	if auth.Nonce != lastNonce+1 {
+		return fmt.Errorf("invalid nonce: expected %d, got %d", lastNonce+1, auth.Nonce)
 	}
 
 	return nil

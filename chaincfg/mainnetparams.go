@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	dcrutil "github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
@@ -612,5 +613,32 @@ func MainNetParams() *Params {
 
 		// Initial SKA types to activate at network genesis
 		InitialSKATypes: []dcrutil.CoinType{1}, // Only SKA-1 initially active
+
+		// SKA emission authorization keys (PLACEHOLDER - MUST BE REPLACED WITH SECURE KEYS)
+		// These keys authorize SKA emission transactions for each coin type
+		SKAEmissionKeys: map[wire.CoinType]*secp256k1.PublicKey{
+			// SECURITY NOTE: These are placeholder keys for development ONLY
+			// Production deployment MUST generate secure keys with proper key ceremony
+			1: mustParseHexPubKey("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"),
+			2: mustParseHexPubKey("03389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26381749838fca9302ccaa9ddd"),
+		},
+
+		// SKA emission nonces for replay protection (starts at 0 for all types)
+		SKAEmissionNonces: map[wire.CoinType]uint64{
+			1: 0, // SKA-1 nonce counter
+			2: 0, // SKA-2 nonce counter
+		},
 	}
+}
+
+// mustParseHexPubKey parses a hex-encoded public key and panics if invalid.
+// This is intended for use with hardcoded keys during development.
+// SECURITY WARNING: These are placeholder keys - production must use secure key generation.
+func mustParseHexPubKey(hexStr string) *secp256k1.PublicKey {
+	keyBytes := mustParseHex(hexStr)
+	pubKey, err := secp256k1.ParsePubKey(keyBytes)
+	if err != nil {
+		panic("failed to parse public key: " + err.Error())
+	}
+	return pubKey
 }

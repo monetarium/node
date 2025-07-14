@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	dcrutil "github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -614,5 +616,54 @@ func SimNetParams() *Params {
 		SKAActivationHeight: 10,         // Activate immediately
 		SKAMaxAmount:        10e6 * 1e8, // 10 million SKA max
 		SKAMinRelayTxFee:    1e3,        // 0.00001 SKA minimum fee
+
+		// SKA coin type configurations for simnet testing
+		SKACoins: map[dcrutil.CoinType]*SKACoinConfig{
+			1: {
+				CoinType:       1,
+				Name:           "Skarb-1",
+				Symbol:         "SKA-1",
+				MaxSupply:      1e6 * 1e8, // 1 million SKA-1 for testing
+				EmissionHeight: 10,        // Emit early for testing
+				Active:         true,
+				Description:    "Primary SKA coin type for simnet testing",
+			},
+			2: {
+				CoinType:       2,
+				Name:           "Skarb-2",
+				Symbol:         "SKA-2",
+				MaxSupply:      5e5 * 1e8, // 500k SKA-2 for testing
+				EmissionHeight: 20,        // Emit slightly later
+				Active:         false,     // Initially inactive
+				Description:    "Secondary SKA coin type for simnet testing",
+			},
+		},
+
+		// Initial SKA types to activate at simnet genesis
+		InitialSKATypes: []dcrutil.CoinType{1}, // Only SKA-1 initially active
+
+		// SKA emission authorization keys for simnet (TEST KEYS ONLY)
+		SKAEmissionKeys: map[wire.CoinType]*secp256k1.PublicKey{
+			// SIMNET TEST KEYS - NOT FOR PRODUCTION USE
+			1: mustParseHexPubKeySimnet("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"),
+			2: mustParseHexPubKeySimnet("03389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26381749838fca9302ccaa9ddd"),
+		},
+
+		// SKA emission nonces for simnet replay protection
+		SKAEmissionNonces: map[wire.CoinType]uint64{
+			1: 0, // SKA-1 nonce counter
+			2: 0, // SKA-2 nonce counter
+		},
 	}
+}
+
+// mustParseHexPubKeySimnet parses a hex-encoded public key for simnet testing.
+// SIMNET ONLY - These are test keys and must not be used in production.
+func mustParseHexPubKeySimnet(hexStr string) *secp256k1.PublicKey {
+	keyBytes := mustParseHex(hexStr)
+	pubKey, err := secp256k1.ParsePubKey(keyBytes)
+	if err != nil {
+		panic("failed to parse simnet test public key: " + err.Error())
+	}
+	return pubKey
 }

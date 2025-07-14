@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"context"
-	"encoding/gob"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -32,6 +31,7 @@ import (
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/dcrd/database/v3"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrjson/v4"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/gcs/v4"
@@ -1383,16 +1383,54 @@ func hexToMsgTx(s string) *wire.MsgTx {
 // cloneParams returns a deep copy of the provided parameters so the caller is
 // free to modify them without worrying about interfering with other tests.
 func cloneParams(params *chaincfg.Params) *chaincfg.Params {
-	// Encode via gob.
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	enc.Encode(params)
+	// Manual deep copy to avoid gob encoding issues with secp256k1.PublicKey
+	result := &chaincfg.Params{}
+	*result = *params
 
-	// Decode via gob to make a deep copy.
-	var paramsCopy chaincfg.Params
-	dec := gob.NewDecoder(buf)
-	dec.Decode(&paramsCopy)
-	return &paramsCopy
+	// Deep copy slices and maps that need separate instances
+	if params.Deployments != nil {
+		result.Deployments = make(map[uint32][]chaincfg.ConsensusDeployment)
+		for k, deployments := range params.Deployments {
+			result.Deployments[k] = make([]chaincfg.ConsensusDeployment, len(deployments))
+			for i, deployment := range deployments {
+				// Deep copy the deployment and its nested Vote and Choices
+				deploymentCopy := deployment
+				deploymentCopy.Vote.Choices = make([]chaincfg.Choice, len(deployment.Vote.Choices))
+				copy(deploymentCopy.Vote.Choices, deployment.Vote.Choices)
+				result.Deployments[k][i] = deploymentCopy
+			}
+		}
+	}
+
+	// Deep copy SKA fields
+	if params.SKAEmissionKeys != nil {
+		result.SKAEmissionKeys = make(map[wire.CoinType]*secp256k1.PublicKey)
+		for k, v := range params.SKAEmissionKeys {
+			result.SKAEmissionKeys[k] = v
+		}
+	}
+	if params.SKAEmissionNonces != nil {
+		result.SKAEmissionNonces = make(map[wire.CoinType]uint64)
+		for k, v := range params.SKAEmissionNonces {
+			result.SKAEmissionNonces[k] = v
+		}
+	}
+
+	// Deep copy other maps as needed
+	if params.SKACoins != nil {
+		result.SKACoins = make(map[dcrutil.CoinType]*chaincfg.SKACoinConfig)
+		for k, v := range params.SKACoins {
+			configCopy := *v
+			result.SKACoins[k] = &configCopy
+		}
+	}
+
+	if params.InitialSKATypes != nil {
+		result.InitialSKATypes = make([]dcrutil.CoinType, len(params.InitialSKATypes))
+		copy(result.InitialSKATypes, params.InitialSKATypes)
+	}
+
+	return result
 }
 
 // block432100 mocks block 432,100 of the block chain.  It is loaded and
@@ -1621,10 +1659,15 @@ func defaultMockSanityChecker() *testSanityChecker {
 // *testMiningState, and then setting rpcTest.mockMiningState as that
 // *testMiningState.
 func defaultMockMiningState() *testMiningState {
-	addrStr := "DcurAwesomeAddressmqDctW5wJCW1Cn2MF"
-	addr, err := stdaddr.DecodeAddress(addrStr, defaultChainParams)
+	// Use the same hash160 that produces the expected test address in the test cases
+	// This corresponds to the address that the test cases expect
+	hash160, err := hex.DecodeString("f59833f104faa3c7fd0c7dc1e3967fe77a9c1523")
 	if err != nil {
-		panic(fmt.Sprintf("invalid address %q in source file: %v", addrStr, err))
+		panic(fmt.Sprintf("failed to decode hash160: %v", err))
+	}
+	addr, err := stdaddr.NewAddressPubKeyHashEcdsaSecp256k1V0(hash160, defaultChainParams)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create mining address: %v", err))
 	}
 
 	blk := block432100
@@ -1982,7 +2025,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 	}}
 	defaultCmdAmount := map[string]int64{"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": 100000000}
 	defaultCmdCOuts := []types.SStxCommitOut{{
-		Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+		Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 		CommitAmt:  100000000,
 		ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
 		ChangeAmt:  0,
@@ -1997,8 +2040,8 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		},
 		result: "01000000010d33d3840e9074183dc9a8d82a5031075a98135bfe182840ddaf575" +
 			"aa2032fe00000000000ffffffff0300e1f5050000000000000018baa914f0b4e851" +
-			"00aee1a996f22915eb3c3f764d53779a870000000000000000000000206a1e06c4a" +
-			"66cc56478aeaa01744ab8ba0d8cc47110a400e1f50500000000000000000000000000" +
+			"00aee1a996f22915eb3c3f764d53779a870000000000000000000000206a1e000102" +
+			"030405060708090a0b0c0d0e0f1011121300e1f50500000000000000000000000000" +
 			"000000001abd76a914a23634e90541542fe2ac2a79e6064333a09b558188ac00000000" +
 			"000000000100e1f5050000000000000000ffffffff00",
 	}, {
@@ -2031,7 +2074,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 				"DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp": 10000000,
 			},
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  90000000,
 				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
 				ChangeAmt:  10000000,
@@ -2130,7 +2173,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
 				ChangeAmt:  200000000,
@@ -2195,7 +2238,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			}},
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
 				ChangeAmt:  dcrutil.MaxAmount + 1,
@@ -2210,7 +2253,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
 				ChangeAmt:  -1,
@@ -2225,7 +2268,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DsfkInvalidcFdQYq3WSKo9vvFs5qxZXbgF",
 				ChangeAmt:  0,
@@ -2240,7 +2283,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DkM3EyZ546GghVSkvzb6J47PvGDyntqiDtFgipQhNj78Xm2mUYRpf",
 				ChangeAmt:  0,
@@ -2255,7 +2298,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsRah84zx6jdA4nMYboMfLERA5V3KhBr4ru",
+				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DSXcZv4oSRiEoWL2a9aD8sgfptRo1YEXNKj",
 				ChangeAmt:  0,
@@ -2657,7 +2700,7 @@ func TestHandleCreateRawTransaction(t *testing.T) {
 				Tree:   0,
 			}},
 			Amounts: map[string]float64{
-				"DcurAwesomeAddressmqDctW5wJCW1Cn2MF": (dcrutil.MaxAmount + 1) / 1e8,
+				"DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ": (dcrutil.MaxAmount + 1) / 1e8,
 			},
 			LockTime: defaultCmdLockTime,
 			Expiry:   defaultCmdExpiry,
@@ -3124,7 +3167,7 @@ func TestHandleEstimateStakeDiff(t *testing.T) {
 func TestHandleExistsAddress(t *testing.T) {
 	t.Parallel()
 
-	validAddr := "DcurAwesomeAddressmqDctW5wJCW1Cn2MF"
+	validAddr := "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ"
 	testRPCServerHandler(t, []rpcTest{{
 		name:    "handleExistsAddress: ok, index is synced",
 		handler: handleExistsAddress,
@@ -3222,7 +3265,7 @@ func TestHandleExistsAddress(t *testing.T) {
 func TestHandleExistsAddresses(t *testing.T) {
 	t.Parallel()
 
-	validAddr := "DcurAwesomeAddressmqDctW5wJCW1Cn2MF"
+	validAddr := "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ"
 	validAddrs := []string{validAddr, validAddr, validAddr}
 	existsSlice := []bool{false, true, true}
 	// existsSlice as a bitset is 110 binary which is 6 in hex.

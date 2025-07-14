@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	dcrutil "github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
@@ -257,6 +258,32 @@ type DNSSeed struct {
 // String returns the hostname of the DNS seed in human-readable form.
 func (d DNSSeed) String() string {
 	return d.Host
+}
+
+// SKAEmissionAuth represents cryptographic authorization for SKA emission.
+// This structure provides replay protection and ensures only authorized
+// entities can create SKA emission transactions.
+type SKAEmissionAuth struct {
+	// EmissionKey is the master public key authorized for this coin type emission
+	EmissionKey *secp256k1.PublicKey
+
+	// Signature is the ECDSA signature proving authorization
+	Signature []byte
+
+	// Nonce provides replay protection - must be unique per coin type
+	Nonce uint64
+
+	// CoinType specifies which SKA coin type this authorization covers (1-255)
+	CoinType wire.CoinType
+
+	// Amount is the total amount authorized for emission
+	Amount int64
+
+	// Height is the target block height for this emission
+	Height int64
+
+	// Timestamp when this authorization was created
+	Timestamp int64
 }
 
 // Params defines a Decred network by its parameters.  These parameters may be
@@ -665,6 +692,14 @@ type Params struct {
 	// single transaction output. This prevents overflow issues.
 	SKAMaxAmount int64
 
+	// SKAEmissionKeys maps coin types to their authorized emission public keys.
+	// Only transactions signed by the corresponding private key are valid emissions.
+	SKAEmissionKeys map[wire.CoinType]*secp256k1.PublicKey
+
+	// SKAEmissionNonces tracks the last used nonce for each coin type to prevent
+	// replay attacks. Each emission must use nonce = last_nonce + 1.
+	SKAEmissionNonces map[wire.CoinType]uint64
+
 	// SKAMinRelayTxFee is the minimum fee rate for SKA transactions to be
 	// relayed by the network. This is separate from VAR transaction fees.
 	SKAMinRelayTxFee int64
@@ -847,6 +882,12 @@ func hexDecode(hexStr string) []byte {
 	return b
 }
 
+// mustParseHex is an alias for hexDecode for consistency with emission key parsing.
+// It decodes the passed hex string and panics if an error occurs.
+func mustParseHex(hexStr string) []byte {
+	return hexDecode(hexStr)
+}
+
 // hexToBigInt converts the passed hex string into a big integer and will panic
 // if there is an error.  This is only provided for the hard-coded constants so
 // errors in the source code can be detected. It will only (and must only) be
@@ -938,4 +979,37 @@ func (p *Params) GetAllSKATypes() []dcrutil.CoinType {
 		all = append(all, coinType)
 	}
 	return all
+}
+
+// GetSKAEmissionKey returns the authorized emission public key for the specified
+// coin type. Returns nil if no key is configured for this coin type.
+func (p *Params) GetSKAEmissionKey(coinType wire.CoinType) *secp256k1.PublicKey {
+	if p.SKAEmissionKeys == nil {
+		return nil
+	}
+	return p.SKAEmissionKeys[coinType]
+}
+
+// GetSKAEmissionNonce returns the last used nonce for the specified coin type.
+// Returns 0 if no nonce has been used yet.
+func (p *Params) GetSKAEmissionNonce(coinType wire.CoinType) uint64 {
+	if p.SKAEmissionNonces == nil {
+		return 0
+	}
+	return p.SKAEmissionNonces[coinType]
+}
+
+// SetSKAEmissionNonce updates the last used nonce for the specified coin type.
+// This should be called after a successful emission to prevent replay attacks.
+func (p *Params) SetSKAEmissionNonce(coinType wire.CoinType, nonce uint64) {
+	if p.SKAEmissionNonces == nil {
+		p.SKAEmissionNonces = make(map[wire.CoinType]uint64)
+	}
+	p.SKAEmissionNonces[coinType] = nonce
+}
+
+// IsSKAEmissionAuthorized returns true if the provided coin type has an
+// authorized emission key configured.
+func (p *Params) IsSKAEmissionAuthorized(coinType wire.CoinType) bool {
+	return p.GetSKAEmissionKey(coinType) != nil
 }
