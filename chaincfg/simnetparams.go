@@ -630,6 +630,14 @@ func SimNetParams() *Params {
 				EmissionWindow: 100,       // 100-block emission window for testing
 				Active:         true,
 				Description:    "Primary SKA coin type for simnet testing",
+				// Governance-approved emission distribution for simnet testing
+				EmissionAddresses: []string{
+					"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc", // Full amount to treasury for testing
+					// Priv key: PsUQzmmSVH2Ry6tGp9NygLRdLAXsRGio9EV4B23sqdYHFer3j7Fhb
+				},
+				EmissionAmounts: []int64{
+					1e6 * 1e8, // 1,000,000 SKA-1 to treasury
+				},
 			},
 			2: {
 				CoinType:       2,
@@ -640,6 +648,13 @@ func SimNetParams() *Params {
 				EmissionWindow: 100,       // 100-block emission window for testing
 				Active:         false,     // Initially inactive
 				Description:    "Secondary SKA coin type for simnet testing",
+				// Governance-approved emission distribution for simnet testing
+				EmissionAddresses: []string{
+					"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc", // Full amount to treasury
+				},
+				EmissionAmounts: []int64{
+					5e5 * 1e8, // 500,000 SKA-2 to treasury
+				},
 			},
 		},
 

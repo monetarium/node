@@ -99,22 +99,13 @@ func TestSKATransactionValidation(t *testing.T) {
 			}
 
 			// Test SKA emission detection
-			if len(test.tx.TxIn) == 1 {
-				prevOut := test.tx.TxIn[0].PreviousOutPoint
-				sigScript := test.tx.TxIn[0].SignatureScript
-
-				isEmission := prevOut.Hash.IsEqual(&chainhash.Hash{}) &&
-					prevOut.Index == 0xffffffff &&
-					len(sigScript) >= 4 &&
-					string(sigScript[len(sigScript)-3:]) == "SKA"
-
-				if isEmission && !test.expectError {
-					t.Errorf("Expected SKA emission transaction to be rejected")
-				}
-				if isEmission && test.expectError && test.errorMsg == "SKA emission transaction" {
-					// This is the expected case - emission transactions should be rejected
-					return
-				}
+			isEmission := wire.IsSKAEmissionTransaction(test.tx)
+			if isEmission && !test.expectError {
+				t.Errorf("Expected SKA emission transaction to be rejected")
+			}
+			if isEmission && test.expectError && test.errorMsg == "SKA emission transaction" {
+				// This is the expected case - emission transactions should be rejected
+				return
 			}
 
 			// Test SKA activation check

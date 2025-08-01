@@ -342,6 +342,17 @@ func (view *UtxoViewpoint) connectRegularTransaction(tx *dcrutil.Tx,
 		return nil
 	}
 
+	// SKA emission transactions don't have any inputs to spend (similar to coinbase).
+	if wire.IsSKAEmissionTransaction(msgTx) {
+		// Add the transaction's outputs as available utxos.
+		view.AddTxOuts(tx, blockHeight, blockIndex, isTreasuryEnabled)
+
+		// Keep track of in-flight transactions in order detect spends of
+		// earlier outputs by transactions later in the same block.
+		inFlightTx[*tx.Hash()] = blockIndex
+		return nil
+	}
+
 	// Spend the referenced utxos by marking them spent in the view and, if a
 	// slice was provided for the spent txout details, append an entry to it.
 	for _, txIn := range msgTx.TxIn {

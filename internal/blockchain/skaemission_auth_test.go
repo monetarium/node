@@ -54,7 +54,7 @@ func TestEmissionAuthorizationBasic(t *testing.T) {
 	amounts := []int64{1000000}
 
 	// Create authorization hash and sign it
-	authHash, err := createEmissionAuthHash(auth, addresses, amounts)
+	authHash, err := CreateEmissionAuthHash(auth, addresses, amounts)
 	if err != nil {
 		t.Fatalf("Failed to create auth hash: %v", err)
 	}

@@ -227,6 +227,21 @@ type GetSKAInfoResult struct {
 	Description string `json:"description"`
 }
 
+// GetEmissionStatusResult models the data returned from the getemissionstatus command.
+type GetEmissionStatusResult struct {
+	CoinType       uint8  `json:"cointype"`       // SKA coin type (1-255)
+	EmissionHeight int64  `json:"emissionheight"` // Start of emission window
+	EmissionWindow int64  `json:"emissionwindow"` // Window size in blocks
+	CurrentHeight  int64  `json:"currentheight"`  // Current block height
+	WindowActive   bool   `json:"windowactive"`   // Is emission window currently active
+	WindowStart    int64  `json:"windowstart"`    // Emission window start height
+	WindowEnd      int64  `json:"windowend"`      // Emission window end height
+	CurrentNonce   uint64 `json:"currentnonce"`   // Last used nonce for replay protection
+	NextNonce      uint64 `json:"nextnonce"`      // Required nonce for next emission
+	AlreadyEmitted bool   `json:"alreadyemitted"` // Has this coin type been emitted
+	MaxSupply      int64  `json:"maxsupply"`      // Maximum supply for this coin type
+}
+
 // GetChainTipsResult models the data returns from the getchaintips command.
 type GetChainTipsResult struct {
 	Height    int64  `json:"height"`

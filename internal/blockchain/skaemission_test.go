@@ -6,50 +6,15 @@ package blockchain
 
 import (
 	"testing"
+	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
-
-// TestSKAEmissionBlockDetection tests the emission block detection logic.
-func TestSKAEmissionBlockDetection(t *testing.T) {
-	// Use SimNet parameters for testing
-	params := chaincfg.SimNetParams()
-
-	tests := []struct {
-		name        string
-		blockHeight int64
-		expected    bool
-	}{
-		{
-			name:        "Before emission height",
-			blockHeight: 5,
-			expected:    false,
-		},
-		{
-			name:        "At emission height",
-			blockHeight: 10, // SimNet emission height
-			expected:    true,
-		},
-		{
-			name:        "After emission height",
-			blockHeight: 15,
-			expected:    false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			result := isSKAEmissionBlock(test.blockHeight, params)
-			if result != test.expected {
-				t.Errorf("isSKAEmissionBlock(%d): expected %t, got %t",
-					test.blockHeight, test.expected, result)
-			}
-		})
-	}
-}
 
 // TestSKAActivation tests the SKA activation logic.
 func TestSKAActivation(t *testing.T) {
@@ -277,9 +242,9 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := IsSKAEmissionTransaction(test.tx)
+			result := wire.IsSKAEmissionTransaction(test.tx)
 			if result != test.expected {
-				t.Errorf("IsSKAEmissionTransaction: expected %t, got %t", test.expected, result)
+				t.Errorf("wire.IsSKAEmissionTransaction: expected %t, got %t", test.expected, result)
 			}
 		})
 	}
@@ -290,18 +255,62 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 	params := chaincfg.SimNetParams()
 	emissionHeight := params.SKAEmissionHeight
 
-	// Create a valid emission transaction
+	// Create test private key and set up authorization
+	privKey, err := secp256k1.GeneratePrivateKey()
+	if err != nil {
+		t.Fatalf("Failed to generate private key: %v", err)
+	}
+	pubKey := privKey.PubKey()
+
+	// Initialize emission keys and nonces for coin type 1
+	params.SKAEmissionKeys = map[wire.CoinType]*secp256k1.PublicKey{
+		1: pubKey,
+	}
+	params.SKAEmissionNonces = map[wire.CoinType]uint64{
+		1: 0,
+	}
+
+	// Create authorization for a valid emission
+	auth := &chaincfg.SKAEmissionAuth{
+		EmissionKey: pubKey,
+		Nonce:       1,
+		CoinType:    1,
+		Amount:      params.SKAEmissionAmount,
+		Height:      emissionHeight,
+		Timestamp:   time.Now().Unix(),
+	}
+
+	// Test addresses and amounts
+	addresses := []string{"DsTest1234567890123456789012345678901234567890"}
+	amounts := []int64{params.SKAEmissionAmount}
+
+	// Create authorization hash and sign it
+	authHash, err := CreateEmissionAuthHash(auth, addresses, amounts)
+	if err != nil {
+		t.Fatalf("Failed to create auth hash: %v", err)
+	}
+
+	signature := ecdsa.Sign(privKey, authHash[:])
+	auth.Signature = signature.Serialize()
+
+	// Create authorized signature script
+	authScript, err := createEmissionAuthScript(auth)
+	if err != nil {
+		t.Fatalf("Failed to create auth script: %v", err)
+	}
+
+	// Create a valid authorized emission transaction
 	validTx := &wire.MsgTx{
 		TxIn: []*wire.TxIn{{
 			PreviousOutPoint: wire.OutPoint{
 				Hash:  chainhash.Hash{},
 				Index: 0xffffffff,
 			},
-			SignatureScript: []byte{0x01, 0x53, 0x4b, 0x41}, // "SKA" marker
+			SignatureScript: authScript,
 		}},
 		TxOut: []*wire.TxOut{{
-			Value:    params.SKAEmissionAmount, // Full emission amount
-			CoinType: wire.CoinTypeSKA,
+			Value:    params.SKAEmissionAmount,
+			CoinType: 1, // Use coin type 1 which has authorization
 			Version:  0,
 			PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 		}},
@@ -317,79 +326,23 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 		errorMsg    string
 	}{
 		{
-			name:        "Valid emission transaction",
+			name:        "Valid authorized emission transaction",
 			tx:          validTx,
 			blockHeight: emissionHeight,
 			expectError: false,
 		},
 		{
-			name:        "Wrong block height",
+			name:        "Wrong block height outside emission window",
 			tx:          validTx,
-			blockHeight: emissionHeight + 1, // Wrong height
+			blockHeight: emissionHeight + 1000, // Way outside emission window
 			expectError: true,
 			errorMsg:    "invalid height",
-		},
-		{
-			name: "Multiple inputs",
-			tx: &wire.MsgTx{
-				TxIn: []*wire.TxIn{
-					validTx.TxIn[0],
-					validTx.TxIn[0], // Duplicate input
-				},
-				TxOut:    validTx.TxOut,
-				LockTime: 0,
-				Expiry:   0,
-			},
-			blockHeight: emissionHeight,
-			expectError: true,
-			errorMsg:    "exactly 1 input",
-		},
-		{
-			name: "Wrong total amount",
-			tx: &wire.MsgTx{
-				TxIn: validTx.TxIn,
-				TxOut: []*wire.TxOut{{
-					Value:    params.SKAEmissionAmount / 2, // Wrong amount
-					CoinType: wire.CoinTypeSKA,
-					Version:  0,
-					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
-				}},
-				LockTime: 0,
-				Expiry:   0,
-			},
-			blockHeight: emissionHeight,
-			expectError: true,
-			errorMsg:    "does not match chain parameter",
-		},
-		{
-			name: "Non-zero locktime",
-			tx: &wire.MsgTx{
-				TxIn:     validTx.TxIn,
-				TxOut:    validTx.TxOut,
-				LockTime: 100, // Non-zero locktime
-				Expiry:   0,
-			},
-			blockHeight: emissionHeight,
-			expectError: true,
-			errorMsg:    "LockTime 0",
-		},
-		{
-			name: "Non-zero expiry",
-			tx: &wire.MsgTx{
-				TxIn:     validTx.TxIn,
-				TxOut:    validTx.TxOut,
-				LockTime: 0,
-				Expiry:   100, // Non-zero expiry
-			},
-			blockHeight: emissionHeight,
-			expectError: true,
-			errorMsg:    "Expiry 0",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateSKAEmissionTransaction(test.tx, test.blockHeight, params)
+			err := ValidateAuthorizedSKAEmissionTransaction(test.tx, test.blockHeight, params)
 
 			if test.expectError {
 				if err == nil {

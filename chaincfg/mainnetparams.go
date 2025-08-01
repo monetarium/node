@@ -601,6 +601,17 @@ func MainNetParams() *Params {
 				EmissionWindow: 4320,       // 30-day emission window (~144 blocks/day * 30)
 				Active:         true,
 				Description:    "Primary asset-backed SKA coin type for mainnet",
+				// Governance-approved emission distribution (TO BE REPLACED WITH REAL ADDRESSES)
+				EmissionAddresses: []string{
+					"DsExampleTreasuryAddress1234567890", // Treasury fund (70%)
+					"DsExampleDevFundAddress1234567890",  // Development fund (20%)
+					"DsExampleStakingAddress1234567890",  // Staking rewards (10%)
+				},
+				EmissionAmounts: []int64{
+					7e6 * 1e8, // 7,000,000 SKA-1 to treasury
+					2e6 * 1e8, // 2,000,000 SKA-1 to development
+					1e6 * 1e8, // 1,000,000 SKA-1 to staking rewards
+				},
 			},
 			2: {
 				CoinType:       2,
@@ -611,6 +622,13 @@ func MainNetParams() *Params {
 				EmissionWindow: 4320,      // 30-day emission window (~144 blocks/day * 30)
 				Active:         false,     // Not yet active, for proof of concept
 				Description:    "Secondary SKA coin type for proof of concept testing",
+				// Governance-approved emission distribution (TO BE REPLACED WITH REAL ADDRESSES)
+				EmissionAddresses: []string{
+					"DsExampleTreasuryAddress1234567890", // Full amount to treasury
+				},
+				EmissionAmounts: []int64{
+					5e6 * 1e8, // 5,000,000 SKA-2 to treasury
+				},
 			},
 		},
 

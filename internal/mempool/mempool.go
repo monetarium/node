@@ -1277,31 +1277,24 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 		return nil, txRuleError(ErrTreasurybase, str)
 	}
 
-	// A standalone transaction must not be a coinbase transaction.
-	if standalone.IsCoinBaseTx(msgTx, isTreasuryEnabled) {
-		str := fmt.Sprintf("transaction %v is an individual coinbase",
-			txHash)
-		return nil, txRuleError(ErrCoinbase, str)
-	}
-
-	// SKA emission transactions are only allowed during active emission windows.
-	if blockchain.IsSKAEmissionTransaction(msgTx) {
-		// Get the current height and check if any emission window is active
+	// SKA emission transactions require full cryptographic authorization.
+	// Check this BEFORE coinbase check since SKA emissions have null previous outputs.
+	if wire.IsSKAEmissionTransaction(msgTx) {
+		// Get the next block height for validation
 		bestHeight := mp.cfg.BestHeight()
 		nextBlockHeight := bestHeight + 1
 
-		// Check if any emission window is active for the next block
-		if !isEmissionWindowActiveForMempool(nextBlockHeight, mp.cfg.ChainParams) {
-			str := fmt.Sprintf("transaction %v is an SKA emission transaction "+
-				"but no emission window is active (height %d)", txHash, nextBlockHeight)
-			return nil, txRuleError(ErrInvalid, str)
-		}
-
-		// Validate that this emission transaction is for a coin type with an active window
-		if err := validateEmissionTransactionForMempool(msgTx, nextBlockHeight, mp.cfg.ChainParams); err != nil {
+		// Perform full cryptographic validation including governance authorization
+		if err := blockchain.ValidateAuthorizedSKAEmissionTransaction(msgTx, nextBlockHeight, mp.cfg.ChainParams); err != nil {
 			str := fmt.Sprintf("transaction %v is an invalid SKA emission transaction: %v", txHash, err)
 			return nil, txRuleError(ErrInvalid, str)
 		}
+	} else if standalone.IsCoinBaseTx(msgTx, isTreasuryEnabled) {
+		// A standalone transaction must not be a coinbase transaction.
+		// SKA emissions are excluded above since they also have null previous outputs.
+		str := fmt.Sprintf("transaction %v is an individual coinbase",
+			txHash)
+		return nil, txRuleError(ErrCoinbase, str)
 	}
 
 	// Get the current height of the main chain.  A standalone transaction
@@ -1487,8 +1480,9 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	// don't exist or are already spent.
 	var missingParents []wire.OutPoint
 	var updateFraudProof bool
+	isSKAEmission := wire.IsSKAEmissionTransaction(msgTx)
 	for i, txIn := range msgTx.TxIn {
-		if (i == 0 && isVote) || isTSpend {
+		if (i == 0 && isVote) || isTSpend || isSKAEmission {
 			continue
 		}
 
@@ -1627,6 +1621,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	// the maximum allowed signature operations per block.
 	numP2SHSigOps, err := blockchain.CountP2SHSigOps(tx, false,
 		(txType == stake.TxTypeSSGen), utxoView, isTreasuryEnabled)
+
 	if err != nil {
 		var cerr blockchain.RuleError
 		if errors.As(err, &cerr) {
@@ -1670,10 +1665,11 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	primaryCoinType := mp.determinePrimaryCoinType(msgTx)
 
 	// Use enhanced fee calculator for validation if available
+	// Note: isSKAEmission already calculated earlier in function
 	if mp.feeCalculator != nil {
 		err := mp.feeCalculator.ValidateTransactionFees(txFee, serializedSize,
 			primaryCoinType, allowHighFees)
-		if err != nil && (txType == stake.TxTypeRegular || isTicket || isTreasuryAdd || isTSpend) {
+		if err != nil && !isSKAEmission && (txType == stake.TxTypeRegular || isTicket || isTreasuryAdd || isTSpend) {
 			var txTypeStr string
 			switch {
 			case txType == stake.TxTypeRegular:
@@ -1692,7 +1688,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 		// Fallback to legacy fee validation if fee calculator not available
 		minFee := mp.calculateLegacyMinFee(msgTx, serializedSize, primaryCoinType)
 
-		if txFee < minFee && (txType == stake.TxTypeRegular || isTicket ||
+		if txFee < minFee && !isSKAEmission && (txType == stake.TxTypeRegular || isTicket ||
 			isTreasuryAdd || isTSpend) {
 
 			var txTypeStr string
@@ -2596,58 +2592,4 @@ func (mp *TxPool) RecordConfirmedTransaction(tx *dcrutil.Tx, fee int64) {
 		txSize := int64(msgTx.SerializeSize())
 		mp.feeCalculator.RecordTransactionFee(primaryCoinType, fee, txSize, true) // true = confirmed
 	}
-}
-
-// isEmissionWindowActiveForMempool checks if any emission window is active for mempool validation
-func isEmissionWindowActiveForMempool(blockHeight int64, chainParams *chaincfg.Params) bool {
-	for coinType := range chainParams.SKACoins {
-		config := chainParams.SKACoins[coinType]
-		if config == nil {
-			continue
-		}
-
-		emissionStart := int64(config.EmissionHeight)
-		emissionEnd := emissionStart + int64(config.EmissionWindow)
-
-		// If EmissionWindow is 0, only allow emission at exact height
-		if config.EmissionWindow == 0 {
-			if blockHeight == emissionStart {
-				return true
-			}
-		} else {
-			if blockHeight >= emissionStart && blockHeight <= emissionEnd {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// validateEmissionTransactionForMempool validates an emission transaction for mempool acceptance
-func validateEmissionTransactionForMempool(msgTx *wire.MsgTx, blockHeight int64, chainParams *chaincfg.Params) error {
-	// Check that all outputs are for coin types with active emission windows
-	for _, txOut := range msgTx.TxOut {
-		coinType := dcrutil.CoinType(txOut.CoinType)
-		config, exists := chainParams.SKACoins[coinType]
-		if !exists {
-			return fmt.Errorf("coin type %d not configured", coinType)
-		}
-
-		emissionStart := int64(config.EmissionHeight)
-		emissionEnd := emissionStart + int64(config.EmissionWindow)
-
-		// Check if this coin type's emission window is active
-		if config.EmissionWindow == 0 {
-			if blockHeight != emissionStart {
-				return fmt.Errorf("coin type %d emission window not active at height %d", coinType, blockHeight)
-			}
-		} else {
-			if blockHeight < emissionStart || blockHeight > emissionEnd {
-				return fmt.Errorf("coin type %d emission window not active at height %d (window: %d-%d)",
-					coinType, blockHeight, emissionStart, emissionEnd)
-			}
-		}
-	}
-
-	return nil
 }

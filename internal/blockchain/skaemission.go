@@ -19,38 +19,18 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
-// isSKAEmissionBlock returns whether or not the provided block is the SKA
-// emission block as defined by the chain parameters.
-// NOTE: This function is deprecated and only supports SKA-1 emission.
-// Use isSKAEmissionWindow for multi-coin support.
-func isSKAEmissionBlock(blockHeight int64, chainParams *chaincfg.Params) bool {
-	return blockHeight == chainParams.SKAEmissionHeight
-}
-
 // isSKAEmissionWindow returns whether the provided block height is within
 // the emission window for the specified SKA coin type.
 func isSKAEmissionWindow(blockHeight int64, coinType dcrutil.CoinType, chainParams *chaincfg.Params) bool {
 	config, exists := chainParams.SKACoins[coinType]
 	if !exists {
-		log.Debugf("SKA coin type %d not configured in chain parameters", coinType)
 		return false
 	}
 
 	emissionStart := int64(config.EmissionHeight)
 	emissionEnd := emissionStart + int64(config.EmissionWindow)
 
-	// If EmissionWindow is 0, only allow emission at exact height (backward compatibility)
-	if config.EmissionWindow == 0 {
-		result := blockHeight == emissionStart
-		log.Debugf("SKA coin type %d emission window check (exact height): height=%d, required=%d, result=%t",
-			coinType, blockHeight, emissionStart, result)
-		return result
-	}
-
-	result := blockHeight >= emissionStart && blockHeight <= emissionEnd
-	log.Debugf("SKA coin type %d emission window check: height=%d, window=%d-%d, result=%t",
-		coinType, blockHeight, emissionStart, emissionEnd, result)
-	return result
+	return blockHeight >= emissionStart && blockHeight <= emissionEnd
 }
 
 // isSKAEmissionWindowActive returns whether any SKA coin type has an active
@@ -65,17 +45,65 @@ func isSKAEmissionWindowActive(blockHeight int64, chainParams *chaincfg.Params) 
 }
 
 // CheckSKAEmissionAlreadyExists checks if a coin type has already been emitted
-// in the blockchain. This function would need to be called with blockchain state
-// to implement "first valid emission wins" logic.
-// TODO: This function needs blockchain state access to check emission history
-func CheckSKAEmissionAlreadyExists(coinType dcrutil.CoinType, blockHeight int64, chainParams *chaincfg.Params) bool {
-	// This is a placeholder implementation. In a full implementation, this would:
-	// 1. Check the blockchain state for existing emission transactions
-	// 2. Look for UTXO entries created by emission transactions for this coin type
-	// 3. Return true if any emission has already occurred
+// in the blockchain by scanning emission window blocks for existing emissions.
+// This implements secure "first valid emission wins" logic using blockchain state.
+func CheckSKAEmissionAlreadyExists(coinType dcrutil.CoinType, chain *BlockChain, chainParams *chaincfg.Params) bool {
+	// Check if coin type is configured
+	config, exists := chainParams.SKACoins[coinType]
+	if !exists {
+		return false // Coin type not configured
+	}
 
-	// For now, we'll implement basic window validation
-	// The actual "first emission wins" logic will be enforced by the UTXO validation
+	// Calculate emission window boundaries
+	emissionStart := int64(config.EmissionHeight)
+	emissionEnd := emissionStart + int64(config.EmissionWindow)
+
+	// Get the current chain tip height to avoid scanning beyond current state
+	tipHeight := chain.BestSnapshot().Height
+	if emissionStart > tipHeight {
+		return false // Emission hasn't started yet
+	}
+
+	// Limit scan to current chain height
+	if emissionEnd > tipHeight {
+		emissionEnd = tipHeight
+	}
+
+	// Scan blocks in emission window for existing emission transactions
+	for height := emissionStart; height <= emissionEnd; height++ {
+		// Fetch block hash at this height
+		blockHash, err := chain.BlockHashByHeight(height)
+		if err != nil {
+			// If we can't fetch the block hash, assume no emission exists
+			// This handles edge cases like chain reorganizations
+			continue
+		}
+
+		// Fetch the block
+		block, err := chain.BlockByHash(blockHash)
+		if err != nil {
+			// If we can't fetch the block, assume no emission exists
+			continue
+		}
+
+		// Check all transactions in this block
+		for _, tx := range block.Transactions() {
+			msgTx := tx.MsgTx()
+
+			// Check if this is an emission transaction
+			if wire.IsSKAEmissionTransaction(msgTx) {
+				// Check if this emission transaction contains outputs for our target coin type
+				for _, txOut := range msgTx.TxOut {
+					if dcrutil.CoinType(txOut.CoinType) == coinType {
+						// Found an existing emission for this coin type
+						return true
+					}
+				}
+			}
+		}
+	}
+
+	// No existing emission found for this coin type
 	return false
 }
 
@@ -236,7 +264,7 @@ func CreateAuthorizedSKAEmissionTransaction(auth *chaincfg.SKAEmissionAuth,
 	}
 
 	// Create authorization hash for signature verification
-	authHash, err := createEmissionAuthHash(auth, emissionAddresses, amounts)
+	authHash, err := CreateEmissionAuthHash(auth, emissionAddresses, amounts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create authorization hash: %w", err)
 	}
@@ -304,7 +332,9 @@ func CreateAuthorizedSKAEmissionTransaction(auth *chaincfg.SKAEmissionAuth,
 // createEmissionAuthHash creates a hash of the emission authorization data
 // for signature verification. This ensures the signature covers all critical
 // emission parameters to prevent tampering.
-func createEmissionAuthHash(auth *chaincfg.SKAEmissionAuth, addresses []string, amounts []int64) ([32]byte, error) {
+// CreateEmissionAuthHash creates the authorization hash for SKA emission signing.
+// This is exported for use by dcrwallet.
+func CreateEmissionAuthHash(auth *chaincfg.SKAEmissionAuth, addresses []string, amounts []int64) ([32]byte, error) {
 	var buf bytes.Buffer
 
 	// Include all authorization fields in hash
@@ -359,6 +389,16 @@ func createEmissionAuthScript(auth *chaincfg.SKAEmissionAuth) ([]byte, error) {
 	// Coin type (1 byte)
 	script.WriteByte(uint8(auth.CoinType))
 
+	// Amount (8 bytes)
+	amountBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amountBytes, uint64(auth.Amount))
+	script.Write(amountBytes)
+
+	// Height (8 bytes)
+	heightBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(heightBytes, uint64(auth.Height))
+	script.Write(heightBytes)
+
 	// Public key (33 bytes compressed)
 	pubKeyBytes := auth.EmissionKey.SerializeCompressed()
 	script.Write(pubKeyBytes)
@@ -375,10 +415,17 @@ func createEmissionAuthScript(auth *chaincfg.SKAEmissionAuth) ([]byte, error) {
 func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	chainParams *chaincfg.Params) error {
 
-	// Check if this is the correct block for SKA emission
-	if !isSKAEmissionBlock(blockHeight, chainParams) {
-		return fmt.Errorf("SKA emission transaction at invalid height %d, expected %d",
-			blockHeight, chainParams.SKAEmissionHeight)
+	// Check if this is within a valid emission window for any SKA coin type
+	// We need to check the transaction outputs to determine the coin type
+	if len(tx.TxOut) == 0 {
+		return fmt.Errorf("SKA emission transaction must have at least 1 output")
+	}
+
+	// Get the coin type from the first output
+	coinType := dcrutil.CoinType(tx.TxOut[0].CoinType)
+	if !isSKAEmissionWindow(blockHeight, coinType, chainParams) {
+		return fmt.Errorf("SKA emission transaction at invalid height %d for coin type %d",
+			blockHeight, coinType)
 	}
 
 	// Validate transaction structure
@@ -387,20 +434,22 @@ func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 			len(tx.TxIn))
 	}
 
-	if len(tx.TxOut) == 0 {
-		return fmt.Errorf("SKA emission transaction must have at least 1 output")
-	}
-
 	// Validate null input (similar to coinbase validation)
 	prevOut := tx.TxIn[0].PreviousOutPoint
 	if !prevOut.Hash.IsEqual(&chainhash.Hash{}) || prevOut.Index != 0xffffffff {
 		return fmt.Errorf("SKA emission transaction input is not null")
 	}
 
-	// Validate signature script contains SKA marker
+	// Validate signature script contains authorized SKA marker
 	sigScript := tx.TxIn[0].SignatureScript
-	if len(sigScript) < 4 || string(sigScript[len(sigScript)-3:]) != "SKA" {
+	if len(sigScript) < 4 {
 		return fmt.Errorf("SKA emission transaction missing SKA marker in signature script")
+	}
+
+	// Check for authorized emission script format: [0x01][S][K][A]...
+	if !(len(sigScript) >= 4 && sigScript[0] == 0x01 &&
+		sigScript[1] == 0x53 && sigScript[2] == 0x4b && sigScript[3] == 0x41) {
+		return fmt.Errorf("SKA emission transaction missing authorized SKA marker in signature script")
 	}
 
 	// Validate all outputs are SKA outputs
@@ -447,20 +496,23 @@ func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	chainParams *chaincfg.Params) error {
 
-	// Check if this is the correct block for SKA emission
-	if !isSKAEmissionBlock(blockHeight, chainParams) {
-		return fmt.Errorf("SKA emission transaction at invalid height %d, expected %d",
-			blockHeight, chainParams.SKAEmissionHeight)
+	// Check if this is within a valid emission window for any SKA coin type
+	// We need to check the transaction outputs to determine the coin type
+	if len(tx.TxOut) == 0 {
+		return fmt.Errorf("SKA emission transaction must have at least 1 output")
+	}
+
+	// Get the coin type from the first output
+	coinType := dcrutil.CoinType(tx.TxOut[0].CoinType)
+	if !isSKAEmissionWindow(blockHeight, coinType, chainParams) {
+		return fmt.Errorf("SKA emission transaction at invalid height %d for coin type %d",
+			blockHeight, coinType)
 	}
 
 	// Validate transaction structure
 	if len(tx.TxIn) != 1 {
 		return fmt.Errorf("SKA emission transaction must have exactly 1 input, got %d",
 			len(tx.TxIn))
-	}
-
-	if len(tx.TxOut) == 0 {
-		return fmt.Errorf("SKA emission transaction must have at least 1 output")
 	}
 
 	// Validate null input (similar to coinbase validation)
@@ -547,16 +599,22 @@ func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 }
 
 // extractEmissionAuthorization extracts the emission authorization from a signature script.
-// The script format is: [SKA_marker][auth_version][nonce][coin_type][pubkey][sig_len][signature]
+// The script format is: [SKA_marker][auth_version][nonce][coin_type][amount][height][pubkey][sig_len][signature]
 func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, error) {
-	if len(sigScript) < 48 { // Minimum: 4(marker) + 1(version) + 8(nonce) + 1(cointype) + 33(pubkey) + 1(siglen) = 48
-		return nil, fmt.Errorf("signature script too short: %d bytes", len(sigScript))
+	// Debug: Print the full signature script
+	log.Debugf("Parsing signature script (len=%d): %x", len(sigScript), sigScript)
+
+	// Calculate minimum required length: 4(marker) + 1(version) + 8(nonce) + 1(cointype) + 8(amount) + 8(height) + 33(pubkey) + 1(siglen)
+	const minScriptLen = 4 + 1 + 8 + 1 + 8 + 8 + 33 + 1 // = 64 bytes
+	if len(sigScript) < minScriptLen {
+		return nil, fmt.Errorf("signature script too short: %d bytes, need at least %d bytes for format [SKA_marker:4][auth_version:1][nonce:8][coin_type:1][amount:8][height:8][pubkey:33][sig_len:1][signature:var]", len(sigScript), minScriptLen)
 	}
 
 	// Check SKA marker
 	if len(sigScript) < 4 || !bytes.Equal(sigScript[0:4], []byte{0x01, 0x53, 0x4b, 0x41}) {
 		return nil, fmt.Errorf("missing SKA emission marker")
 	}
+	log.Debugf("SKA marker found: %x", sigScript[0:4])
 
 	offset := 4
 
@@ -564,6 +622,7 @@ func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, 
 	if sigScript[offset] != 0x02 {
 		return nil, fmt.Errorf("unsupported authorization version: %d", sigScript[offset])
 	}
+	log.Debugf("Auth version: %d at offset %d", sigScript[offset], offset)
 	offset++
 
 	// Extract nonce (8 bytes)
@@ -571,6 +630,7 @@ func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, 
 		return nil, fmt.Errorf("insufficient data for nonce")
 	}
 	nonce := binary.LittleEndian.Uint64(sigScript[offset : offset+8])
+	log.Debugf("Nonce: %d from bytes %x at offset %d", nonce, sigScript[offset:offset+8], offset)
 	offset += 8
 
 	// Extract coin type (1 byte)
@@ -578,17 +638,50 @@ func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, 
 		return nil, fmt.Errorf("insufficient data for coin type")
 	}
 	coinType := wire.CoinType(sigScript[offset])
+	log.Debugf("Coin type: %d from byte %x at offset %d", coinType, sigScript[offset], offset)
 	offset++
+
+	// Extract amount (8 bytes)
+	if len(sigScript) < offset+8 {
+		return nil, fmt.Errorf("insufficient data for amount at offset %d, have %d bytes, need %d", offset, len(sigScript), offset+8)
+	}
+	amount := int64(binary.LittleEndian.Uint64(sigScript[offset : offset+8]))
+	log.Debugf("Amount: %d from bytes %x at offset %d", amount, sigScript[offset:offset+8], offset)
+
+	// Check if this looks like a public key instead of an amount (starts with 0x02 or 0x03)
+	if sigScript[offset] == 0x02 || sigScript[offset] == 0x03 {
+		return nil, fmt.Errorf("script format error: expected amount at offset %d but found what appears to be a compressed public key (starts with 0x%02x). The script format should be [SKA_marker:4][auth_version:1][nonce:8][coin_type:1][amount:8][height:8][pubkey:33][sig_len:1][signature:var] but this appears to be missing amount and height fields", offset, sigScript[offset])
+	}
+	offset += 8
+
+	// Extract height (8 bytes)
+	if len(sigScript) < offset+8 {
+		return nil, fmt.Errorf("insufficient data for height at offset %d, have %d bytes, need %d", offset, len(sigScript), offset+8)
+	}
+	height := int64(binary.LittleEndian.Uint64(sigScript[offset : offset+8]))
+	log.Debugf("Height: %d from bytes %x at offset %d", height, sigScript[offset:offset+8], offset)
+	offset += 8
 
 	// Extract public key (33 bytes compressed)
 	if len(sigScript) < offset+33 {
-		return nil, fmt.Errorf("insufficient data for public key")
+		return nil, fmt.Errorf("insufficient data for public key at offset %d, have %d bytes, need %d", offset, len(sigScript), offset+33)
 	}
 	pubKeyBytes := sigScript[offset : offset+33]
+	log.Debugf("Public key bytes: %x at offset %d", pubKeyBytes, offset)
+
+	// Validate public key format
+	if len(pubKeyBytes) != 33 {
+		return nil, fmt.Errorf("invalid public key length: expected 33 bytes, got %d", len(pubKeyBytes))
+	}
+	if pubKeyBytes[0] != 0x02 && pubKeyBytes[0] != 0x03 {
+		return nil, fmt.Errorf("invalid public key format: first byte should be 0x02 or 0x03 for compressed keys, got 0x%02x", pubKeyBytes[0])
+	}
+
 	pubKey, err := secp256k1.ParsePubKey(pubKeyBytes)
 	if err != nil {
 		return nil, fmt.Errorf("invalid public key: %w", err)
 	}
+	log.Debugf("Successfully parsed public key")
 	offset += 33
 
 	// Extract signature length
@@ -610,7 +703,8 @@ func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, 
 		Signature:   signature,
 		Nonce:       nonce,
 		CoinType:    coinType,
-		// Amount and Height will be validated separately
+		Amount:      amount,
+		Height:      height,
 	}, nil
 }
 
@@ -638,41 +732,6 @@ func validateEmissionAuthorization(auth *chaincfg.SKAEmissionAuth, chainParams *
 	return nil
 }
 
-// IsSKAEmissionTransaction returns whether the given transaction is an SKA
-// emission transaction based on its structure.
-func IsSKAEmissionTransaction(tx *wire.MsgTx) bool {
-	// Must have exactly one input
-	if len(tx.TxIn) != 1 {
-		return false
-	}
-
-	// Must have at least one output
-	if len(tx.TxOut) == 0 {
-		return false
-	}
-
-	// Input must be null (similar to coinbase)
-	prevOut := tx.TxIn[0].PreviousOutPoint
-	if !prevOut.Hash.IsEqual(&chainhash.Hash{}) || prevOut.Index != 0xffffffff {
-		return false
-	}
-
-	// Check for SKA marker in signature script
-	sigScript := tx.TxIn[0].SignatureScript
-	if len(sigScript) < 4 || string(sigScript[len(sigScript)-3:]) != "SKA" {
-		return false
-	}
-
-	// All outputs must be SKA outputs
-	for _, txOut := range tx.TxOut {
-		if txOut.CoinType != wire.CoinTypeSKA {
-			return false
-		}
-	}
-
-	return true
-}
-
 // CheckSKAEmissionInBlock validates SKA emission rules for a block at the given height.
 // This function enforces:
 // 1. SKA emission windows allow emission transactions during defined periods
@@ -680,10 +739,7 @@ func IsSKAEmissionTransaction(tx *wire.MsgTx) bool {
 // 3. No SKA transactions are allowed before activation height
 // 4. Each coin type can only be emitted once (first valid emission wins)
 func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
-	chainParams *chaincfg.Params) error {
-
-	// Check if this is the legacy SKA emission block (backward compatibility)
-	isLegacyEmissionBlock := isSKAEmissionBlock(blockHeight, chainParams)
+	chain *BlockChain, chainParams *chaincfg.Params) error {
 
 	// Check if any emission window is active
 	isEmissionWindowActive := isSKAEmissionWindowActive(blockHeight, chainParams)
@@ -699,28 +755,59 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 		msgTx := tx.MsgTx()
 
 		// Count SKA emission transactions
-		if IsSKAEmissionTransaction(msgTx) {
+		if wire.IsSKAEmissionTransaction(msgTx) {
 			emissionTxCount++
 
-			// Validate the emission transaction
-			if err := ValidateSKAEmissionTransaction(msgTx, blockHeight, chainParams); err != nil {
+			// Validate the emission transaction with full cryptographic authorization
+			if err := ValidateAuthorizedSKAEmissionTransaction(msgTx, blockHeight, chainParams); err != nil {
 				return fmt.Errorf("invalid SKA emission transaction at index %d: %w", i, err)
 			}
 
-			// Track which coin types are being emitted
+			// Track which coin types are being emitted and check for previous emissions
 			for _, txOut := range msgTx.TxOut {
 				coinType := dcrutil.CoinType(txOut.CoinType)
+
+				// Check for multiple emission transactions in the same block
 				if emissionTxCoinTypes[coinType] {
 					log.Errorf("Multiple emission transactions detected for coin type %d at height %d", coinType, blockHeight)
 					return fmt.Errorf("multiple emission transactions for coin type %d at height %d - only one emission per coin type allowed", coinType, blockHeight)
 				}
+
+				// Check if this coin type has already been emitted in previous blocks
+				//
+				// NOTE: This check provides defense-in-depth protection, but Decred's transaction
+				// hash mechanism already provides robust duplicate emission protection:
+				//
+				// **Hash-Based Protection (Primary Defense):**
+				// All emission transactions for the same coin type produce identical transaction hashes
+				// because the hash calculation (TxSerializeNoWitness) excludes witness data and only
+				// includes the transaction structure:
+				// - Input: null hash + 0xffffffff index + empty signature script
+				// - Output: governance-defined value + coin type + governance-defined script
+				// - LockTime + Expiry: always zero for emissions
+				//
+				// **Variables Excluded from Hash (in witness data):**
+				// - Nonce, authorization amount/height, public key, signature (all in signature script)
+				// - These can vary but don't affect the transaction hash
+				//
+				// **Automatic Rejection:**
+				// Identical hashes trigger ErrAlreadyExists in mempool, preventing duplicate emissions
+				// for the same coin type regardless of nonce, signature, or other witness variations.
+				//
+				// **This Function's Role:**
+				// Provides additional protection for sophisticated edge cases and explicit error messaging
+				// for emission-specific conflicts (vs generic "transaction already exists").
+				if CheckSKAEmissionAlreadyExists(coinType, chain, chainParams) {
+					log.Errorf("SKA coin type %d has already been emitted in previous blocks", coinType)
+					return fmt.Errorf("SKA coin type %d has already been emitted - only one emission per coin type allowed", coinType)
+				}
+
 				emissionTxCoinTypes[coinType] = true
-				log.Debugf("Tracking emission transaction for coin type %d at height %d", coinType, blockHeight)
 			}
 		}
 
 		// Count transactions with SKA outputs (excluding emission transactions)
-		if !IsSKAEmissionTransaction(msgTx) {
+		if !wire.IsSKAEmissionTransaction(msgTx) {
 			for _, txOut := range msgTx.TxOut {
 				if txOut.CoinType == wire.CoinTypeSKA {
 					skaTxCount++
@@ -731,10 +818,9 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 	}
 
 	// Validate emission rules based on block height
-	if isLegacyEmissionBlock || isEmissionWindowActive {
+	if isEmissionWindowActive {
 		// Emission transactions are allowed during emission windows
 		if emissionTxCount > 0 {
-			log.Debugf("Validating %d emission transactions at height %d", emissionTxCount, blockHeight)
 			// Validate that emission transactions are within their respective windows
 			for coinType := range emissionTxCoinTypes {
 				if !isSKAEmissionWindow(blockHeight, coinType, chainParams) {
@@ -758,7 +844,7 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 	}
 
 	// Before activation, no SKA transactions are allowed (except emission)
-	if !isActive && !isLegacyEmissionBlock && !isEmissionWindowActive && skaTxCount > 0 {
+	if !isActive && !isEmissionWindowActive && skaTxCount > 0 {
 		return fmt.Errorf("SKA transactions not allowed before activation height %d (current: %d)",
 			chainParams.SKAActivationHeight, blockHeight)
 	}

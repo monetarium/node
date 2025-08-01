@@ -418,6 +418,7 @@ func checkTransactionContext(tx *wire.MsgTx, params *chaincfg.Params, flags Agen
 	// Determine type.
 	var isCoinBase, isVote, isTicket, isRevocation bool
 	var isTreasuryBase, isTreasuryAdd, isTreasurySpend bool
+	var isSKAEmission bool
 	switch stake.DetermineTxType(tx) {
 	case stake.TxTypeSSGen:
 		isVote = true
@@ -432,12 +433,21 @@ func checkTransactionContext(tx *wire.MsgTx, params *chaincfg.Params, flags Agen
 	case stake.TxTypeTSpend:
 		isTreasurySpend = true
 	default:
-		// Determine if we are dealing with a coinbase.
-		isCoinBase = standalone.IsCoinBaseTx(tx, isTreasuryEnabled)
+		// Check for SKA emission transaction first
+		isSKAEmission = wire.IsSKAEmissionTransaction(tx)
+		if !isSKAEmission {
+			// Determine if we are dealing with a coinbase.
+			isCoinBase = standalone.IsCoinBaseTx(tx, isTreasuryEnabled)
+		}
 	}
 
 	// Take action on type.
 	switch {
+	case isSKAEmission:
+		// SKA emission transactions are validated separately.
+		// They are allowed to have null inputs during emission windows.
+		// Additional validation happens in mempool and block validation.
+
 	case isVote:
 		// Check script length of stake base signature.
 		slen := len(tx.TxIn[0].SignatureScript)
@@ -961,6 +971,116 @@ func checkBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, flags B
 // free.
 func CheckBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, chainParams *chaincfg.Params) error {
 	return checkBlockSanity(block, timeSource, BFNone, chainParams)
+}
+
+// validateCoinbaseMultiOutput performs detailed validation of multi-output
+// coinbase transactions to ensure proper fee distribution by coin type.
+// This validation ensures that:
+// 1. The coinbase output structure is valid (no duplicate coin types)
+// 2. Fee outputs match exactly the collected fees by coin type
+// 3. The subsidy output is correctly formed (VAR coin type)
+// 4. All outputs have valid coin types and consistent addresses
+func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesByType, subsidyAmount int64) error {
+	outputs := coinbaseTx.TxOut
+	if len(outputs) == 0 {
+		return ruleError(ErrBadCoinbaseOutputStructure, "coinbase has no outputs")
+	}
+
+	// Track coin types we've seen to detect duplicates
+	seenCoinTypes := make(map[wire.CoinType]bool)
+
+	// Track fee amounts we've found in outputs
+	foundFees := wire.NewFeesByType()
+
+	// Track subsidy output
+	var subsidyOutput *wire.TxOut
+	var subsidyOutputIdx int = -1
+
+	// Analyze each output
+	for i, output := range outputs {
+		coinType := output.CoinType
+
+		// Note: CoinType is uint8, so 0-255 range is enforced by type system
+		// No additional validation needed for coin type range
+
+		// Check for duplicate coin types
+		if seenCoinTypes[coinType] {
+			return ruleError(ErrBadCoinbaseOutputStructure,
+				fmt.Sprintf("duplicate coin type %d in coinbase outputs", coinType))
+		}
+		seenCoinTypes[coinType] = true
+
+		// Identify subsidy output (should be first VAR output)
+		if coinType == wire.CoinTypeVAR {
+			if subsidyOutputIdx == -1 {
+				subsidyOutput = output
+				subsidyOutputIdx = i
+			} else {
+				// This is a fee output for VAR
+				foundFees.Add(coinType, output.Value)
+			}
+		} else {
+			// This is a fee output for a non-VAR coin type
+			foundFees.Add(coinType, output.Value)
+		}
+	}
+
+	// Validate that we have a subsidy output
+	if subsidyOutput == nil {
+		return ruleError(ErrBadCoinbaseOutputStructure, "coinbase missing VAR subsidy output")
+	}
+
+	// Validate subsidy output amount (should be subsidy + VAR fees)
+	expectedSubsidyAmount := subsidyAmount + expectedFees.Get(wire.CoinTypeVAR)
+	if subsidyOutput.Value != expectedSubsidyAmount {
+		return ruleError(ErrBadCoinbaseFeeDistribution,
+			fmt.Sprintf("subsidy output amount mismatch: got %d, expected %d (subsidy %d + VAR fees %d)",
+				subsidyOutput.Value, expectedSubsidyAmount, subsidyAmount, expectedFees.Get(wire.CoinTypeVAR)))
+	}
+
+	// Validate fee outputs match expected fees exactly
+	for _, coinType := range expectedFees.Types() {
+		if coinType == wire.CoinTypeVAR {
+			continue // Already validated above in subsidy output
+		}
+
+		expectedAmount := expectedFees.Get(coinType)
+		foundAmount := foundFees.Get(coinType)
+
+		if foundAmount != expectedAmount {
+			return ruleError(ErrBadCoinbaseFeeDistribution,
+				fmt.Sprintf("fee output mismatch for coin type %d: got %d, expected %d",
+					coinType, foundAmount, expectedAmount))
+		}
+	}
+
+	// Validate that we don't have unexpected fee outputs
+	for _, coinType := range foundFees.Types() {
+		if expectedFees.Get(coinType) == 0 {
+			return ruleError(ErrBadCoinbaseFeeDistribution,
+				fmt.Sprintf("unexpected fee output for coin type %d with amount %d",
+					coinType, foundFees.Get(coinType)))
+		}
+	}
+
+	// Validate script consistency (all outputs should pay to the same address)
+	if len(outputs) > 1 {
+		referenceScript := outputs[0].PkScript
+		referenceVersion := outputs[0].Version
+
+		for i := 1; i < len(outputs); i++ {
+			if !bytes.Equal(outputs[i].PkScript, referenceScript) {
+				return ruleError(ErrBadCoinbaseMultiOutput,
+					fmt.Sprintf("coinbase output %d has different payment script than output 0", i))
+			}
+			if outputs[i].Version != referenceVersion {
+				return ruleError(ErrBadCoinbaseMultiOutput,
+					fmt.Sprintf("coinbase output %d has different script version than output 0", i))
+			}
+		}
+	}
+
+	return nil
 }
 
 // isDCP0005Violation returns whether or not the block is known to violate
@@ -2308,7 +2428,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 	}
 
 	// Validate SKA emission rules for this block
-	err = CheckSKAEmissionInBlock(block, blockHeight, b.chainParams)
+	err = CheckSKAEmissionInBlock(block, blockHeight, b, b.chainParams)
 	if err != nil {
 		return err
 	}
@@ -3113,7 +3233,7 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 	}
 
 	// SKA emission transactions have no real inputs (only null input).
-	if IsSKAEmissionTransaction(msgTx) {
+	if wire.IsSKAEmissionTransaction(msgTx) {
 		return 0, nil
 	}
 
@@ -3602,6 +3722,11 @@ func CountP2SHSigOps(tx *dcrutil.Tx, isCoinBaseTx bool, isStakeBaseTx bool, view
 		}
 	}
 
+	// SKA emission transactions have null inputs by design.
+	if wire.IsSKAEmissionTransaction(msgTx) {
+		return 0, nil
+	}
+
 	// Accumulate the number of signature operations in all transaction
 	// inputs.
 	totalSigOps := 0
@@ -3866,7 +3991,11 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 	if !stakeTree {
 		inFlightRegularTx = make(map[chainhash.Hash]uint32, len(txs))
 	}
-	totalFees := int64(inputFees) // Stake tx tree carry forward
+	totalFees := wire.NewFeesByType()
+	if inputFees > 0 {
+		// Carry forward stake tree fees (assumed to be VAR for now)
+		totalFees.Add(wire.CoinTypeVAR, int64(inputFees))
+	}
 	prevHeader := node.parent.Header()
 	var cumulativeSigOps int
 	for idx, tx := range txs {
@@ -3897,13 +4026,13 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 			return err
 		}
 
-		// Sum the total fees and ensure we don't overflow the
+		// Sum the total fees by coin type and ensure we don't overflow the
 		// accumulator.
-		lastTotalFees := totalFees
-		totalFees += txFee
-		if totalFees < lastTotalFees {
-			return ruleError(ErrBadFees, "total fees for block "+
-				"overflows accumulator")
+		coinType := wire.GetPrimaryCoinType(tx.MsgTx())
+		lastCoinTypeFees := totalFees.Get(coinType)
+		totalFees.Add(coinType, txFee)
+		if totalFees.Get(coinType) < lastCoinTypeFees {
+			return ruleError(ErrBadFees, fmt.Sprintf("total fees for coin type %d overflow accumulator", coinType))
 		}
 
 		// Update the view to mark all utxos spent by the transaction as spent
@@ -3939,8 +4068,11 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 	if !stakeTree { // TxTreeRegular
 		// Apply penalty to fees if we're at stake validation height.
 		if node.height >= b.chainParams.StakeValidationHeight {
-			totalFees *= int64(node.voters)
-			totalFees /= int64(b.chainParams.TicketsPerBlock)
+			// Scale all coin type fees proportionally
+			for coinType := range totalFees {
+				scaledFee := totalFees[coinType] * int64(node.voters) / int64(b.chainParams.TicketsPerBlock)
+				totalFees[coinType] = scaledFee
+			}
 		}
 
 		var totalAtomOutRegular int64
@@ -3960,15 +4092,15 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 			if isTreasuryEnabled {
 				// The treasury payout is done via a treasurybase in the stake
 				// tree when the treasury agenda is active.
-				expAtomOut = subsidyWork + totalFees
+				expAtomOut = subsidyWork + totalFees.Total()
 			} else {
-				expAtomOut = subsidyWork + subsidyTreasury + totalFees
+				expAtomOut = subsidyWork + subsidyTreasury + totalFees.Total()
 			}
 		}
 
 		// AmountIn for the input should be equal to the subsidy.
 		coinbaseIn := txs[0].MsgTx().TxIn[0]
-		subsidyWithoutFees := expAtomOut - totalFees
+		subsidyWithoutFees := expAtomOut - totalFees.Total()
 		if (coinbaseIn.ValueIn != subsidyWithoutFees) &&
 			(node.height > 0) {
 			errStr := fmt.Sprintf("bad coinbase subsidy in input;"+
@@ -3983,6 +4115,27 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 				"of %v", node.hash, totalAtomOutRegular,
 				expAtomOut)
 			return ruleError(ErrBadCoinbaseValue, str)
+		}
+
+		// Perform detailed validation of multi-output coinbase structure
+		// to ensure proper fee distribution by coin type.
+		// Only apply this validation for new-style coinbase transactions that:
+		// 1. Have fees from multiple coin types, OR
+		// 2. Have a non-VAR coin type output (indicating new format)
+		coinbaseTx := txs[0].MsgTx()
+		hasMultiCoinFees := len(totalFees.Types()) > 1
+		hasNonVAROutputs := false
+		for _, output := range coinbaseTx.TxOut {
+			if output.CoinType != wire.CoinTypeVAR {
+				hasNonVAROutputs = true
+				break
+			}
+		}
+
+		if hasMultiCoinFees || hasNonVAROutputs {
+			if err := validateCoinbaseMultiOutput(coinbaseTx, totalFees, subsidyWithoutFees); err != nil {
+				return err
+			}
 		}
 	} else { // TxTreeStake
 		// When treasury is enabled check treasurybase value
@@ -4037,7 +4190,7 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 				subsidySplitVariant)
 			expAtomOut = voteSubsidy * int64(node.voters)
 		} else {
-			expAtomOut = totalFees
+			expAtomOut = totalFees.Total()
 		}
 
 		if totalAtomOutStake > expAtomOut {

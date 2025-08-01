@@ -498,6 +498,23 @@ var helpDescsEnUS = map[string]string{
 	"getskainforesult-active":      "Whether this SKA coin type is currently active",
 	"getskainforesult-description": "A description of the SKA coin type",
 
+	// GetEmissionStatusCmd help.
+	"getemissionstatus--synopsis": "Returns the current emission status for a specific SKA coin type.",
+	"getemissionstatus-cointype":  "The SKA coin type to get emission status for (1-255)",
+
+	// GetEmissionStatusResult help.
+	"getemissionstatusresult-cointype":       "The coin type number (1-255)",
+	"getemissionstatusresult-emissionheight": "The block height at which emission begins",
+	"getemissionstatusresult-emissionwindow": "The number of blocks during which emission is allowed",
+	"getemissionstatusresult-currentheight":  "The current blockchain height",
+	"getemissionstatusresult-windowactive":   "Whether the emission window is currently active",
+	"getemissionstatusresult-windowstart":    "The block height when the emission window starts",
+	"getemissionstatusresult-windowend":      "The block height when the emission window ends",
+	"getemissionstatusresult-currentnonce":   "The last used nonce for replay protection",
+	"getemissionstatusresult-nextnonce":      "The required nonce for the next emission",
+	"getemissionstatusresult-alreadyemitted": "Whether this coin type has already been emitted",
+	"getemissionstatusresult-maxsupply":      "The maximum supply for this coin type in atoms",
+
 	// GetMempoolInfoCmd help.
 	"getmempoolinfo--synopsis": "Returns memory pool information",
 
@@ -1046,6 +1063,7 @@ var rpcResultTypes = map[types.Method][]interface{}{
 	"getheaders":               {(*types.GetHeadersResult)(nil)},
 	"getinfo":                  {(*types.InfoChainResult)(nil)},
 	"getskainfo":               {(*[]types.GetSKAInfoResult)(nil)},
+	"getemissionstatus":        {(*types.GetEmissionStatusResult)(nil)},
 	"getmempoolinfo":           {(*types.GetMempoolInfoResult)(nil)},
 	"getmempoolfeesinfo":       {(*types.GetMempoolFeesInfoResult)(nil)},
 	"getmininginfo":            {(*types.GetMiningInfoResult)(nil)},

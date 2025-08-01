@@ -218,6 +218,7 @@ var rpcHandlersBeforeInit = map[types.Method]commandHandler{
 	"getrawmempool":            handleGetRawMempool,
 	"getrawtransaction":        handleGetRawTransaction,
 	"getskainfo":               handleGetSKAInfo,
+	"getemissionstatus":        handleGetEmissionStatus,
 	"getstakedifficulty":       handleGetStakeDifficulty,
 	"getstakeversioninfo":      handleGetStakeVersionInfo,
 	"getstakeversions":         handleGetStakeVersions,
@@ -3462,6 +3463,64 @@ func handleGetSKAInfo(_ context.Context, s *Server, _ interface{}) (interface{},
 	}
 
 	return result, nil
+}
+
+// handleGetEmissionStatus returns the current emission status for a specific SKA coin type.
+func handleGetEmissionStatus(_ context.Context, s *Server, icmd interface{}) (interface{}, error) {
+	c := icmd.(*types.GetEmissionStatusCmd)
+
+	// Validate coin type range
+	coinType := dcrutil.CoinType(c.CoinType)
+	if coinType < 1 || coinType > 255 {
+		return nil, dcrjson.NewRPCError(dcrjson.ErrRPCInvalidParameter,
+			"coin type must be between 1 and 255 (SKA types)")
+	}
+
+	// Get chain configuration for this coin type
+	chainParams := s.cfg.ChainParams
+	config, exists := chainParams.SKACoins[coinType]
+	if !exists {
+		return nil, dcrjson.NewRPCError(dcrjson.ErrRPCInvalidParameter,
+			fmt.Sprintf("coin type %d is not configured in chain parameters", c.CoinType))
+	}
+
+	// Get current block height
+	best := s.cfg.Chain.BestSnapshot()
+	currentHeight := best.Height
+
+	// Calculate emission window boundaries
+	windowStart := int64(config.EmissionHeight)
+	windowEnd := windowStart + int64(config.EmissionWindow)
+
+	// Determine if emission window is currently active
+	windowActive := currentHeight >= windowStart && currentHeight <= windowEnd
+
+	// Get current nonce from chain parameters
+	currentNonce := uint64(0)
+	if chainParams.SKAEmissionNonces != nil {
+		wireCoinType := wire.CoinType(coinType)
+		currentNonce = chainParams.SKAEmissionNonces[wireCoinType]
+	}
+
+	// TODO: Check if already emitted by examining blockchain state
+	// For now, this is a placeholder - actual implementation would need to:
+	// 1. Search blockchain for existing emission transactions for this coin type
+	// 2. Check UTXO set for emission-created outputs
+	alreadyEmitted := false
+
+	return types.GetEmissionStatusResult{
+		CoinType:       c.CoinType,
+		EmissionHeight: windowStart,
+		EmissionWindow: int64(config.EmissionWindow),
+		CurrentHeight:  currentHeight,
+		WindowActive:   windowActive,
+		WindowStart:    windowStart,
+		WindowEnd:      windowEnd,
+		CurrentNonce:   currentNonce,
+		NextNonce:      currentNonce + 1,
+		AlreadyEmitted: alreadyEmitted,
+		MaxSupply:      config.MaxSupply,
+	}, nil
 }
 
 // convertVersionMap translates a map[int]int into a sorted array of

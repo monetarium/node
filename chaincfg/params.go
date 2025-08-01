@@ -247,6 +247,14 @@ type SKACoinConfig struct {
 
 	// Description provides additional information about this SKA coin type.
 	Description string
+
+	// EmissionAddresses are the governance-approved addresses that will
+	// receive the emitted SKA coins for this coin type.
+	EmissionAddresses []string
+
+	// EmissionAmounts are the corresponding amounts to be sent to each
+	// address in EmissionAddresses. Must have same length as EmissionAddresses.
+	EmissionAmounts []int64
 }
 
 // DNSSeed identifies a DNS seed.

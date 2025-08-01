@@ -141,6 +141,12 @@ func checkInputsStandard(tx *dcrutil.Tx, txType stake.TxType, utxoView *blockcha
 	// but coinbases have already been rejected prior to calling this
 	// function so no need to recheck.
 
+	// SKA emission transactions have null inputs that are not standard by definition.
+	// Skip standard input validation for SKA emission transactions.
+	if wire.IsSKAEmissionTransaction(tx.MsgTx()) {
+		return nil
+	}
+
 	// Ignore the first input if this is a SSGen (vote) or tspend since
 	// those inputs are not standard by definition.
 	ignoreFirst := txType == stake.TxTypeSSGen ||

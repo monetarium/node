@@ -171,15 +171,14 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 	const op = "MsgBlock.DeserializeTxLoc"
 	fullLen := r.Len()
 
-	// At the current time, there is no difference between the wire encoding
-	// at protocol version 0 and the stable long-term storage format.  As
-	// a result, make use of existing wire protocol functions.
-	err := readBlockHeader(r, 0, &msg.Header)
+	// Use current protocol version to properly handle dual-coin features.
+	// This ensures compatibility with blocks serialized using current protocol.
+	err := readBlockHeader(r, ProtocolVersion, &msg.Header)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	txCount, err := ReadVarInt(r, 0)
+	txCount, err := ReadVarInt(r, ProtocolVersion)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -203,7 +202,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 	for i := uint64(0); i < txCount; i++ {
 		txLocs[i].TxStart = fullLen - r.Len()
 		var tx MsgTx
-		err := tx.Deserialize(r)
+		err := tx.BtcDecode(r, ProtocolVersion)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -211,7 +210,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 		txLocs[i].TxLen = (fullLen - r.Len()) - txLocs[i].TxStart
 	}
 
-	stakeTxCount, err := ReadVarInt(r, 0)
+	stakeTxCount, err := ReadVarInt(r, ProtocolVersion)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -235,7 +234,7 @@ func (msg *MsgBlock) DeserializeTxLoc(r *bytes.Buffer) ([]TxLoc, []TxLoc, error)
 	for i := uint64(0); i < stakeTxCount; i++ {
 		sTxLocs[i].TxStart = fullLen - r.Len()
 		var tx MsgTx
-		err := tx.Deserialize(r)
+		err := tx.BtcDecode(r, ProtocolVersion)
 		if err != nil {
 			return nil, nil, err
 		}

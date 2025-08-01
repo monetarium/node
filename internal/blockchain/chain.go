@@ -957,6 +957,10 @@ func countSpentRegularOutputs(block *dcrutil.Block) int {
 	// Skip the coinbase since it has no inputs.
 	var numSpent int
 	for _, tx := range block.MsgBlock().Transactions[1:] {
+		// Skip SKA emission transactions since they have null inputs (similar to coinbase).
+		if wire.IsSKAEmissionTransaction(tx) {
+			continue
+		}
 		numSpent += len(tx.TxIn)
 	}
 	return numSpent

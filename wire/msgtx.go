@@ -27,6 +27,65 @@ const (
 	CoinTypeSKA CoinType = 1
 )
 
+// FeesByType represents transaction fees collected by coin type.
+// This map-based approach scales to handle all coin types (0-255) without
+// requiring separate variables for each coin type.
+type FeesByType map[CoinType]int64
+
+// NewFeesByType creates a new empty fees-by-type map.
+func NewFeesByType() FeesByType {
+	return make(FeesByType)
+}
+
+// Add adds a fee amount to the specified coin type.
+func (f FeesByType) Add(coinType CoinType, amount int64) {
+	f[coinType] += amount
+}
+
+// Get returns the total fees for the specified coin type.
+func (f FeesByType) Get(coinType CoinType) int64 {
+	return f[coinType]
+}
+
+// Total returns the sum of all fees across all coin types.
+func (f FeesByType) Total() int64 {
+	total := int64(0)
+	for _, amount := range f {
+		total += amount
+	}
+	return total
+}
+
+// Types returns a slice of all coin types that have non-zero fees.
+func (f FeesByType) Types() []CoinType {
+	types := make([]CoinType, 0, len(f))
+	for coinType, amount := range f {
+		if amount > 0 {
+			types = append(types, coinType)
+		}
+	}
+	return types
+}
+
+// Merge adds all fees from another FeesByType into this one.
+func (f FeesByType) Merge(other FeesByType) {
+	for coinType, amount := range other {
+		f[coinType] += amount
+	}
+}
+
+// GetPrimaryCoinType determines the primary coin type of a transaction by
+// examining its outputs. Returns the first non-zero coin type found, or
+// CoinTypeVAR if all outputs are VAR or no outputs exist.
+func GetPrimaryCoinType(tx *MsgTx) CoinType {
+	for _, txOut := range tx.TxOut {
+		if txOut.CoinType != CoinTypeVAR {
+			return txOut.CoinType
+		}
+	}
+	return CoinTypeVAR
+}
+
 const (
 	// TxVersion is the initial transaction version.
 	TxVersion uint16 = 1
@@ -879,7 +938,7 @@ func (msg *MsgTx) BtcDecode(r io.Reader, pver uint32) error {
 func (msg *MsgTx) Deserialize(r io.Reader) error {
 	// Try to auto-detect wire format by attempting deserialization
 	// with DualCoinVersion first, falling back to older version for specific cases
-	
+
 	// Read all data into buffer for multiple attempts
 	var buf bytes.Buffer
 	_, err := buf.ReadFrom(r)
@@ -887,13 +946,13 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 		return err
 	}
 	data := buf.Bytes()
-	
+
 	// First try with DualCoinVersion (current protocol with CoinType field)
 	err = msg.BtcDecode(bytes.NewReader(data), DualCoinVersion)
 	if err == nil {
 		return nil
 	}
-	
+
 	// Fall back to older protocol version for specific errors that indicate
 	// missing CoinType fields in old transaction data. Only handle errors
 	// that are clearly from wire format differences, not genuine corruption.
@@ -906,7 +965,7 @@ func (msg *MsgTx) Deserialize(r io.Reader) error {
 			return nil
 		}
 	}
-	
+
 	// Return the original error from DualCoinVersion attempt
 	return err
 }
@@ -1348,4 +1407,43 @@ func writeTxOut(w io.Writer, pver uint32, version uint16, to *TxOut) error {
 	}
 
 	return WriteVarBytes(w, pver, to.PkScript)
+}
+
+// IsSKAEmissionTransaction returns whether the given transaction is an SKA
+// emission transaction based on its structure. SKA emission transactions have
+// null inputs with authorized signature scripts and only produce SKA outputs.
+// This function is optimized for performance as it may be called frequently
+// to validate multiple SKA coin types (1-255).
+func IsSKAEmissionTransaction(tx *MsgTx) bool {
+	// Fast path: basic structure validation (most common rejection)
+	if len(tx.TxIn) != 1 || len(tx.TxOut) == 0 {
+		return false
+	}
+
+	// Check null input (fast rejection for regular transactions)
+	prevOut := tx.TxIn[0].PreviousOutPoint
+	if !prevOut.Hash.IsEqual(&chainhash.Hash{}) || prevOut.Index != 0xffffffff {
+		return false
+	}
+
+	// Optimized signature script checking (single format only)
+	sigScript := tx.TxIn[0].SignatureScript
+	if len(sigScript) < 4 {
+		return false
+	}
+
+	// Only check authorized format: [0x01][S][K][A]...
+	if !(sigScript[0] == 0x01 && sigScript[1] == 0x53 &&
+		sigScript[2] == 0x4b && sigScript[3] == 0x41) {
+		return false
+	}
+
+	// Check all outputs are SKA coin types (1-255)
+	for _, txOut := range tx.TxOut {
+		if txOut.CoinType == CoinTypeVAR || txOut.CoinType > 255 {
+			return false
+		}
+	}
+
+	return true
 }

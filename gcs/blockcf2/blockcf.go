@@ -276,6 +276,11 @@ func Regular(block *wire.MsgBlock, prevScripts PrevScripter) (*gcs.FilterV2, err
 			continue
 		}
 
+		// Skip SKA emission transactions since they have null inputs.
+		if wire.IsSKAEmissionTransaction(tx) {
+			continue
+		}
+
 		for txInIdx, txIn := range tx.TxIn {
 			prevOut := &txIn.PreviousOutPoint
 			scriptVer, prevOutScript, ok := prevScripts.PrevScript(prevOut)

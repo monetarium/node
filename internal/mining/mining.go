@@ -1202,6 +1202,43 @@ func calcCoinTypeAwareFeePerKb(txDesc *TxDesc, ancestorStats *TxAncestorStats,
 //	|                                   |   |
 //	 -----------------------------------  --
 //
+// addFeesToCoinbase adds fees from different coin types to the coinbase transaction.
+// VAR fees are added to the existing PoW output, while other coin types get new outputs.
+func addFeesToCoinbase(coinbaseTx *wire.MsgTx, totalFees wire.FeesByType, powOutputIdx int, payToAddress stdaddr.Address) error {
+	// Add VAR fees to existing PoW output
+	varFees := totalFees.Get(wire.CoinTypeVAR)
+	if varFees > 0 {
+		coinbaseTx.TxOut[powOutputIdx].Value += varFees
+	}
+
+	// Create new outputs for other coin types
+	for _, coinType := range totalFees.Types() {
+		if coinType == wire.CoinTypeVAR {
+			continue // Already handled above
+		}
+
+		feeAmount := totalFees.Get(coinType)
+		if feeAmount <= 0 {
+			continue // Skip zero/negative fees
+		}
+
+		// Create payment script for the miner address
+		scriptVersion, payScript := payToAddress.PaymentScript()
+
+		// Create new output for this coin type's fees
+		feeOutput := &wire.TxOut{
+			Value:    feeAmount,
+			CoinType: coinType,
+			Version:  scriptVersion,
+			PkScript: payScript,
+		}
+
+		coinbaseTx.TxOut = append(coinbaseTx.TxOut, feeOutput)
+	}
+
+	return nil
+}
+
 // This function returns nil when there are not enough voters on any of the
 // current top blocks to create a new block template.
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress stdaddr.Address) (*BlockTemplate, error) {
@@ -1438,7 +1475,8 @@ mempoolLoop:
 			// Evaluate if this is a stakebase input or not. If it is, continue
 			// without evaluation of the input.
 			// if isStakeBase
-			if (i == 0 && isSSGen) || isTSpend {
+			isSKAEmissionForUTXO := wire.IsSKAEmissionTransaction(tx.MsgTx())
+			if (i == 0 && isSSGen) || isTSpend || isSKAEmissionForUTXO {
 				continue
 			}
 
@@ -1511,7 +1549,7 @@ mempoolLoop:
 	// pop loop. This is buggy, but not catastrophic behaviour. A future
 	// release should fix it. TODO
 	blockSigOps := int64(0)
-	totalFees := int64(0)
+	totalFees := wire.NewFeesByType()
 
 	numSStx := 0
 	numSSGen := 0
@@ -1563,6 +1601,7 @@ mempoolLoop:
 	// Choose which transactions make it into the block.
 nextPriorityQueueItem:
 	for priorityQueue.Len() > 0 {
+		log.Debugf("Priority queue length: %d", priorityQueue.Len())
 		// Grab the highest priority (or highest fee per kilobyte
 		// depending on the sort order) transaction.
 		prioItem := heap.Pop(priorityQueue).(*txPrioItem)
@@ -1818,9 +1857,10 @@ nextPriorityQueueItem:
 		}
 
 		// Skip transactions that do not pay enough fee except for stake
-		// transactions. Use coin-type-aware fee validation when available.
+		// transactions and SKA emission transactions. Use coin-type-aware fee validation when available.
 		skipForLowFee := false
-		if tx.Tree() != wire.TxTreeStake {
+		isSKAEmission := wire.IsSKAEmissionTransaction(tx.MsgTx())
+		if tx.Tree() != wire.TxTreeStake && !isSKAEmission {
 			if g.cfg.FeeCalculator != nil {
 				// Use coin-type-specific fee validation
 				txSize := int64(tx.MsgTx().SerializeSize())
@@ -1863,14 +1903,17 @@ nextPriorityQueueItem:
 				miningView.reject(bundledTx.Tx.Hash())
 				continue nextPriorityQueueItem
 			}
-			err = g.cfg.ValidateTransactionScripts(bundledTx.Tx, blockUtxos,
-				scriptFlags, isAutoRevocationsEnabled)
-			if err != nil {
-				log.Tracef("Skipping tx %s due to error in "+
-					"ValidateTransactionScripts: %v", bundledTx.Tx.Hash(), err)
-				logSkippedDeps(bundledTx.Tx, deps)
-				miningView.reject(bundledTx.Tx.Hash())
-				continue nextPriorityQueueItem
+			// Skip script validation for SKA emission transactions
+			if !wire.IsSKAEmissionTransaction(bundledTx.Tx.MsgTx()) {
+				err = g.cfg.ValidateTransactionScripts(bundledTx.Tx, blockUtxos,
+					scriptFlags, isAutoRevocationsEnabled)
+				if err != nil {
+					log.Tracef("Skipping tx %s due to error in "+
+						"ValidateTransactionScripts: %v", bundledTx.Tx.Hash(), err)
+					logSkippedDeps(bundledTx.Tx, deps)
+					miningView.reject(bundledTx.Tx.Hash())
+					continue nextPriorityQueueItem
+				}
 			}
 		}
 
@@ -1888,6 +1931,7 @@ nextPriorityQueueItem:
 			// Add the transaction to the block, increment counters, and
 			// save the fees and signature operation counts to the block
 			// template.
+			log.Debugf("Adding transaction %v to block at height %d", bundledTx.Hash(), nextBlockHeight)
 			blockTxns = append(blockTxns, bundledTx)
 			blockSize += uint32(bundledTx.MsgTx().SerializeSize())
 			bundledTxSigOps := int64(bundledTxDesc.TotalSigOps)
@@ -1930,6 +1974,7 @@ nextPriorityQueueItem:
 			// block template.
 			bundledTxDeps := miningView.children(bundledTxHash)
 			miningView.RemoveTransaction(bundledTxHash, false)
+			log.Debugf("Removed transaction %v from mining view, priority queue length now: %d", bundledTxHash, priorityQueue.Len())
 
 			// Add transactions which depend on this one (and also do not
 			// have any other unsatisfied dependencies) to the priority
@@ -2248,7 +2293,10 @@ nextPriorityQueueItem:
 			return nil, fmt.Errorf("couldn't find fee for tx %v",
 				*tx.Hash())
 		}
-		totalFees += fee
+
+		// Determine coin type for this transaction and add fees by type
+		coinType := wire.GetPrimaryCoinType(tx.MsgTx())
+		totalFees.Add(coinType, fee)
 		txFees = append(txFees, fee)
 
 		tsos, ok := txSigOpCountsMap[*tx.Hash()]
@@ -2265,7 +2313,10 @@ nextPriorityQueueItem:
 			return nil, fmt.Errorf("couldn't find fee for stx %v",
 				*tx.Hash())
 		}
-		totalFees += fee
+
+		// Determine coin type for this transaction and add fees by type
+		coinType := wire.GetPrimaryCoinType(tx.MsgTx())
+		totalFees.Add(coinType, fee)
 		txFees = append(txFees, fee)
 
 		tsos, ok := txSigOpCountsMap[*tx.Hash()]
@@ -2279,8 +2330,11 @@ nextPriorityQueueItem:
 	// Scale the fees according to the number of voters once stake validation
 	// height is reached.
 	if nextBlockHeight >= stakeValidationHeight {
-		totalFees *= int64(voters)
-		totalFees /= int64(g.cfg.ChainParams.TicketsPerBlock)
+		// Scale all coin type fees proportionally
+		for coinType := range totalFees {
+			scaledFee := totalFees[coinType] * int64(voters) / int64(g.cfg.ChainParams.TicketsPerBlock)
+			totalFees[coinType] = scaledFee
+		}
 	}
 
 	txSigOpCounts = append(txSigOpCounts, numCoinbaseSigOps)
@@ -2296,8 +2350,13 @@ nextPriorityQueueItem:
 		if isTreasuryEnabled {
 			powOutputIdx = 1
 		}
-		coinbaseTx.MsgTx().TxOut[powOutputIdx].Value += totalFees
-		txFees[0] = -totalFees
+		// Add fees to coinbase - VAR fees go to existing PoW output,
+		// other coin types get new outputs
+		err := addFeesToCoinbase(coinbaseTx.MsgTx(), totalFees, powOutputIdx, payToAddress)
+		if err != nil {
+			return nil, err
+		}
+		txFees[0] = -totalFees.Total()
 	}
 
 	// Calculate the required difficulty for the block.  The timestamp
@@ -2365,8 +2424,8 @@ nextPriorityQueueItem:
 
 	// Fill in locally referenced inputs.
 	for i, tx := range blockTxnsRegular {
-		// Skip coinbase.
-		if i == 0 {
+		// Skip coinbase and SKA emission
+		if i == 0 || wire.IsSKAEmissionTransaction(tx.MsgTx()) {
 			continue
 		}
 
@@ -2482,6 +2541,7 @@ nextPriorityQueueItem:
 	if err != nil {
 		str := fmt.Sprintf("failed to do final check for check connect "+
 			"block when making new block template: %v", err)
+		log.Debugf(str)
 		return nil, makeError(ErrCheckConnectBlock, str)
 	}
 
@@ -2489,7 +2549,7 @@ nextPriorityQueueItem:
 		"transactions, %d treasury transactions, %d in fees, %d signature "+
 		"operations, %d bytes, target difficulty %064x, stake difficulty %v)",
 		len(msgBlock.Transactions), len(msgBlock.STransactions),
-		totalTreasuryOps, totalFees, blockSigOps, blockSize,
+		totalTreasuryOps, totalFees.Total(), blockSigOps, blockSize,
 		standalone.CompactToBig(msgBlock.Header.Bits),
 		dcrutil.Amount(msgBlock.Header.SBits).ToCoin())
 
