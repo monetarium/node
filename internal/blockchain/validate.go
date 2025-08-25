@@ -1003,20 +1003,25 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 		// Note: CoinType is uint8, so 0-255 range is enforced by type system
 		// No additional validation needed for coin type range
 
-		// Check for duplicate coin types
-		if seenCoinTypes[coinType] {
-			return ruleError(ErrBadCoinbaseOutputStructure,
-				fmt.Sprintf("duplicate coin type %d in coinbase outputs", coinType))
-		}
+		// Note: Multiple outputs of the same coin type are allowed in coinbase
+		// transactions (e.g., subsidy output + fee outputs for the same coin type)
 		seenCoinTypes[coinType] = true
 
-		// Identify subsidy output (should be first VAR output)
+		// Identify subsidy output (should be VAR output with highest value)
 		if coinType == wire.CoinTypeVAR {
-			if subsidyOutputIdx == -1 {
+			if subsidyOutputIdx == -1 || output.Value > subsidyOutput.Value {
+				// First VAR output or a VAR output with higher value
+				if subsidyOutputIdx != -1 {
+					// Previous candidate becomes a fee output
+					log.Debugf("DEBUG: validateCoinbaseMultiOutput - Previous subsidy candidate[%d] with value %d becomes fee output", subsidyOutputIdx, subsidyOutput.Value)
+					foundFees.Add(coinType, subsidyOutput.Value)
+				}
+				log.Debugf("DEBUG: validateCoinbaseMultiOutput - Found new subsidy output[%d]: Value=%d, CoinType=%d", i, output.Value, output.CoinType)
 				subsidyOutput = output
 				subsidyOutputIdx = i
 			} else {
 				// This is a fee output for VAR
+				log.Debugf("DEBUG: validateCoinbaseMultiOutput - Found VAR fee output[%d]: Value=%d", i, output.Value)
 				foundFees.Add(coinType, output.Value)
 			}
 		} else {
@@ -1032,6 +1037,15 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 
 	// Validate subsidy output amount (should be subsidy + VAR fees)
 	expectedSubsidyAmount := subsidyAmount + expectedFees.Get(wire.CoinTypeVAR)
+	
+	// DEBUG: Log validation details
+	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyOutput.Value=%d, expectedSubsidyAmount=%d", subsidyOutput.Value, expectedSubsidyAmount)
+	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyAmount=%d, VAR fees=%d", subsidyAmount, expectedFees.Get(wire.CoinTypeVAR))
+	log.Debugf("DEBUG: validateCoinbaseMultiOutput - coinbase has %d outputs:", len(coinbaseTx.TxOut))
+	for i, out := range coinbaseTx.TxOut {
+		log.Debugf("DEBUG: validateCoinbaseMultiOutput - Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
+	}
+	
 	if subsidyOutput.Value != expectedSubsidyAmount {
 		return ruleError(ErrBadCoinbaseFeeDistribution,
 			fmt.Sprintf("subsidy output amount mismatch: got %d, expected %d (subsidy %d + VAR fees %d)",
@@ -1063,19 +1077,36 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 		}
 	}
 
-	// Validate script consistency (all outputs should pay to the same address)
-	if len(outputs) > 1 {
-		referenceScript := outputs[0].PkScript
-		referenceVersion := outputs[0].Version
-
-		for i := 1; i < len(outputs); i++ {
-			if !bytes.Equal(outputs[i].PkScript, referenceScript) {
-				return ruleError(ErrBadCoinbaseMultiOutput,
-					fmt.Sprintf("coinbase output %d has different payment script than output 0", i))
+	// Validate script consistency (all payment outputs should pay to the same address)
+	// Find first non-zero-value output as reference for payment script
+	var referenceScript []byte
+	var referenceVersion uint16
+	var referenceFound bool
+	
+	for _, output := range outputs {
+		if output.Value > 0 {
+			referenceScript = output.PkScript
+			referenceVersion = output.Version
+			referenceFound = true
+			break
+		}
+	}
+	
+	// If we have payment outputs, ensure they all use the same script
+	if referenceFound {
+		for i, output := range outputs {
+			// Skip zero-value outputs (like OP_RETURN)
+			if output.Value == 0 {
+				continue
 			}
-			if outputs[i].Version != referenceVersion {
+			
+			if !bytes.Equal(output.PkScript, referenceScript) {
 				return ruleError(ErrBadCoinbaseMultiOutput,
-					fmt.Sprintf("coinbase output %d has different script version than output 0", i))
+					fmt.Sprintf("coinbase output %d has different payment script than reference payment output", i))
+			}
+			if output.Version != referenceVersion {
+				return ruleError(ErrBadCoinbaseMultiOutput,
+					fmt.Sprintf("coinbase output %d has different script version than reference payment output", i))
 			}
 		}
 	}
@@ -1963,6 +1994,15 @@ func (b *BlockChain) checkMerkleRoots(block *wire.MsgBlock, prevNode *blockNode)
 		// Build the two merkle trees and use their calculated merkle roots as
 		// leaves to another merkle tree and ensure the final calculated merkle
 		// root matches the entry in the block header.
+		
+		// Debug logging for dual-coin transactions
+		for i, tx := range block.Transactions {
+			if len(tx.TxOut) > 0 && tx.TxOut[0].CoinType != 0 {
+				txHash := tx.TxHashFull()
+				log.Debugf("DEBUG: Block validation - tx[%d] hash=%x (dual-coin)", i, txHash[:8])
+			}
+		}
+		
 		wantMerkleRoot := standalone.CalcCombinedTxTreeMerkleRoot(
 			block.Transactions, block.STransactions)
 		if header.MerkleRoot != wantMerkleRoot {
@@ -3621,10 +3661,10 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 		return 0, ruleError(ErrSpendTooHigh, str)
 	}
 
-	// Rule 2: SKA inputs must exactly equal SKA outputs (no fees for SKA-only)
-	if totalSKAOut > 0 && totalSKAIn != totalSKAOut {
-		str := fmt.Sprintf("SKA input/output mismatch for transaction %v: "+
-			"SKA inputs %v != SKA outputs %v", txHash, totalSKAIn, totalSKAOut)
+	// Rule 2: SKA inputs must cover SKA outputs (fees allowed for SKA transactions)
+	if totalSKAOut > 0 && totalSKAIn < totalSKAOut {
+		str := fmt.Sprintf("insufficient SKA inputs for transaction %v: "+
+			"SKA inputs %v < SKA outputs %v", txHash, totalSKAIn, totalSKAOut)
 		return 0, ruleError(ErrSpendTooHigh, str)
 	}
 
@@ -3637,13 +3677,22 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 
 	// Calculate and return appropriate fees
 	if totalSKAOut > 0 {
-		// SKA transaction - no fees allowed
+		// SKA transaction - calculate SKA fees
 		if totalVARIn > 0 {
 			str := fmt.Sprintf("SKA transaction %v contains VAR inputs, "+
 				"which is not allowed", txHash)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
-		return 0, nil
+		
+		// Calculate SKA fee (inputs - outputs)
+		txFeeInAtom := totalSKAIn - totalSKAOut
+		if txFeeInAtom < 0 {
+			str := fmt.Sprintf("transaction %v has negative SKA fee: "+
+				"SKA inputs %v - SKA outputs %v = %v",
+				txHash, totalSKAIn, totalSKAOut, txFeeInAtom)
+			return 0, ruleError(ErrSpendTooHigh, str)
+		}
+		return txFeeInAtom, nil
 	} else {
 		// VAR transaction - return VAR fee
 		txFeeInAtom := totalVARIn - totalVAROut

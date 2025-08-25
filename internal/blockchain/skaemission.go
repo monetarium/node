@@ -228,10 +228,9 @@ func CreateAuthorizedSKAEmissionTransaction(auth *chaincfg.SKAEmissionAuth,
 		return nil, fmt.Errorf("unauthorized emission key for coin type %d", auth.CoinType)
 	}
 
-	// Check nonce for replay protection
-	lastNonce := chainParams.GetSKAEmissionNonce(auth.CoinType)
-	if auth.Nonce != lastNonce+1 {
-		return nil, fmt.Errorf("invalid nonce: expected %d, got %d", lastNonce+1, auth.Nonce)
+	// Check nonce - must always be 1 for emissions (only one emission per coin type allowed)
+	if auth.Nonce != 1 {
+		return nil, fmt.Errorf("invalid nonce: expected 1, got %d", auth.Nonce)
 	}
 
 	// Validate emission amounts
@@ -592,8 +591,9 @@ func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 		return fmt.Errorf("SKA emission transaction must have Expiry 0")
 	}
 
-	// Update nonce to prevent replay attacks
-	chainParams.SetSKAEmissionNonce(auth.CoinType, auth.Nonce)
+	// Note: Nonce is NOT updated here during validation to avoid side effects.
+	// The nonce will be updated when the block is successfully connected to the chain
+	// in CheckSKAEmissionInBlock to ensure replay protection only after commitment.
 
 	return nil
 }
@@ -723,10 +723,9 @@ func validateEmissionAuthorization(auth *chaincfg.SKAEmissionAuth, chainParams *
 		return fmt.Errorf("unauthorized emission key for coin type %d", auth.CoinType)
 	}
 
-	// Check nonce for replay protection
-	lastNonce := chainParams.GetSKAEmissionNonce(auth.CoinType)
-	if auth.Nonce != lastNonce+1 {
-		return fmt.Errorf("invalid nonce: expected %d, got %d", lastNonce+1, auth.Nonce)
+	// Check nonce - must always be 1 for emissions (only one emission per coin type allowed)
+	if auth.Nonce != 1 {
+		return fmt.Errorf("invalid nonce: expected 1, got %d", auth.Nonce)
 	}
 
 	return nil
@@ -762,6 +761,9 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 			if err := ValidateAuthorizedSKAEmissionTransaction(msgTx, blockHeight, chainParams); err != nil {
 				return fmt.Errorf("invalid SKA emission transaction at index %d: %w", i, err)
 			}
+
+			// Note: Nonce update is handled separately during actual block connection
+			// to avoid double-updates during validation phases.
 
 			// Track which coin types are being emitted and check for previous emissions
 			for _, txOut := range msgTx.TxOut {

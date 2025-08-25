@@ -25,9 +25,9 @@
 set -e
 
 SESSION="dcrd-simnet-nodes"
-NODES_ROOT=${VAR_SIMNET_ROOT:-${HOME}/dcrdsimnetnodes}
-RPCUSER="USER"
-RPCPASS="PASS"
+NODES_ROOT=${VAR_SIMNET_ROOT:-/Users/wenzel/projects/monetarium}
+RPCUSER="test"
+RPCPASS="test"
 WALLET_SEED="b280922d2cffda44648346412c5ec97f429938105003730414f10b01e1402eac"
 WALLET_MINING_ADDR="SsXciQNTo3HuV5tX3yy4hXndRWgLMRVC7Ah" # NOTE: This must be changed if the seed is changed. Priv key: PsURysSJKBLShqF1TQjiohLuTQRGHznHjEskWSc78v8JusGGopXW5
 WALLET_XFER_ADDR="SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc" # same as above Priv key: PsUQzmmSVH2Ry6tGp9NygLRdLAXsRGio9EV4B23sqdYHFer3j7Fhb

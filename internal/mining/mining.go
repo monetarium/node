@@ -521,11 +521,23 @@ func standardTreasurybaseOpReturn(height uint32) ([]byte, error) {
 // Once the agenda is active, it returns the combined merkle root for the
 // regular and stake transaction trees in accordance with DCP0005.
 func calcBlockMerkleRoot(regularTxns, stakeTxns []*wire.MsgTx, hdrCmtActive bool) chainhash.Hash {
+	// Debug logging for dual-coin transactions in block template
+	for i, tx := range regularTxns {
+		if len(tx.TxOut) > 0 && tx.TxOut[0].CoinType != 0 {
+			txHash := tx.TxHashFull()
+			log.Debugf("DEBUG: Block template - tx[%d] hash=%x (dual-coin)", i, txHash[:8])
+		}
+	}
+	
 	if !hdrCmtActive {
-		return standalone.CalcTxTreeMerkleRoot(regularTxns)
+		merkleRoot := standalone.CalcTxTreeMerkleRoot(regularTxns)
+		log.Debugf("DEBUG: Block template merkle root (old method)=%x", merkleRoot[:8])
+		return merkleRoot
 	}
 
-	return standalone.CalcCombinedTxTreeMerkleRoot(regularTxns, stakeTxns)
+	merkleRoot := standalone.CalcCombinedTxTreeMerkleRoot(regularTxns, stakeTxns)
+	log.Debugf("DEBUG: Block template merkle root (combined)=%x", merkleRoot[:8])
+	return merkleRoot
 }
 
 // calcBlockCommitmentRootV1 calculates and returns the required v1 block and
@@ -571,6 +583,7 @@ func createCoinbaseTx(subsidyCache *standalone.SubsidyCache,
 		for _, payout := range params.BlockOneLedger {
 			tx.AddTxOut(&wire.TxOut{
 				Value:    payout.Amount,
+				CoinType: wire.CoinTypeVAR,
 				Version:  payout.ScriptVersion,
 				PkScript: payout.Script,
 			})
@@ -639,17 +652,28 @@ func createCoinbaseTx(subsidyCache *standalone.SubsidyCache,
 	tx.AddTxIn(coinbaseInput)
 	tx.TxIn[0].ValueIn = workSubsidy + treasurySubsidy
 	if treasuryOutput != nil {
+		// Add CoinType to treasury output
+		treasuryOutput.CoinType = wire.CoinTypeVAR
 		tx.AddTxOut(treasuryOutput)
 	}
 	tx.AddTxOut(&wire.TxOut{
 		Value:    0,
+		CoinType: wire.CoinTypeVAR,
 		PkScript: opReturnPkScript,
 	})
 	tx.AddTxOut(&wire.TxOut{
 		Value:    workSubsidy,
+		CoinType: wire.CoinTypeVAR,
 		Version:  workSubsidyScriptVer,
 		PkScript: workSubsidyScript,
 	})
+	
+	// DEBUG: Log coinbase outputs before returning
+	log.Debugf("DEBUG: createCoinbaseTx - Created coinbase with %d outputs:", len(tx.TxOut))
+	for i, out := range tx.TxOut {
+		log.Debugf("DEBUG: createCoinbaseTx - Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
+	}
+	
 	return dcrutil.NewTx(tx)
 }
 
@@ -694,11 +718,13 @@ func createTreasuryBaseTx(subsidyCache *standalone.SubsidyCache, nextBlockHeight
 	tx.TxIn[0].ValueIn = trsySubsidy
 	tx.AddTxOut(&wire.TxOut{
 		Value:    trsySubsidy,
+		CoinType: wire.CoinTypeVAR,
 		Version:  0,
 		PkScript: []byte{txscript.OP_TADD},
 	})
 	tx.AddTxOut(&wire.TxOut{
 		Value:    0,
+		CoinType: wire.CoinTypeVAR,
 		PkScript: opReturnTreasury,
 	})
 	retTx := dcrutil.NewTx(tx)
@@ -901,8 +927,10 @@ func (g *BlkTmplGenerator) handleTooFewVoters(nextHeight int64,
 			return nil, err
 		}
 		header := &block.Header
-		header.MerkleRoot = calcBlockMerkleRoot(block.Transactions,
+		calculatedMerkleRoot := calcBlockMerkleRoot(block.Transactions,
 			block.STransactions, hdrCmtActive)
+		header.MerkleRoot = calculatedMerkleRoot
+		log.Debugf("DEBUG: Set header.MerkleRoot (location 1) = %x", calculatedMerkleRoot[:8])
 
 		// Calculate the required difficulty for the block.
 		reqDifficulty, err := g.cfg.CalcNextRequiredDifficulty(prevHash, ts)
@@ -937,6 +965,7 @@ func (g *BlkTmplGenerator) handleTooFewVoters(nextHeight int64,
 
 		// Make sure the block validates.
 		btBlock := dcrutil.NewBlockDeepCopyCoinbase(&block)
+		log.Debugf("DEBUG: Before CheckConnectBlockTemplate (location 1), header.MerkleRoot = %x", btBlock.MsgBlock().Header.MerkleRoot[:8])
 		err = g.cfg.CheckConnectBlockTemplate(btBlock)
 		if err != nil {
 			str := fmt.Sprintf("failed to check template: %v while "+
@@ -1205,9 +1234,18 @@ func calcCoinTypeAwareFeePerKb(txDesc *TxDesc, ancestorStats *TxAncestorStats,
 // addFeesToCoinbase adds fees from different coin types to the coinbase transaction.
 // VAR fees are added to the existing PoW output, while other coin types get new outputs.
 func addFeesToCoinbase(coinbaseTx *wire.MsgTx, totalFees wire.FeesByType, powOutputIdx int, payToAddress stdaddr.Address) error {
+	log.Debugf("DEBUG: addFeesToCoinbase - powOutputIdx=%d, totalFees=%v", powOutputIdx, totalFees)
+	
+	// Log initial coinbase outputs
+	log.Debugf("DEBUG: addFeesToCoinbase - Initial coinbase has %d outputs:", len(coinbaseTx.TxOut))
+	for i, out := range coinbaseTx.TxOut {
+		log.Debugf("DEBUG: addFeesToCoinbase - Initial Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
+	}
+	
 	// Add VAR fees to existing PoW output
 	varFees := totalFees.Get(wire.CoinTypeVAR)
 	if varFees > 0 {
+		log.Debugf("DEBUG: addFeesToCoinbase - Adding VAR fees %d to output[%d]", varFees, powOutputIdx)
 		coinbaseTx.TxOut[powOutputIdx].Value += varFees
 	}
 
@@ -1234,6 +1272,13 @@ func addFeesToCoinbase(coinbaseTx *wire.MsgTx, totalFees wire.FeesByType, powOut
 		}
 
 		coinbaseTx.TxOut = append(coinbaseTx.TxOut, feeOutput)
+		log.Debugf("DEBUG: addFeesToCoinbase - Added fee output for coinType %d with value %d", coinType, feeAmount)
+	}
+
+	// Log final coinbase outputs
+	log.Debugf("DEBUG: addFeesToCoinbase - Final coinbase has %d outputs:", len(coinbaseTx.TxOut))
+	for i, out := range coinbaseTx.TxOut {
+		log.Debugf("DEBUG: addFeesToCoinbase - Final Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
 	}
 
 	return nil
@@ -1813,8 +1858,11 @@ nextPriorityQueueItem:
 		}
 
 		// Check if transaction fits within coin type allocation
+		coinType := GetTransactionCoinType(tx)
+		log.Debugf("DEBUG: Evaluating transaction %s (coinType=%d, size=%d) for block inclusion", 
+			tx.Hash(), coinType, txSize)
+		
 		if !transactionTracker.CanAddTransaction(tx) {
-			coinType := GetTransactionCoinType(tx)
 			log.Tracef("Skipping tx %s (coin type %d, size %v) because it "+
 				"would exceed the coin type allocation; cur block "+
 				"size %v, cur num tx %v", tx.Hash(), coinType, txSize,
@@ -1828,8 +1876,11 @@ nextPriorityQueueItem:
 		// for overflow.
 		numSigOps := int64(prioItem.txDesc.TotalSigOps)
 		numSigOpsBundle := numSigOps + int64(ancestorStats.TotalSigOps)
+		log.Debugf("DEBUG: Checking sigops for tx %s - numSigOps=%d, numSigOpsBundle=%d, blockSigOps=%d, max=%d", 
+			tx.Hash(), numSigOps, numSigOpsBundle, blockSigOps, blockchain.MaxSigOpsPerBlock)
 		if blockSigOps+numSigOpsBundle < blockSigOps ||
 			blockSigOps+numSigOpsBundle > blockchain.MaxSigOpsPerBlock {
+			log.Debugf("DEBUG: Transaction %s REJECTED due to sigops limit", tx.Hash())
 			log.Tracef("Skipping tx %s because it would "+
 				"exceed the maximum sigops per block", tx.Hash())
 			logSkippedDeps(tx, deps)
@@ -1860,25 +1911,37 @@ nextPriorityQueueItem:
 		// transactions and SKA emission transactions. Use coin-type-aware fee validation when available.
 		skipForLowFee := false
 		isSKAEmission := wire.IsSKAEmissionTransaction(tx.MsgTx())
+		log.Debugf("DEBUG: Fee validation check for tx %s - tree=%d, isSKAEmission=%v", 
+			tx.Hash(), tx.Tree(), isSKAEmission)
 		if tx.Tree() != wire.TxTreeStake && !isSKAEmission {
 			if g.cfg.FeeCalculator != nil {
 				// Use coin-type-specific fee validation
 				txSize := int64(tx.MsgTx().SerializeSize())
+				log.Debugf("DEBUG: Validating fees for tx %s - fee=%d, size=%d, coinType=%d", 
+					tx.Hash(), prioItem.txDesc.Fee, txSize, prioItem.coinType)
 				err := g.cfg.FeeCalculator.ValidateTransactionFees(prioItem.txDesc.Fee,
 					txSize, prioItem.coinType, false)
 				if err != nil {
+					log.Debugf("DEBUG: Transaction %s REJECTED due to fee validation: %v", tx.Hash(), err)
 					log.Tracef("Skipping tx %s with coin type %d: %v",
 						tx.Hash(), prioItem.coinType, err)
 					skipForLowFee = true
+				} else {
+					log.Debugf("DEBUG: Transaction %s passed fee validation", tx.Hash())
 				}
 			} else {
 				// Fallback to standard fee validation
+				log.Debugf("DEBUG: Using fallback fee validation for tx %s - feePerKB=%.2f, min=%d", 
+					tx.Hash(), prioItem.feePerKB, g.cfg.Policy.TxMinFreeFee)
 				if prioItem.feePerKB < float64(g.cfg.Policy.TxMinFreeFee) {
+					log.Debugf("DEBUG: Transaction %s REJECTED due to low fee per KB", tx.Hash())
 					log.Tracef("Skipping tx %s with feePerKB %.2f < TxMinFreeFee %d ",
 						tx.Hash(), prioItem.feePerKB, g.cfg.Policy.TxMinFreeFee)
 					skipForLowFee = true
 				}
 			}
+		} else {
+			log.Debugf("DEBUG: Skipping fee validation for tx %s (stake or SKA emission)", tx.Hash())
 		}
 
 		if skipForLowFee {
@@ -1893,10 +1956,13 @@ nextPriorityQueueItem:
 			// preconditions before allowing it to be added to the block.
 			// The fraud proof is not checked because it will be filled in
 			// by the miner.
+			log.Debugf("DEBUG: Calling CheckTransactionInputs for tx %s (coinType=%d)", 
+				bundledTx.Tx.Hash(), GetTransactionCoinType(bundledTx.Tx))
 			_, err = g.cfg.CheckTransactionInputs(bundledTx.Tx, nextBlockHeight,
 				blockUtxos, false, &bestHeader, isTreasuryEnabled,
 				isAutoRevocationsEnabled, subsidySplitVariant)
 			if err != nil {
+				log.Debugf("DEBUG: CheckTransactionInputs FAILED for tx %s: %v", bundledTx.Tx.Hash(), err)
 				log.Tracef("Skipping tx %s due to error in "+
 					"CheckTransactionInputs: %v", bundledTx.Tx.Hash(), err)
 				logSkippedDeps(bundledTx.Tx, deps)
@@ -2513,8 +2579,10 @@ nextPriorityQueueItem:
 	if err != nil {
 		return nil, err
 	}
-	msgBlock.Header.MerkleRoot = calcBlockMerkleRoot(msgBlock.Transactions,
+	calculatedMerkleRoot := calcBlockMerkleRoot(msgBlock.Transactions,
 		msgBlock.STransactions, hdrCmtActive)
+	msgBlock.Header.MerkleRoot = calculatedMerkleRoot
+	log.Debugf("DEBUG: Set msgBlock.Header.MerkleRoot (location 2) = %x", calculatedMerkleRoot[:8])
 
 	// Calculate the stake root or commitment root depending on the result of
 	// the header commitments agenda vote.
@@ -2537,6 +2605,7 @@ nextPriorityQueueItem:
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
 	block := dcrutil.NewBlockDeepCopyCoinbase(&msgBlock)
+	log.Debugf("DEBUG: Before CheckConnectBlockTemplate (location 2), header.MerkleRoot = %x", block.MsgBlock().Header.MerkleRoot[:8])
 	err = g.cfg.CheckConnectBlockTemplate(block)
 	if err != nil {
 		str := fmt.Sprintf("failed to do final check for check connect "+

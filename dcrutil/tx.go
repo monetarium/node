@@ -132,6 +132,7 @@ func NewTxDeep(msgTx *wire.MsgTx) *Tx {
 
 		txOuts[i] = &wire.TxOut{
 			Value:    txout.Value,
+			CoinType: txout.CoinType,
 			Version:  txout.Version,
 			PkScript: pkScript,
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/decred/dcrd/connmgr/v3"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/internal/blockchain"
+	"github.com/decred/dcrd/internal/fees"
 	"github.com/decred/dcrd/internal/mempool"
 	"github.com/decred/dcrd/internal/mining"
 	"github.com/decred/dcrd/internal/mining/cpuminer"
@@ -627,4 +628,41 @@ func (c *rpcCPUMiner) SetNumWorkers(numWorkers int32) {
 	if c.miner != nil {
 		c.miner.SetNumWorkers(numWorkers)
 	}
+}
+
+// rpcCoinTypeFeeCalculator provides a coin type fee calculator for use with the RPC
+// server and implements the rpcserver.CoinTypeFeeCalculator interface.
+type rpcCoinTypeFeeCalculator struct {
+	calc *fees.CoinTypeFeeCalculator
+}
+
+// Ensure rpcCoinTypeFeeCalculator implements the rpcserver.CoinTypeFeeCalculator interface.
+var _ rpcserver.CoinTypeFeeCalculator = (*rpcCoinTypeFeeCalculator)(nil)
+
+// GetFeeStats returns comprehensive fee statistics for a specific coin type.
+func (r *rpcCoinTypeFeeCalculator) GetFeeStats(coinType wire.CoinType) (*rpcserver.CoinTypeFeeStats, error) {
+	stats, err := r.calc.GetFeeStats(coinType)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Convert from fees.CoinTypeFeeStats to rpcserver.CoinTypeFeeStats
+	return &rpcserver.CoinTypeFeeStats{
+		CoinType:             stats.CoinType,
+		MinRelayFee:          stats.MinRelayFee,
+		DynamicFeeMultiplier: stats.DynamicFeeMultiplier,
+		MaxFeeRate:           stats.MaxFeeRate,
+		FastFee:              stats.FastFee,
+		NormalFee:            stats.NormalFee,
+		SlowFee:              stats.SlowFee,
+		PendingTxCount:       stats.PendingTxCount,
+		PendingTxSize:        stats.PendingTxSize,
+		BlockSpaceUsed:       stats.BlockSpaceUsed,
+		LastUpdated:          stats.LastUpdated,
+	}, nil
+}
+
+// EstimateFeeRate returns the current fee rate estimate for the given coin type.
+func (r *rpcCoinTypeFeeCalculator) EstimateFeeRate(coinType wire.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
+	return r.calc.EstimateFeeRate(coinType, targetConfirmations)
 }

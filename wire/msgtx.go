@@ -464,12 +464,26 @@ func (msg *MsgTx) serialize(serType TxSerializeType) ([]byte, error) {
 	// modifying the original transaction.
 	mtxCopy := *msg
 	mtxCopy.SerType = serType
-	buf := bytes.NewBuffer(make([]byte, 0, mtxCopy.SerializeSize()))
+	expectedSize := mtxCopy.SerializeSize()
+	buf := bytes.NewBuffer(make([]byte, 0, expectedSize))
 	err := mtxCopy.Serialize(buf)
 	if err != nil {
+		// Enhanced debug logging for dual-coin transactions
+		if len(msg.TxOut) > 0 && msg.TxOut[0].CoinType != 0 {
+			fmt.Printf("DEBUG: serialize error for dual-coin tx - serType=%d, expectedSize=%d, error=%v\n", 
+				serType, expectedSize, err)
+		}
 		return nil, err
 	}
-	return buf.Bytes(), nil
+	result := buf.Bytes()
+	
+	// Debug logging for size mismatches
+	if len(result) != expectedSize && len(msg.TxOut) > 0 && msg.TxOut[0].CoinType != 0 {
+		fmt.Printf("DEBUG: Size mismatch for dual-coin tx - expected=%d, actual=%d, serType=%d\n", 
+			expectedSize, len(result), serType)
+	}
+	
+	return result, nil
 }
 
 // mustSerialize returns the serialization of the transaction for the provided
@@ -478,10 +492,21 @@ func (msg *MsgTx) serialize(serType TxSerializeType) ([]byte, error) {
 func (msg *MsgTx) mustSerialize(serType TxSerializeType) []byte {
 	serialized, err := msg.serialize(serType)
 	if err != nil {
-		// Log critical error instead of panicking for production safety
+		// Enhanced debug logging for merkle root debugging
 		fmt.Printf("CRITICAL: MsgTx failed serializing for type %v: %v\n", serType, err)
+		fmt.Printf("  Transaction details: Version=%d, SerType=%d, TxIn=%d, TxOut=%d\n", 
+			msg.Version, msg.SerType, len(msg.TxIn), len(msg.TxOut))
+		if len(msg.TxOut) > 0 {
+			fmt.Printf("  First TxOut: CoinType=%d, Value=%d, Version=%d, PkScript len=%d\n",
+				msg.TxOut[0].CoinType, msg.TxOut[0].Value, msg.TxOut[0].Version, len(msg.TxOut[0].PkScript))
+		}
+		fmt.Printf("  Expected SerializeSize: %d\n", msg.SerializeSize())
 		// Return empty byte slice as fallback
 		return []byte{}
+	}
+	// Log successful serialization details for debugging
+	if len(serialized) == 0 {
+		fmt.Printf("WARNING: Successful serialization produced empty bytes for type %v\n", serType)
 	}
 	return serialized
 }
@@ -535,10 +560,23 @@ func (msg *MsgTx) TxHashFull() chainhash.Hash {
 	concat := make([]byte, chainhash.HashSize*2)
 	prefixHash := msg.TxHash()
 	witnessHash := msg.TxHashWitness()
+	
+	// Debug logging for merkle root issue
+	if len(msg.TxOut) > 0 && msg.TxOut[0].CoinType != 0 {
+		fmt.Printf("DEBUG: TxHashFull for dual-coin tx - prefixHash=%x, witnessHash=%x\n", 
+			prefixHash[:8], witnessHash[:8])
+	}
+	
 	copy(concat[0:], prefixHash[:])
 	copy(concat[chainhash.HashSize:], witnessHash[:])
+	fullHash := chainhash.HashH(concat)
+	
+	// Additional debug for dual-coin transactions
+	if len(msg.TxOut) > 0 && msg.TxOut[0].CoinType != 0 {
+		fmt.Printf("DEBUG: TxHashFull result=%x\n", fullHash[:8])
+	}
 
-	return chainhash.HashH(concat)
+	return fullHash
 }
 
 // Copy creates a deep copy of a transaction so that the original does not get

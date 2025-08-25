@@ -323,8 +323,14 @@ func (tst *TransactionSizeTracker) CanAddTransaction(tx *dcrutil.Tx) bool {
 
 	// Check if this coin type would exceed its final allocation
 	coinAllocation := allocation.GetAllocationForCoinType(coinType)
+	
+	// DEBUG: Log allocation check details
 	if coinAllocation == nil {
+		log.Debugf("DEBUG: Transaction rejected - no allocation for coinType %d", coinType)
 		return false
+	} else {
+		log.Debugf("DEBUG: Transaction coinType %d - allocation exists, finalAllocation=%d, testSize=%d", 
+			coinType, coinAllocation.FinalAllocation, testSizes[coinType])
 	}
 
 	return testSizes[coinType] <= coinAllocation.FinalAllocation
