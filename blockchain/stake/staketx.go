@@ -17,6 +17,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/txscript/v4"
 	"github.com/decred/dcrd/txscript/v4/stdaddr"
@@ -1407,9 +1408,9 @@ func CreateRevocationFromTicket(ticketHash *chainhash.Hash,
 	feeApplied := false
 	for i, payToHash := range payToHashes {
 		// Ensure amount is in the valid range for monetary amounts.
-		if amounts[i] <= 0 || amounts[i] > dcrutil.MaxAmount {
+		if amounts[i] <= 0 || amounts[i] > int64(cointype.MaxVARAmount) {
 			str := fmt.Sprintf("invalid output amount: %v (min: 0, max: %v)",
-				amounts[i], dcrutil.MaxAmount)
+				amounts[i], cointype.MaxVARAmount)
 			return nil, stakeRuleError(ErrSStxBadCommitAmount, str)
 		}
 

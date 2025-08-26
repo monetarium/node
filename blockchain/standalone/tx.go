@@ -24,20 +24,19 @@ const (
 	opTSpend = 0xc2
 	opTGen   = 0xc3
 
-	// These constants are defined here to avoid a dependency on dcrutil.  They
-	// are used in consensus code which can't be changed without a vote anyway,
-	// so not referring to them directly via dcrutil is safe.
+	// These constants use values from cointype package for consistency.
+	// They are used in consensus code which can't be changed without a vote anyway.
 	//
 	// atomsPerCoin is the number of atoms in one coin.
 	//
 	// maxAtoms is the maximum transaction amount allowed in atoms.
-	atomsPerCoin = 1e8
-	maxAtoms     = 21e6 * atomsPerCoin
+	atomsPerCoin = cointype.AtomsPerVAR
+	maxAtoms     = cointype.MaxVARAtoms
 
 	// Dual-coin support constants
 	// atomsPerSKA is the number of atoms in one SKA coin.
-	atomsPerSKA = 1e8
-	maxSKAAtoms = 10e6 * atomsPerSKA
+	atomsPerSKA = cointype.AtomsPerSKA
+	maxSKAAtoms = cointype.MaxSKAAtoms
 )
 
 var (

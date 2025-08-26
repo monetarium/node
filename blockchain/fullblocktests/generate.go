@@ -15,6 +15,7 @@ import (
 
 	"github.com/decred/dcrd/blockchain/v5/chaingen"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/crypto/rand"
 	"github.com/decred/dcrd/dcrec"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
@@ -2511,7 +2512,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//                  \-> bcb9(19)
 	g.SetTip("bsb2")
 	g.NextBlock("bcb9", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
-		b.Transactions[1].TxOut[0].Value = dcrutil.MaxAmount + 1
+		b.Transactions[1].TxOut[0].Value = int64(cointype.MaxVARAmount) + 1
 	})
 	rejected(ErrBadTxOutValue)
 
@@ -2522,7 +2523,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 	//                  \-> bcb10(19)
 	g.SetTip("bsb2")
 	g.NextBlock("bcb10", outs[19], ticketOuts[19], func(b *wire.MsgBlock) {
-		b.Transactions[1].TxOut[0].Value = dcrutil.MaxAmount
+		b.Transactions[1].TxOut[0].Value = int64(cointype.MaxVARAmount)
 		b.Transactions[1].TxOut[1].Value = 1
 	})
 	rejected(ErrBadTxOutValue)

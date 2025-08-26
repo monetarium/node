@@ -792,9 +792,9 @@ func handleCreateRawTransaction(_ context.Context, s *Server, cmd interface{}) (
 		}
 
 		// Ensure amount is in the valid range for monetary amounts.
-		if atoms <= 0 || atoms > dcrutil.MaxAmount {
+		if atoms <= 0 || int64(atoms) > int64(cointype.MaxVARAmount) {
 			return nil, rpcInvalidError("Invalid amount: 0 >= %v "+
-				"> %v", amount, dcrutil.MaxAmount)
+				"> %v", amount, cointype.MaxVARAmount)
 		}
 
 		// Decode the provided address.  This also ensures the network encoded
@@ -876,10 +876,10 @@ func handleCreateRawSStx(_ context.Context, s *Server, cmd interface{}) (interfa
 
 	for encodedAddr, amount := range c.Amount {
 		// Ensure amount is in the valid range for monetary amounts.
-		if amount <= 0 || amount > dcrutil.MaxAmount {
+		if amount <= 0 || amount > int64(cointype.MaxVARAmount) {
 			return nil, rpcInvalidError("Invalid SSTx commitment "+
 				"amount: 0 >= %v > %v", amount,
-				dcrutil.MaxAmount)
+				cointype.MaxVARAmount)
 		}
 
 		// Decode the provided address.  This also ensures the network encoded
@@ -957,9 +957,9 @@ func handleCreateRawSStx(_ context.Context, s *Server, cmd interface{}) (interfa
 		// 2. Append change output.
 
 		// Ensure amount is in the valid range for monetary amounts.
-		if cout.ChangeAmt < 0 || cout.ChangeAmt > dcrutil.MaxAmount {
+		if cout.ChangeAmt < 0 || cout.ChangeAmt > int64(cointype.MaxVARAmount) {
 			return nil, rpcInvalidError("Invalid change amount: 0 "+
-				"> %v > %v", cout.ChangeAmt, dcrutil.MaxAmount)
+				"> %v > %v", cout.ChangeAmt, cointype.MaxVARAmount)
 		}
 
 		// Decode the provided address.  This also ensures the network encoded
@@ -2118,7 +2118,7 @@ func handleGetBlock(_ context.Context, s *Server, cmd interface{}) (interface{},
 		confirmations = 1 + best.Height - int64(blockHeader.Height)
 	}
 
-	sbitsFloat := float64(blockHeader.SBits) / dcrutil.AtomsPerCoin
+	sbitsFloat := float64(blockHeader.SBits) / cointype.AtomsPerVAR
 
 	medianTime, err := chain.MedianTimeByHash(hash)
 	if err != nil {

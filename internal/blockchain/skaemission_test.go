@@ -5,6 +5,9 @@
 package blockchain
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -280,24 +283,12 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 		Timestamp:   time.Now().Unix(),
 	}
 
-	// Test addresses and amounts
-	addresses := []string{"DsTest1234567890123456789012345678901234567890"}
+	// Create a test script for output
+	testScript := []byte{0x76, 0xa9, 0x14}                             // OP_DUP OP_HASH160 OP_DATA_20
+	testScript = append(testScript, bytes.Repeat([]byte{0x01}, 20)...) // 20-byte hash
+	testScript = append(testScript, 0x88, 0xac)                        // OP_EQUALVERIFY OP_CHECKSIG
+
 	amounts := []int64{params.SKAEmissionAmount}
-
-	// Create authorization hash and sign it
-	authHash, err := CreateEmissionAuthHash(auth, addresses, amounts)
-	if err != nil {
-		t.Fatalf("Failed to create auth hash: %v", err)
-	}
-
-	signature := ecdsa.Sign(privKey, authHash[:])
-	auth.Signature = signature.Serialize()
-
-	// Create authorized signature script
-	authScript, err := createEmissionAuthScript(auth)
-	if err != nil {
-		t.Fatalf("Failed to create auth script: %v", err)
-	}
 
 	// Create a valid authorized emission transaction
 	validTx := &wire.MsgTx{
@@ -306,17 +297,46 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 				Hash:  chainhash.Hash{},
 				Index: 0xffffffff,
 			},
-			SignatureScript: authScript,
-		}},
-		TxOut: []*wire.TxOut{{
-			Value:    params.SKAEmissionAmount,
-			CoinType: 1, // Use coin type 1 which has authorization
-			Version:  0,
-			PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
+			SignatureScript: []byte{0x01, 0x53, 0x4b, 0x41}, // "SKA" marker initially
 		}},
 		LockTime: 0,
 		Expiry:   0,
 	}
+
+	// Add output with test script
+	validTx.TxOut = append(validTx.TxOut, &wire.TxOut{
+		Value:    amounts[0],
+		CoinType: 1, // Use coin type 1 which has authorization
+		Version:  0,
+		PkScript: testScript,
+	})
+
+	// Sign the transaction properly
+	txBytes, err := validTx.BytesPrefix()
+	if err != nil {
+		t.Fatalf("Failed to serialize tx: %v", err)
+	}
+	txHash := sha256.Sum256(txBytes)
+
+	// Build the signing message
+	var msgBuf bytes.Buffer
+	msgBuf.WriteString("SKA-EMIT-V2")
+	binary.Write(&msgBuf, binary.LittleEndian, uint32(params.Net)) // Use the actual network
+	msgBuf.WriteByte(byte(auth.CoinType))
+	binary.Write(&msgBuf, binary.LittleEndian, auth.Nonce)
+	binary.Write(&msgBuf, binary.LittleEndian, uint64(auth.Height)) // Sign auth.Height for window-based validation
+	msgBuf.Write(txHash[:])
+
+	msgHash := sha256.Sum256(msgBuf.Bytes())
+	signature := ecdsa.Sign(privKey, msgHash[:])
+	auth.Signature = signature.Serialize()
+
+	// Create authorized signature script
+	authScript, err := createEmissionAuthScript(auth)
+	if err != nil {
+		t.Fatalf("Failed to create auth script: %v", err)
+	}
+	validTx.TxIn[0].SignatureScript = authScript
 
 	tests := []struct {
 		name        string
@@ -340,9 +360,18 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 		},
 	}
 
+	// Create mock chain for testing
+	chain := &BlockChain{
+		chainParams: params,
+		skaEmissionState: &SKAEmissionState{
+			nonces:  make(map[cointype.CoinType]uint64),
+			emitted: make(map[cointype.CoinType]bool),
+		},
+	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			err := ValidateAuthorizedSKAEmissionTransaction(test.tx, test.blockHeight, params)
+			err := ValidateAuthorizedSKAEmissionTransaction(test.tx, test.blockHeight, chain, params)
 
 			if test.expectError {
 				if err == nil {

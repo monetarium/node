@@ -60,8 +60,8 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"max standard tx size with max relay fee",
 			MaxStandardTxSize,
-			dcrutil.MaxAmount,
-			dcrutil.MaxAmount,
+			dcrutil.Amount(cointype.MaxVARAmount),
+			int64(cointype.MaxVARAmount),
 		},
 		{
 			"1500 bytes with 5000 relay fee",
@@ -274,8 +274,8 @@ func TestDust(t *testing.T) {
 		{
 			// Maximum allowed value is never dust.
 			"max amount is never dust",
-			wire.TxOut{Value: dcrutil.MaxAmount, Version: 0, PkScript: pkScript, CoinType: cointype.CoinTypeVAR},
-			dcrutil.MaxAmount,
+			wire.TxOut{Value: int64(cointype.MaxVARAmount), Version: 0, PkScript: pkScript, CoinType: cointype.CoinTypeVAR},
+			dcrutil.Amount(cointype.MaxVARAmount),
 			false,
 		},
 		{

@@ -3550,10 +3550,10 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 				"value of %v", originTxAtom)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
-		if originTxAtom > dcrutil.MaxAmount {
+		if originTxAtom > int64(cointype.MaxVARAmount) {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
-				originTxAtom, dcrutil.MaxAmount)
+				originTxAtom, cointype.MaxVARAmount)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
 
@@ -3563,11 +3563,11 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 		lastAtomIn := totalAtomIn
 		totalAtomIn += originTxAtom
 		if totalAtomIn < lastAtomIn ||
-			totalAtomIn > dcrutil.MaxAmount {
+			totalAtomIn > int64(cointype.MaxVARAmount) {
 			str := fmt.Sprintf("total value of all transaction "+
 				"inputs is %v which is higher than max "+
 				"allowed value of %v", totalAtomIn,
-				dcrutil.MaxAmount)
+				cointype.MaxVARAmount)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
 	}

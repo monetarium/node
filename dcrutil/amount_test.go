@@ -10,6 +10,14 @@ import (
 	"reflect"
 	"sort"
 	"testing"
+
+	"github.com/decred/dcrd/cointype"
+)
+
+// Define test constants for backward compatibility
+const (
+	AtomsPerCoin = cointype.AtomsPerVAR // Use VAR atoms for tests
+	MaxAmount    = Amount(21e6 * AtomsPerCoin)
 )
 
 func TestAmountCreation(t *testing.T) {

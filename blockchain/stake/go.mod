@@ -1,10 +1,13 @@
 module github.com/decred/dcrd/blockchain/stake/v5
 
-go 1.17
+go 1.23
+
+toolchain go1.23.4
 
 require (
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.4
 	github.com/decred/dcrd/chaincfg/v3 v3.2.1
+	github.com/decred/dcrd/cointype v1.0.0
 	github.com/decred/dcrd/database/v3 v3.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0
 	github.com/decred/dcrd/dcrutil/v4 v4.0.2
@@ -26,3 +29,5 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
+
+replace github.com/decred/dcrd/cointype => ../../cointype

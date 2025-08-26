@@ -89,8 +89,8 @@ func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee dcrutil.Amoun
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
-	if minFee < 0 || minFee > dcrutil.MaxAmount {
-		minFee = dcrutil.MaxAmount
+	if minFee < 0 || minFee > int64(cointype.MaxVARAmount) {
+		minFee = int64(cointype.MaxVARAmount)
 	}
 
 	return minFee

@@ -169,8 +169,8 @@ func (calc *CoinTypeFeeCalculator) CalculateMinFee(serializedSize int64, coinTyp
 
 	// Ensure fee is within valid monetary range
 	finalFee := int64(dynamicFee)
-	if finalFee < 0 || finalFee > dcrutil.MaxAmount {
-		finalFee = dcrutil.MaxAmount
+	if finalFee < 0 || finalFee > int64(cointype.MaxVARAmount) {
+		finalFee = int64(cointype.MaxVARAmount)
 	}
 
 	return finalFee

@@ -22,6 +22,7 @@ import (
 	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/container/lru"
 	"github.com/decred/dcrd/database/v3"
 	"github.com/decred/dcrd/dcrutil/v4"
@@ -182,6 +183,10 @@ type BlockChain struct {
 	// subsidyCache is the cache that provides quick lookup of subsidy
 	// values.
 	subsidyCache *standalone.SubsidyCache
+
+	// skaEmissionState manages the persistent state for SKA emissions
+	// including nonces and emission tracking for security.
+	skaEmissionState *SKAEmissionState
 
 	// processLock protects concurrent access to overall chain processing
 	// independent from the chain lock which is periodically released to
@@ -1624,6 +1629,29 @@ func (b *BlockChain) BestSnapshot() *BestState {
 	return snapshot
 }
 
+// GetSKAEmissionNonce returns the last used nonce for the specified coin type.
+// This replaces the old chainParams-based nonce storage with proper blockchain
+// state management for security and reorg handling.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) GetSKAEmissionNonce(coinType cointype.CoinType) uint64 {
+	if b.skaEmissionState == nil {
+		return 0
+	}
+	return b.skaEmissionState.GetNonce(coinType)
+}
+
+// HasSKAEmissionOccurred checks if an emission has already occurred for the
+// specified coin type. This is used to prevent duplicate emissions.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) HasSKAEmissionOccurred(coinType cointype.CoinType) bool {
+	if b.skaEmissionState == nil {
+		return false
+	}
+	return b.skaEmissionState.IsEmitted(coinType)
+}
+
 // maxBlockSize returns the maximum permitted block size for the block
 // AFTER the given node.
 //
@@ -2468,6 +2496,15 @@ func New(ctx context.Context, config *Config) (*BlockChain, error) {
 		utxoCache:                     config.UtxoCache,
 	}
 	b.pruner = newChainPruner(&b)
+
+	// Initialize the SKA emission state for tracking nonces and emissions.
+	// This must be done before chain state initialization as it may be
+	// referenced during block validation.
+	skaState, err := NewSKAEmissionState(config.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize SKA emission state: %w", err)
+	}
+	b.skaEmissionState = skaState
 
 	// Initialize the chain state from the passed database.  When the db
 	// does not yet contain any chain state, both it and the chain state

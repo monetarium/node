@@ -2114,12 +2114,12 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		wantErr: true,
 		errCode: dcrjson.ErrRPCInvalidParameter,
 	}, {
-		name:    "handleCreateRawSStx: invalid amount > dcrutil.MaxAmount",
+		name:    "handleCreateRawSStx: invalid amount > cointype.MaxVARAmount",
 		handler: handleCreateRawSStx,
 		cmd: &types.CreateRawSStxCmd{
 			Inputs: defaultCmdInputs,
 			Amount: map[string]int64{
-				"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": dcrutil.MaxAmount + 1,
+				"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": int64(cointype.MaxVARAmount) + 1,
 			},
 			COuts: defaultCmdCOuts,
 		},
@@ -2228,21 +2228,21 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		wantErr: true,
 		errCode: dcrjson.ErrRPCInvalidAddressOrKey,
 	}, {
-		name:    "handleCreateRawSStx: invalid change amount > dcrutil.MaxAmount",
+		name:    "handleCreateRawSStx: invalid change amount > cointype.MaxVARAmount",
 		handler: handleCreateRawSStx,
 		cmd: &types.CreateRawSStxCmd{
 			Inputs: []types.SStxInput{{
 				Txid: "e02f03a25a57afdd402818fe5b13985a0731502ad8a8c93d1874900e84d3330d",
 				Vout: 0,
 				Tree: 0,
-				Amt:  dcrutil.MaxAmount + 2,
+				Amt:  int64(cointype.MaxVARAmount) + 2,
 			}},
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
 				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
 				CommitAmt:  100000000,
 				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
-				ChangeAmt:  dcrutil.MaxAmount + 1,
+				ChangeAmt:  int64(cointype.MaxVARAmount) + 1,
 			}},
 		},
 		wantErr: true,
@@ -2695,13 +2695,13 @@ func TestHandleCreateRawTransaction(t *testing.T) {
 		handler: handleCreateRawTransaction,
 		cmd: &types.CreateRawTransactionCmd{
 			Inputs: []types.TransactionInput{{
-				Amount: (dcrutil.MaxAmount + 1) / 1e8,
+				Amount: float64(cointype.MaxVARAmount+1) / 1e8,
 				Txid:   "e02f03a25a57afdd402818fe5b13985a0731502ad8a8c93d1874900e84d3330d",
 				Vout:   0,
 				Tree:   0,
 			}},
 			Amounts: map[string]float64{
-				"DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ": (dcrutil.MaxAmount + 1) / 1e8,
+				"DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ": float64(cointype.MaxVARAmount+1) / 1e8,
 			},
 			LockTime: defaultCmdLockTime,
 			Expiry:   defaultCmdExpiry,

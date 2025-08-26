@@ -101,6 +101,15 @@ type Config struct {
 	// the current best chain.
 	BestHeight func() int64
 
+	// HasSKAEmissionOccurred defines the function to check if an SKA emission
+	// has already occurred for the specified coin type.
+	// This is used to prevent duplicate emissions in the mempool.
+	HasSKAEmissionOccurred func(cointype.CoinType) bool
+
+	// GetSKAEmissionNonce defines the function to get the current nonce
+	// for an SKA coin type.
+	GetSKAEmissionNonce func(cointype.CoinType) uint64
+
 	// HeaderByHash returns the block header identified by the given hash or an
 	// error if it doesn't exist.  Note that this will return headers from both
 	// the main chain and any side chains.
@@ -1285,8 +1294,22 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 		bestHeight := mp.cfg.BestHeight()
 		nextBlockHeight := bestHeight + 1
 
+		// SECURITY FIX: Check if this coin type has already been emitted
+		// This prevents duplicate emissions from entering the mempool
+		if len(msgTx.TxOut) > 0 && mp.cfg.HasSKAEmissionOccurred != nil {
+			coinType := msgTx.TxOut[0].CoinType
+			if mp.cfg.HasSKAEmissionOccurred(coinType) {
+				str := fmt.Sprintf("transaction %v is a duplicate SKA emission - coin type %d has already been emitted",
+					txHash, coinType)
+				return nil, txRuleError(ErrDuplicate, str)
+			}
+		}
+
 		// Perform full cryptographic validation including governance authorization
-		if err := blockchain.ValidateAuthorizedSKAEmissionTransaction(msgTx, nextBlockHeight, mp.cfg.ChainParams); err != nil {
+		// Note: Signature verification will be done during block validation
+		// since mempool doesn't have direct access to blockchain state.
+		// For now, we do basic structural validation.
+		if err := blockchain.ValidateSKAEmissionTransaction(msgTx, nextBlockHeight, mp.cfg.ChainParams); err != nil {
 			str := fmt.Sprintf("transaction %v is an invalid SKA emission transaction: %v", txHash, err)
 			return nil, txRuleError(ErrInvalid, str)
 		}
