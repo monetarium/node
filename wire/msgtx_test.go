@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/decred/dcrd/cointype"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
@@ -168,7 +170,7 @@ func TestTxHash(t *testing.T) {
 	}
 	txOut := TxOut{
 		Value:    5000000000,
-		CoinType: CoinTypeVAR,
+		CoinType: cointype.CoinTypeVAR,
 		Version:  0xf0f0,
 		PkScript: []byte{
 			0x41, // OP_DATA_65
@@ -876,7 +878,7 @@ var multiTx = &MsgTx{
 	TxOut: []*TxOut{
 		{
 			Value:    0x12a05f200,
-			CoinType: CoinTypeVAR,
+			CoinType: cointype.CoinTypeVAR,
 			Version:  0xabab,
 			PkScript: []byte{
 				0x41, // OP_DATA_65
@@ -894,7 +896,7 @@ var multiTx = &MsgTx{
 		},
 		{
 			Value:    0x5f5e100,
-			CoinType: CoinTypeVAR,
+			CoinType: cointype.CoinTypeVAR,
 			Version:  0xbcbc,
 			PkScript: []byte{
 				0x41, // OP_DATA_65
@@ -931,7 +933,7 @@ var multiTxPrefix = &MsgTx{
 	TxOut: []*TxOut{
 		{
 			Value:    0x12a05f200,
-			CoinType: CoinTypeVAR,
+			CoinType: cointype.CoinTypeVAR,
 			Version:  0xabab,
 			PkScript: []byte{
 				0x41, // OP_DATA_65
@@ -949,7 +951,7 @@ var multiTxPrefix = &MsgTx{
 		},
 		{
 			Value:    0x5f5e100,
-			CoinType: CoinTypeVAR,
+			CoinType: cointype.CoinTypeVAR,
 			Version:  0xbcbc,
 			PkScript: []byte{
 				0x41, // OP_DATA_65

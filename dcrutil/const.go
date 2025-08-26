@@ -5,6 +5,10 @@
 
 package dcrutil
 
+import (
+	"github.com/decred/dcrd/cointype"
+)
+
 const (
 	// AtomsPerCent is the number of atomic units in one coin cent.
 	AtomsPerCent = 1e6
@@ -18,8 +22,8 @@ const (
 	MaxAmount = 21e6 * AtomsPerCoin
 
 	// SatoshiPerVAR is an alias for AtomsPerVAR for compatibility.
-	SatoshiPerVAR = AtomsPerVAR
+	SatoshiPerVAR = cointype.AtomsPerVAR
 
 	// SatoshiPerSKA is an alias for AtomsPerSKA for compatibility.
-	SatoshiPerSKA = AtomsPerSKA
+	SatoshiPerSKA = cointype.AtomsPerSKA
 )

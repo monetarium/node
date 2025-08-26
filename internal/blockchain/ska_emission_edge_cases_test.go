@@ -9,7 +9,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -57,7 +57,7 @@ func TestSKAEmissionBasicValidation(t *testing.T) {
 	t.Run("VAROutput", func(t *testing.T) {
 		// Create emission with VAR output (should fail)
 		tx := createValidEmissionTx(config.MaxSupply)
-		tx.TxOut[0].CoinType = wire.CoinTypeVAR
+		tx.TxOut[0].CoinType = cointype.CoinTypeVAR
 
 		err := ValidateSKAEmissionTransaction(tx, int64(config.EmissionHeight), params)
 		if err == nil {
@@ -115,7 +115,7 @@ func TestSKAEmissionWindowCalculations(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			params := &chaincfg.Params{
-				SKACoins: map[dcrutil.CoinType]*chaincfg.SKACoinConfig{
+				SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{
 					1: {
 						CoinType:       1,
 						EmissionHeight: int32(test.emissionHeight),
@@ -172,7 +172,7 @@ func createValidEmissionTx(amount int64) *wire.MsgTx {
 		}},
 		TxOut: []*wire.TxOut{{
 			Value:    amount,
-			CoinType: wire.CoinTypeSKA,
+			CoinType: cointype.CoinType(1),
 			Version:  0,
 			PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x88, 0xac},
 		}},

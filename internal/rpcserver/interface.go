@@ -12,6 +12,7 @@ import (
 	"github.com/decred/dcrd/addrmgr/v3"
 	"github.com/decred/dcrd/blockchain/stake/v5"
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/gcs/v4"
 	"github.com/decred/dcrd/internal/blockchain"
@@ -498,17 +499,17 @@ type FeeEstimator interface {
 type CoinTypeFeeCalculator interface {
 	// GetFeeStats returns comprehensive fee statistics for a specific coin type
 	// including dynamic multiplier, pending transaction data, and fee percentiles.
-	GetFeeStats(coinType wire.CoinType) (*CoinTypeFeeStats, error)
+	GetFeeStats(coinType cointype.CoinType) (*CoinTypeFeeStats, error)
 
 	// EstimateFeeRate returns the current fee rate estimate for the given coin type
 	// and target confirmation blocks.
-	EstimateFeeRate(coinType wire.CoinType, targetConfirmations int) (dcrutil.Amount, error)
+	EstimateFeeRate(coinType cointype.CoinType, targetConfirmations int) (dcrutil.Amount, error)
 }
 
 // CoinTypeFeeStats contains fee statistics for a specific coin type as used by
 // the RPC interface - this mirrors the fees package structure for compatibility.
 type CoinTypeFeeStats struct {
-	CoinType             wire.CoinType
+	CoinType             cointype.CoinType
 	MinRelayFee          dcrutil.Amount
 	DynamicFeeMultiplier float64
 	MaxFeeRate           dcrutil.Amount

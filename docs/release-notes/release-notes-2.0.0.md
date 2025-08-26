@@ -212,7 +212,7 @@ All commits since the last release may be viewed on GitHub
 
 ### dcrd command-line flags and configuration:
 
-- config: Support VARD_APPDATA env variable ([decred/dcrd#3152](https://github.com/decred/dcrd/pull/3152))
+- config: Support MONETARIUM_APPDATA env variable ([decred/dcrd#3152](https://github.com/decred/dcrd/pull/3152))
 - config: Show usage message on invalid cli flags ([decred/dcrd#3282](https://github.com/decred/dcrd/pull/3282))
 
 ### Documentation:

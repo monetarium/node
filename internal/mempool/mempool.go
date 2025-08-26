@@ -16,6 +16,7 @@ import (
 	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/internal/blockchain"
 	"github.com/decred/dcrd/internal/blockchain/indexers"
@@ -1306,7 +1307,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	// Check if transaction has SKA outputs and validate SKA is active
 	hasSKAOutputs := false
 	for _, txOut := range msgTx.TxOut {
-		if txOut.CoinType == wire.CoinTypeSKA {
+		if txOut.CoinType.IsSKA() {
 			hasSKAOutputs = true
 			break
 		}
@@ -2449,15 +2450,15 @@ func New(cfg *Config) *TxPool {
 
 // determinePrimaryCoinType determines the primary coin type for a transaction
 // based on the majority of its outputs
-func (mp *TxPool) determinePrimaryCoinType(msgTx *wire.MsgTx) wire.CoinType {
+func (mp *TxPool) determinePrimaryCoinType(msgTx *wire.MsgTx) cointype.CoinType {
 	// Count outputs by coin type
-	coinTypeCounts := make(map[wire.CoinType]int)
+	coinTypeCounts := make(map[cointype.CoinType]int)
 	for _, txOut := range msgTx.TxOut {
 		coinTypeCounts[txOut.CoinType]++
 	}
 
 	// Find the coin type with the most outputs
-	var primaryCoinType wire.CoinType = wire.CoinTypeVAR // Default to VAR
+	var primaryCoinType cointype.CoinType = cointype.CoinTypeVAR // Default to VAR
 	maxCount := 0
 	for coinType, count := range coinTypeCounts {
 		if count > maxCount {
@@ -2470,8 +2471,8 @@ func (mp *TxPool) determinePrimaryCoinType(msgTx *wire.MsgTx) wire.CoinType {
 }
 
 // calculateLegacyMinFee calculates minimum fee using legacy logic for fallback
-func (mp *TxPool) calculateLegacyMinFee(msgTx *wire.MsgTx, serializedSize int64, primaryCoinType wire.CoinType) int64 {
-	if primaryCoinType == wire.CoinTypeSKA {
+func (mp *TxPool) calculateLegacyMinFee(msgTx *wire.MsgTx, serializedSize int64, primaryCoinType cointype.CoinType) int64 {
+	if primaryCoinType.IsSKA() {
 		return calcMinRequiredTxRelayFeeForCoinType(serializedSize,
 			primaryCoinType, mp.cfg.Policy.MinRelayTxFee, mp.cfg.ChainParams)
 	} else {
@@ -2480,8 +2481,8 @@ func (mp *TxPool) calculateLegacyMinFee(msgTx *wire.MsgTx, serializedSize int64,
 }
 
 // calculateLegacyMaxFee calculates maximum fee using legacy logic for fallback
-func (mp *TxPool) calculateLegacyMaxFee(msgTx *wire.MsgTx, serializedSize int64, primaryCoinType wire.CoinType) int64 {
-	if primaryCoinType == wire.CoinTypeSKA {
+func (mp *TxPool) calculateLegacyMaxFee(msgTx *wire.MsgTx, serializedSize int64, primaryCoinType cointype.CoinType) int64 {
+	if primaryCoinType.IsSKA() {
 		return calcMinRequiredTxRelayFeeForCoinType(serializedSize*maxRelayFeeMultiplier,
 			primaryCoinType, mp.cfg.Policy.MinRelayTxFee, mp.cfg.ChainParams)
 	} else {
@@ -2523,7 +2524,7 @@ func (mp *TxPool) validateCoinTypeConsistency(tx *dcrutil.Tx, utxoView *blockcha
 	}
 
 	// Collect input coin types
-	inputCoinTypes := make(map[wire.CoinType]bool)
+	inputCoinTypes := make(map[cointype.CoinType]bool)
 	for i, txIn := range msgTx.TxIn {
 		// Skip the stakebase (first input of SSGen transactions)
 		if i == 0 && txType == stake.TxTypeSSGen {
@@ -2537,12 +2538,12 @@ func (mp *TxPool) validateCoinTypeConsistency(tx *dcrutil.Tx, utxoView *blockcha
 			continue
 		}
 
-		inputCoinType := wire.CoinType(entry.CoinType())
+		inputCoinType := entry.CoinType()
 		inputCoinTypes[inputCoinType] = true
 	}
 
 	// Collect output coin types
-	outputCoinTypes := make(map[wire.CoinType]bool)
+	outputCoinTypes := make(map[cointype.CoinType]bool)
 	for _, txOut := range msgTx.TxOut {
 		outputCoinTypes[txOut.CoinType] = true
 	}
@@ -2560,7 +2561,7 @@ func (mp *TxPool) validateCoinTypeConsistency(tx *dcrutil.Tx, utxoView *blockcha
 
 	// Check that input and output coin types match
 	if len(inputCoinTypes) > 0 && len(outputCoinTypes) > 0 {
-		var inputCoinType, outputCoinType wire.CoinType
+		var inputCoinType, outputCoinType cointype.CoinType
 
 		// Get the single input coin type
 		for ct := range inputCoinTypes {

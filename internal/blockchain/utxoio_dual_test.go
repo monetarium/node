@@ -7,6 +7,8 @@ package blockchain
 import (
 	"bytes"
 	"testing"
+
+	"github.com/decred/dcrd/cointype"
 )
 
 // TestUtxoSerializationDualCoin tests UTXO serialization/deserialization
@@ -24,7 +26,7 @@ func TestUtxoSerializationDualCoin(t *testing.T) {
 				blockHeight:   12345,
 				blockIndex:    2,
 				scriptVersion: 0,
-				coinType:      CoinTypeVAR,
+				coinType:      cointype.CoinTypeVAR,
 				packedFlags:   0,
 			},
 		},
@@ -36,7 +38,7 @@ func TestUtxoSerializationDualCoin(t *testing.T) {
 				blockHeight:   54321,
 				blockIndex:    1,
 				scriptVersion: 0,
-				coinType:      CoinTypeSKA,
+				coinType:      cointype.CoinType(1),
 				packedFlags:   0,
 			},
 		},
@@ -48,7 +50,7 @@ func TestUtxoSerializationDualCoin(t *testing.T) {
 				blockHeight:   100000,
 				blockIndex:    0,
 				scriptVersion: 0,
-				coinType:      CoinTypeVAR,
+				coinType:      cointype.CoinTypeVAR,
 				packedFlags:   encodeUtxoFlags(true, false, 0), // coinbase
 			},
 		},
@@ -117,7 +119,7 @@ func TestUtxoSerializationBackwardCompatibility(t *testing.T) {
 		blockHeight:   12345,
 		blockIndex:    2,
 		scriptVersion: 0,
-		coinType:      CoinTypeVAR, // This won't be in the serialized data
+		coinType:      cointype.CoinTypeVAR, // This won't be in the serialized data
 		packedFlags:   0,
 	}
 
@@ -146,7 +148,7 @@ func TestUtxoSerializationBackwardCompatibility(t *testing.T) {
 	}
 
 	// Should default to VAR coin type
-	if deserialized.coinType != CoinTypeVAR {
+	if deserialized.coinType != cointype.CoinTypeVAR {
 		t.Errorf("Expected default coin type VAR, got %d", deserialized.coinType)
 	}
 
@@ -174,7 +176,7 @@ func TestUtxoSerializationSize(t *testing.T) {
 				blockHeight:   100,
 				blockIndex:    1,
 				scriptVersion: 0,
-				coinType:      CoinTypeVAR,
+				coinType:      cointype.CoinTypeVAR,
 				packedFlags:   0,
 			},
 		},
@@ -186,7 +188,7 @@ func TestUtxoSerializationSize(t *testing.T) {
 				blockHeight:   1000000,
 				blockIndex:    100,
 				scriptVersion: 0,
-				coinType:      CoinTypeSKA,
+				coinType:      cointype.CoinType(1),
 				packedFlags:   0,
 			},
 		},
@@ -222,7 +224,7 @@ func TestUtxoSerializationSpentEntry(t *testing.T) {
 		blockHeight:   12345,
 		blockIndex:    2,
 		scriptVersion: 0,
-		coinType:      CoinTypeVAR,
+		coinType:      cointype.CoinTypeVAR,
 		state:         utxoStateSpent, // Mark as spent
 		packedFlags:   0,
 	}

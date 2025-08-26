@@ -1,9 +1,12 @@
 module github.com/decred/dcrd/blockchain/standalone/v2
 
-go 1.17
+go 1.23
+
+toolchain go1.23.4
 
 require (
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.4
+	github.com/decred/dcrd/cointype v1.0.0
 	github.com/decred/dcrd/wire v1.7.0
 )
 
@@ -13,5 +16,7 @@ require (
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
 
-// Use local wire package with dual-coin support
+// Use local packages with dual-coin support
 replace github.com/decred/dcrd/wire => ../../wire
+
+replace github.com/decred/dcrd/cointype => ../../cointype

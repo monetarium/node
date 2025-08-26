@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
 )
 
 // CoinTypeFeeRate represents fee rate configuration for a specific coin type
@@ -38,10 +38,10 @@ type CoinTypeFeeCalculator struct {
 	chainParams *chaincfg.Params
 
 	// feeRates maps coin types to their current fee rates
-	feeRates map[wire.CoinType]*CoinTypeFeeRate
+	feeRates map[cointype.CoinType]*CoinTypeFeeRate
 
 	// utilizationStats tracks network utilization per coin type
-	utilizationStats map[wire.CoinType]*UtilizationStats
+	utilizationStats map[cointype.CoinType]*UtilizationStats
 
 	// defaultMinRelayFee is the baseline minimum relay fee
 	defaultMinRelayFee dcrutil.Amount
@@ -75,8 +75,8 @@ type UtilizationStats struct {
 func NewCoinTypeFeeCalculator(chainParams *chaincfg.Params, defaultMinRelayFee dcrutil.Amount) *CoinTypeFeeCalculator {
 	calc := &CoinTypeFeeCalculator{
 		chainParams:        chainParams,
-		feeRates:           make(map[wire.CoinType]*CoinTypeFeeRate),
-		utilizationStats:   make(map[wire.CoinType]*UtilizationStats),
+		feeRates:           make(map[cointype.CoinType]*CoinTypeFeeRate),
+		utilizationStats:   make(map[cointype.CoinType]*UtilizationStats),
 		defaultMinRelayFee: defaultMinRelayFee,
 		updateInterval:     time.Minute * 5, // Update every 5 minutes
 	}
@@ -87,52 +87,63 @@ func NewCoinTypeFeeCalculator(chainParams *chaincfg.Params, defaultMinRelayFee d
 	return calc
 }
 
-// initializeDefaultFeeRates sets up initial fee rates for supported coin types
+// initializeDefaultFeeRates sets up the initial fee rates for VAR.
+// SKA coin types are initialized on-demand using helper methods.
 func (calc *CoinTypeFeeCalculator) initializeDefaultFeeRates() {
 	now := time.Now()
 
-	// VAR (Varta) coin fee rates
-	calc.feeRates[wire.CoinTypeVAR] = &CoinTypeFeeRate{
+	// VAR (Varta) coin fee rates - VAR has unique properties and is always active
+	calc.feeRates[cointype.CoinTypeVAR] = &CoinTypeFeeRate{
 		MinRelayFee:          calc.defaultMinRelayFee,
 		DynamicFeeMultiplier: 1.0,
 		MaxFeeRate:           calc.defaultMinRelayFee * 100, // 100x max
 		LastUpdated:          now,
 	}
 
-	// SKA (Skarb) coin fee rates - start with lower base fee
-	skaMinFee := calc.defaultMinRelayFee / 10 // 10x lower than VAR
+	// Initialize VAR utilization stats
+	calc.utilizationStats[cointype.CoinTypeVAR] = &UtilizationStats{
+		RecentTxFees:      make([]int64, 0, 100),
+		LastBlockIncluded: now,
+	}
+
+	// Initialize all active SKA coins from chain configuration
+	for coinType, config := range calc.chainParams.SKACoins {
+		if config.Active {
+			calc.feeRates[coinType] = calc.getDefaultSKAFeeRate()
+			calc.utilizationStats[coinType] = &UtilizationStats{
+				RecentTxFees:      make([]int64, 0, 100),
+				LastBlockIncluded: now,
+			}
+		}
+	}
+}
+
+// getDefaultSKAFeeRate returns default fee rate configuration for SKA coin types.
+// This method uses cointype package constants for consistent SKA settings.
+func (calc *CoinTypeFeeCalculator) getDefaultSKAFeeRate() *CoinTypeFeeRate {
+	// SKA coin fee rates - use chain parameters if available, otherwise default to lower than VAR
+	skaMinFee := calc.defaultMinRelayFee
 	if calc.chainParams.SKAMinRelayTxFee > 0 {
 		skaMinFee = dcrutil.Amount(calc.chainParams.SKAMinRelayTxFee)
 	}
 
-	calc.feeRates[wire.CoinTypeSKA] = &CoinTypeFeeRate{
+	return &CoinTypeFeeRate{
 		MinRelayFee:          skaMinFee,
 		DynamicFeeMultiplier: 1.0,
-		MaxFeeRate:           skaMinFee * 100, // 100x max
-		LastUpdated:          now,
-	}
-
-	// Initialize utilization stats
-	calc.utilizationStats[wire.CoinTypeVAR] = &UtilizationStats{
-		RecentTxFees:      make([]int64, 0, 100),
-		LastBlockIncluded: now,
-	}
-
-	calc.utilizationStats[wire.CoinTypeSKA] = &UtilizationStats{
-		RecentTxFees:      make([]int64, 0, 100),
-		LastBlockIncluded: now,
+		MaxFeeRate:           skaMinFee * 100, // 100x max to prevent abuse
+		LastUpdated:          time.Now(),
 	}
 }
 
 // CalculateMinFee calculates the minimum fee for a transaction of the given size and coin type
-func (calc *CoinTypeFeeCalculator) CalculateMinFee(serializedSize int64, coinType wire.CoinType) int64 {
+func (calc *CoinTypeFeeCalculator) CalculateMinFee(serializedSize int64, coinType cointype.CoinType) int64 {
 	calc.mu.RLock()
 	defer calc.mu.RUnlock()
 
 	feeRate, exists := calc.feeRates[coinType]
 	if !exists {
 		// Default to VAR fee calculation for unknown coin types
-		feeRate = calc.feeRates[wire.CoinTypeVAR]
+		feeRate = calc.feeRates[cointype.CoinTypeVAR]
 	}
 
 	// Base fee calculation: (size in bytes * fee rate per KB) / 1000
@@ -140,9 +151,9 @@ func (calc *CoinTypeFeeCalculator) CalculateMinFee(serializedSize int64, coinTyp
 
 	// Apply dynamic multiplier based on network utilization
 	dynamicFee := float64(baseFee) * feeRate.DynamicFeeMultiplier
-	
+
 	// DEBUG: Log the fee calculation details
-	log.Debugf("DEBUG: Fee calculation for coinType %d: baseFee=%d, multiplier=%.3f, dynamicFee=%.1f", 
+	log.Debugf("DEBUG: Fee calculation for coinType %d: baseFee=%d, multiplier=%.3f, dynamicFee=%.1f",
 		coinType, baseFee, feeRate.DynamicFeeMultiplier, dynamicFee)
 
 	// Ensure minimum fee is at least 1 atom if fee rate > 0
@@ -166,7 +177,7 @@ func (calc *CoinTypeFeeCalculator) CalculateMinFee(serializedSize int64, coinTyp
 }
 
 // EstimateFeeRate returns the current fee rate estimate for the given coin type and target confirmation blocks
-func (calc *CoinTypeFeeCalculator) EstimateFeeRate(coinType wire.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
+func (calc *CoinTypeFeeCalculator) EstimateFeeRate(coinType cointype.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
 	calc.mu.RLock()
 	defer calc.mu.RUnlock()
 
@@ -226,7 +237,7 @@ func (calc *CoinTypeFeeCalculator) calculateConfirmationMultiplier(targetConfirm
 }
 
 // UpdateUtilization updates network utilization stats for dynamic fee calculation
-func (calc *CoinTypeFeeCalculator) UpdateUtilization(coinType wire.CoinType, pendingTxCount int,
+func (calc *CoinTypeFeeCalculator) UpdateUtilization(coinType cointype.CoinType, pendingTxCount int,
 	pendingTxSize int64, blockSpaceUsed float64) {
 	calc.mu.Lock()
 	defer calc.mu.Unlock()
@@ -248,7 +259,7 @@ func (calc *CoinTypeFeeCalculator) UpdateUtilization(coinType wire.CoinType, pen
 }
 
 // updateDynamicFeeMultiplier adjusts fee multiplier based on network conditions
-func (calc *CoinTypeFeeCalculator) updateDynamicFeeMultiplier(coinType wire.CoinType, stats *UtilizationStats) {
+func (calc *CoinTypeFeeCalculator) updateDynamicFeeMultiplier(coinType cointype.CoinType, stats *UtilizationStats) {
 	feeRate, exists := calc.feeRates[coinType]
 	if !exists {
 		return
@@ -296,7 +307,7 @@ func (calc *CoinTypeFeeCalculator) updateDynamicFeeMultiplier(coinType wire.Coin
 }
 
 // RecordTransactionFee records a transaction fee for fee estimation
-func (calc *CoinTypeFeeCalculator) RecordTransactionFee(coinType wire.CoinType, fee int64, size int64, confirmed bool) {
+func (calc *CoinTypeFeeCalculator) RecordTransactionFee(coinType cointype.CoinType, fee int64, size int64, confirmed bool) {
 	calc.mu.Lock()
 	defer calc.mu.Unlock()
 
@@ -324,7 +335,7 @@ func (calc *CoinTypeFeeCalculator) RecordTransactionFee(coinType wire.CoinType, 
 }
 
 // GetFeeStats returns current fee statistics for a coin type
-func (calc *CoinTypeFeeCalculator) GetFeeStats(coinType wire.CoinType) (*CoinTypeFeeStats, error) {
+func (calc *CoinTypeFeeCalculator) GetFeeStats(coinType cointype.CoinType) (*CoinTypeFeeStats, error) {
 	calc.mu.RLock()
 	defer calc.mu.RUnlock()
 
@@ -363,17 +374,17 @@ func (calc *CoinTypeFeeCalculator) GetFeeStats(coinType wire.CoinType) (*CoinTyp
 
 // CoinTypeFeeStats contains fee statistics for a specific coin type
 type CoinTypeFeeStats struct {
-	CoinType             wire.CoinType  `json:"cointype"`
-	MinRelayFee          dcrutil.Amount `json:"minrelayfee"`
-	DynamicFeeMultiplier float64        `json:"dynamicfeemultiplier"`
-	MaxFeeRate           dcrutil.Amount `json:"maxfeerate"`
-	PendingTxCount       int            `json:"pendingtxcount"`
-	PendingTxSize        int64          `json:"pendingtxsize"`
-	BlockSpaceUsed       float64        `json:"blockspaceused"`
-	FastFee              dcrutil.Amount `json:"fastfee"`   // ~1 block (90th percentile)
-	NormalFee            dcrutil.Amount `json:"normalfee"` // ~3 blocks (50th percentile)
-	SlowFee              dcrutil.Amount `json:"slowfee"`   // ~6 blocks (10th percentile)
-	LastUpdated          time.Time      `json:"lastupdated"`
+	CoinType             cointype.CoinType `json:"cointype"`
+	MinRelayFee          dcrutil.Amount    `json:"minrelayfee"`
+	DynamicFeeMultiplier float64           `json:"dynamicfeemultiplier"`
+	MaxFeeRate           dcrutil.Amount    `json:"maxfeerate"`
+	PendingTxCount       int               `json:"pendingtxcount"`
+	PendingTxSize        int64             `json:"pendingtxsize"`
+	BlockSpaceUsed       float64           `json:"blockspaceused"`
+	FastFee              dcrutil.Amount    `json:"fastfee"`   // ~1 block (90th percentile)
+	NormalFee            dcrutil.Amount    `json:"normalfee"` // ~3 blocks (50th percentile)
+	SlowFee              dcrutil.Amount    `json:"slowfee"`   // ~6 blocks (10th percentile)
+	LastUpdated          time.Time         `json:"lastupdated"`
 }
 
 // calculatePercentileFees calculates fee percentiles from recent transaction data
@@ -435,7 +446,7 @@ func calcPercentile(sortedData []int64, percentile float64) int64 {
 
 // ValidateTransactionFees validates fees for a transaction, ensuring they meet coin-type-specific requirements
 func (calc *CoinTypeFeeCalculator) ValidateTransactionFees(txFee int64, serializedSize int64,
-	coinType wire.CoinType, allowHighFees bool) error {
+	coinType cointype.CoinType, allowHighFees bool) error {
 
 	// Calculate minimum required fee
 	minFee := calc.CalculateMinFee(serializedSize, coinType)
@@ -464,11 +475,11 @@ func (calc *CoinTypeFeeCalculator) ValidateTransactionFees(txFee int64, serializ
 }
 
 // GetSupportedCoinTypes returns a list of coin types supported by the fee calculator
-func (calc *CoinTypeFeeCalculator) GetSupportedCoinTypes() []wire.CoinType {
+func (calc *CoinTypeFeeCalculator) GetSupportedCoinTypes() []cointype.CoinType {
 	calc.mu.RLock()
 	defer calc.mu.RUnlock()
 
-	coinTypes := make([]wire.CoinType, 0, len(calc.feeRates))
+	coinTypes := make([]cointype.CoinType, 0, len(calc.feeRates))
 	for coinType := range calc.feeRates {
 		coinTypes = append(coinTypes, coinType)
 	}

@@ -43,12 +43,12 @@ if [ -d "${NODES_ROOT}" ] ; then
   rm -R "${NODES_ROOT}"
 fi
 
-PRIMARY_VARD_NAME=dcrd1
-SECONDARY_VARD_NAME=dcrd2
+PRIMARY_VAR_NAME=dcrd1
+SECONDARY_VAR_NAME=dcrd2
 PRIMARY_WALLET_NAME=wallet1
 SECONDARY_WALLET_NAME=wallet2
-mkdir -p "${NODES_ROOT}/${PRIMARY_VARD_NAME}"
-mkdir -p "${NODES_ROOT}/${SECONDARY_VARD_NAME}"
+mkdir -p "${NODES_ROOT}/${PRIMARY_VAR_NAME}"
+mkdir -p "${NODES_ROOT}/${SECONDARY_VAR_NAME}"
 mkdir -p "${NODES_ROOT}/${PRIMARY_WALLET_NAME}"
 mkdir -p "${NODES_ROOT}/${SECONDARY_WALLET_NAME}"
 
@@ -84,26 +84,26 @@ cd ${NODES_ROOT} && tmux -2 new-session -d -s $SESSION
 # Setup the primary dcrd node
 ################################################################################
 
-PRIMARY_VARD_P2P=127.0.0.1:19555
-PRIMARY_VARD_RPC=127.0.0.1:19556
-tmux rename-window -t $SESSION:0 "${PRIMARY_VARD_NAME}"
+PRIMARY_VAR_P2P=127.0.0.1:19555
+PRIMARY_VAR_RPC=127.0.0.1:19556
+tmux rename-window -t $SESSION:0 "${PRIMARY_VAR_NAME}"
 tmux split-window -v
 tmux select-pane -t 0
-tmux send-keys "cd ${NODES_ROOT}/${PRIMARY_VARD_NAME}" C-m
-tmux send-keys "dcrd -C ../dcrd.conf --listen ${PRIMARY_VARD_P2P} --miningaddr=${WALLET_MINING_ADDR}" C-m
+tmux send-keys "cd ${NODES_ROOT}/${PRIMARY_VAR_NAME}" C-m
+tmux send-keys "dcrd -C ../dcrd.conf --listen ${PRIMARY_VAR_P2P} --miningaddr=${WALLET_MINING_ADDR}" C-m
 tmux resize-pane -D 15
 tmux select-pane -t 1
-tmux send-keys "cd ${NODES_ROOT}/${PRIMARY_VARD_NAME}" C-m
+tmux send-keys "cd ${NODES_ROOT}/${PRIMARY_VAR_NAME}" C-m
 
-cat > "${NODES_ROOT}/${PRIMARY_VARD_NAME}/ctl" <<EOF
+cat > "${NODES_ROOT}/${PRIMARY_VAR_NAME}/ctl" <<EOF
 #!/usr/bin/env bash
 dcrctl -C ../dcrctl.conf "\$@"
 EOF
-chmod +x "${NODES_ROOT}/${PRIMARY_VARD_NAME}/ctl"
+chmod +x "${NODES_ROOT}/${PRIMARY_VAR_NAME}/ctl"
 
 # Script to mine a specified number of blocks with a delay in between them
 # Defaults to 1 block
-cat > "${NODES_ROOT}/${PRIMARY_VARD_NAME}/mine" <<EOF
+cat > "${NODES_ROOT}/${PRIMARY_VAR_NAME}/mine" <<EOF
 #!/usr/bin/env bash
 NUM=1
 case \$1 in
@@ -116,7 +116,7 @@ while [ \$((NUM--)) != 0 ]; do
   sleep 1
 done
 EOF
-chmod +x "${NODES_ROOT}/${PRIMARY_VARD_NAME}/mine"
+chmod +x "${NODES_ROOT}/${PRIMARY_VAR_NAME}/mine"
 sleep 3
 tmux send-keys "./ctl generate 32" C-m
 
@@ -183,37 +183,37 @@ tmux send-keys "./ctl importprivkey ${TSPEND_PRIMARY_WIF} imported false; ./ctl 
 # Setup the serially connected secondary dcrd node
 ################################################################################
 
-SECONDARY_VARD_P2P=127.0.0.1:19565
-SECONDARY_VARD_RPC=127.0.0.1:19566
-cat > "${NODES_ROOT}/${SECONDARY_VARD_NAME}/ctl" <<EOF
+SECONDARY_VAR_P2P=127.0.0.1:19565
+SECONDARY_VAR_RPC=127.0.0.1:19566
+cat > "${NODES_ROOT}/${SECONDARY_VAR_NAME}/ctl" <<EOF
 #!/usr/bin/env bash
-dcrctl -C ../dcrctl.conf -s ${SECONDARY_VARD_RPC} "\$@"
+dcrctl -C ../dcrctl.conf -s ${SECONDARY_VAR_RPC} "\$@"
 EOF
-chmod +x "${NODES_ROOT}/${SECONDARY_VARD_NAME}/ctl"
+chmod +x "${NODES_ROOT}/${SECONDARY_VAR_NAME}/ctl"
 
-cp "${NODES_ROOT}/${PRIMARY_VARD_NAME}/mine" "${NODES_ROOT}/${SECONDARY_VARD_NAME}/"
-chmod +x "${NODES_ROOT}/${SECONDARY_VARD_NAME}/mine"
+cp "${NODES_ROOT}/${PRIMARY_VAR_NAME}/mine" "${NODES_ROOT}/${SECONDARY_VAR_NAME}/"
+chmod +x "${NODES_ROOT}/${SECONDARY_VAR_NAME}/mine"
 
 # Script to force reorg
-cat > "${NODES_ROOT}/${SECONDARY_VARD_NAME}/reorg" <<EOF
+cat > "${NODES_ROOT}/${SECONDARY_VAR_NAME}/reorg" <<EOF
 #!/usr/bin/env bash
-./ctl node remove ${PRIMARY_VARD_P2P}
+./ctl node remove ${PRIMARY_VAR_P2P}
 ./mine
-cd "${NODES_ROOT}/${PRIMARY_VARD_NAME}"
+cd "${NODES_ROOT}/${PRIMARY_VAR_NAME}"
 ./mine 2
-cd "${NODES_ROOT}/${SECONDARY_VARD_NAME}"
-./ctl node connect ${PRIMARY_VARD_P2P} perm
+cd "${NODES_ROOT}/${SECONDARY_VAR_NAME}"
+./ctl node connect ${PRIMARY_VAR_P2P} perm
 EOF
-chmod +x "${NODES_ROOT}/${SECONDARY_VARD_NAME}/reorg"
+chmod +x "${NODES_ROOT}/${SECONDARY_VAR_NAME}/reorg"
 
-tmux new-window -t $SESSION:2 -n "${SECONDARY_VARD_NAME}"
+tmux new-window -t $SESSION:2 -n "${SECONDARY_VAR_NAME}"
 tmux split-window -v
 tmux select-pane -t 0
 tmux resize-pane -D 15
-tmux send-keys "cd ${NODES_ROOT}/${SECONDARY_VARD_NAME}" C-m
-tmux send-keys "dcrd -C ../dcrd.conf --listen ${SECONDARY_VARD_P2P} --rpclisten ${SECONDARY_VARD_RPC} --connect ${PRIMARY_VARD_P2P}  --miningaddr=${WALLET_MINING_ADDR}" C-m
+tmux send-keys "cd ${NODES_ROOT}/${SECONDARY_VAR_NAME}" C-m
+tmux send-keys "dcrd -C ../dcrd.conf --listen ${SECONDARY_VAR_P2P} --rpclisten ${SECONDARY_VAR_RPC} --connect ${PRIMARY_VAR_P2P}  --miningaddr=${WALLET_MINING_ADDR}" C-m
 tmux select-pane -t 1
-tmux send-keys "cd ${NODES_ROOT}/${SECONDARY_VARD_NAME}" C-m
+tmux send-keys "cd ${NODES_ROOT}/${SECONDARY_VAR_NAME}" C-m
 
 ################################################################################
 # Setup the secondary wallet
@@ -227,7 +227,7 @@ tmux resize-pane -D 15
 tmux send-keys "cd ${NODES_ROOT}/${SECONDARY_WALLET_NAME}" C-m
 tmux send-keys "echo \"${WALLET_CREATE_CONFIG}\" | dcrwallet -C ../wallet.conf --create; tmux wait-for -S ${SECONDARY_WALLET_NAME}" C-m
 tmux wait-for ${SECONDARY_WALLET_NAME}
-tmux send-keys "dcrwallet -C ../wallet.conf --rpcconnect=${SECONDARY_VARD_RPC} --rpclisten=${SECONDARY_WALLET_RPC} --nogrpc" C-m
+tmux send-keys "dcrwallet -C ../wallet.conf --rpcconnect=${SECONDARY_VAR_RPC} --rpclisten=${SECONDARY_WALLET_RPC} --nogrpc" C-m
 tmux select-pane -t 1
 tmux send-keys "cd ${NODES_ROOT}/${SECONDARY_WALLET_NAME}" C-m
 
@@ -250,7 +250,7 @@ tmux send-keys "./ctl importprivkey ${TSPEND_PRIMARY_WIF} imported false; ./ctl 
 # Setup helper script to stop everything
 ################################################################################
 
-cat > "${NODES_ROOT}/${PRIMARY_VARD_NAME}/stopall" <<EOF
+cat > "${NODES_ROOT}/${PRIMARY_VAR_NAME}/stopall" <<EOF
 #!/usr/bin/env bash
 function countdown {
   secs=\$1
@@ -262,11 +262,11 @@ function countdown {
   done
 }
 
-cd "${NODES_ROOT}/${PRIMARY_VARD_NAME}"
+cd "${NODES_ROOT}/${PRIMARY_VAR_NAME}"
 ./ctl stop 2>/dev/null
 cd "${NODES_ROOT}/${PRIMARY_WALLET_NAME}"
 ./ctl stop 2>/dev/null
-cd "${NODES_ROOT}/${SECONDARY_VARD_NAME}"
+cd "${NODES_ROOT}/${SECONDARY_VAR_NAME}"
 ./ctl stop 2>/dev/null
 cd "${NODES_ROOT}/${SECONDARY_WALLET_NAME}"
 ./ctl stop 2>/dev/null
@@ -275,11 +275,11 @@ DELAY=3
 countdown \$DELAY "until shutdown"
 tmux kill-session -t $SESSION
 EOF
-cp "${NODES_ROOT}/${PRIMARY_VARD_NAME}/stopall" "${NODES_ROOT}/${SECONDARY_VARD_NAME}/"
-cp "${NODES_ROOT}/${PRIMARY_VARD_NAME}/stopall" "${NODES_ROOT}/${PRIMARY_WALLET_NAME}/"
-cp "${NODES_ROOT}/${PRIMARY_VARD_NAME}/stopall" "${NODES_ROOT}/${SECONDARY_WALLET_NAME}/"
-chmod +x "${NODES_ROOT}/${PRIMARY_VARD_NAME}/stopall"
-chmod +x "${NODES_ROOT}/${SECONDARY_VARD_NAME}/stopall"
+cp "${NODES_ROOT}/${PRIMARY_VAR_NAME}/stopall" "${NODES_ROOT}/${SECONDARY_VAR_NAME}/"
+cp "${NODES_ROOT}/${PRIMARY_VAR_NAME}/stopall" "${NODES_ROOT}/${PRIMARY_WALLET_NAME}/"
+cp "${NODES_ROOT}/${PRIMARY_VAR_NAME}/stopall" "${NODES_ROOT}/${SECONDARY_WALLET_NAME}/"
+chmod +x "${NODES_ROOT}/${PRIMARY_VAR_NAME}/stopall"
+chmod +x "${NODES_ROOT}/${SECONDARY_VAR_NAME}/stopall"
 chmod +x "${NODES_ROOT}/${PRIMARY_WALLET_NAME}/stopall"
 chmod +x "${NODES_ROOT}/${SECONDARY_WALLET_NAME}/stopall"
 

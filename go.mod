@@ -1,6 +1,8 @@
 module github.com/decred/dcrd
 
-go 1.19
+go 1.23
+
+toolchain go1.23.4
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -13,6 +15,7 @@ require (
 	github.com/decred/dcrd/certgen v1.1.3
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.4
 	github.com/decred/dcrd/chaincfg/v3 v3.2.1
+	github.com/decred/dcrd/cointype v1.0.0
 	github.com/decred/dcrd/connmgr/v3 v3.1.2
 	github.com/decred/dcrd/container/apbf v1.0.1
 	github.com/decred/dcrd/container/lru v1.0.0
@@ -69,6 +72,7 @@ replace (
 	github.com/decred/dcrd/certgen => ./certgen
 	github.com/decred/dcrd/chaincfg/chainhash => ./chaincfg/chainhash
 	github.com/decred/dcrd/chaincfg/v3 => ./chaincfg
+	github.com/decred/dcrd/cointype => ./cointype
 	github.com/decred/dcrd/connmgr/v3 => ./connmgr
 	github.com/decred/dcrd/container/apbf => ./container/apbf
 	github.com/decred/dcrd/container/lru => ./container/lru

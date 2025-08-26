@@ -9,7 +9,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -53,7 +53,7 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			outputs: []wire.TxOut{
 				{
 					Value:    100000000, // 1 VAR
-					CoinType: wire.CoinType(dcrutil.CoinTypeVAR),
+					CoinType: cointype.CoinTypeVAR,
 					PkScript: []byte{0x76, 0xa9, 0x14}, // Mock script
 				},
 			},
@@ -63,9 +63,9 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			name: "Valid active SKA-1 output",
 			outputs: []wire.TxOut{
 				{
-					Value:    100000000,                          // 1 SKA-1
-					CoinType: wire.CoinType(dcrutil.CoinTypeSKA), // SKA-1 = 1
-					PkScript: []byte{0x76, 0xa9, 0x14},           // Mock script
+					Value:    100000000,                // 1 SKA-1
+					CoinType: cointype.CoinType(1),     // SKA-1 = 1
+					PkScript: []byte{0x76, 0xa9, 0x14}, // Mock script
 				},
 			},
 			shouldError: false,
@@ -75,7 +75,7 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			outputs: []wire.TxOut{
 				{
 					Value:    100000000,                // 1 SKA-2
-					CoinType: wire.CoinType(2),         // SKA-2 is configured but inactive
+					CoinType: cointype.CoinType(2),     // SKA-2 is configured but inactive
 					PkScript: []byte{0x76, 0xa9, 0x14}, // Mock script
 				},
 			},
@@ -87,7 +87,7 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			outputs: []wire.TxOut{
 				{
 					Value:    100000000,                // 1 SKA-99
-					CoinType: wire.CoinType(99),        // SKA-99 is not configured
+					CoinType: cointype.CoinType(99),    // SKA-99 is not configured
 					PkScript: []byte{0x76, 0xa9, 0x14}, // Mock script
 				},
 			},
@@ -99,7 +99,7 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			outputs: []wire.TxOut{
 				{
 					Value:    100000000,
-					CoinType: wire.CoinType(255), // This should be valid but inactive
+					CoinType: cointype.CoinType(255), // This should be valid but inactive
 					PkScript: []byte{0x76, 0xa9, 0x14},
 				},
 			},
@@ -111,12 +111,12 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			outputs: []wire.TxOut{
 				{
 					Value:    100000000, // 1 VAR
-					CoinType: wire.CoinType(dcrutil.CoinTypeVAR),
+					CoinType: cointype.CoinTypeVAR,
 					PkScript: []byte{0x76, 0xa9, 0x14},
 				},
 				{
 					Value:    50000000, // 0.5 SKA-1
-					CoinType: wire.CoinType(dcrutil.CoinTypeSKA),
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14},
 				},
 			},
@@ -127,12 +127,12 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			outputs: []wire.TxOut{
 				{
 					Value:    100000000, // 1 VAR
-					CoinType: wire.CoinType(dcrutil.CoinTypeVAR),
+					CoinType: cointype.CoinTypeVAR,
 					PkScript: []byte{0x76, 0xa9, 0x14},
 				},
 				{
 					Value:    50000000, // 0.5 SKA-2 (inactive)
-					CoinType: wire.CoinType(2),
+					CoinType: cointype.CoinType(2),
 					PkScript: []byte{0x76, 0xa9, 0x14},
 				},
 			},
@@ -152,12 +152,12 @@ func TestSKACoinTypeValidation(t *testing.T) {
 			var errorMsg string
 
 			for _, txOut := range msgTx.TxOut {
-				coinType := dcrutil.CoinType(txOut.CoinType)
+				coinType := txOut.CoinType
 				switch {
-				case coinType == dcrutil.CoinTypeVAR:
+				case coinType == cointype.CoinTypeVAR:
 					// VAR is always valid
 					continue
-				case coinType >= dcrutil.CoinTypeSKA && coinType <= dcrutil.CoinTypeMax:
+				case coinType >= cointype.CoinType(1) && coinType <= cointype.CoinTypeMax:
 					// Check if this SKA coin type is active
 					if !params.IsSKACoinTypeActive(coinType) {
 						hasError = true
@@ -189,14 +189,14 @@ func TestSKACoinTypeValidation(t *testing.T) {
 // TestSKACoinTypeStringRepresentation tests the string representation of coin types.
 func TestSKACoinTypeStringRepresentation(t *testing.T) {
 	tests := []struct {
-		coinType dcrutil.CoinType
+		coinType cointype.CoinType
 		expected string
 	}{
-		{dcrutil.CoinTypeVAR, "VAR"},
-		{dcrutil.CoinTypeSKA, "SKA"}, // Backward compatibility
-		{dcrutil.CoinType(2), "SKA-2"},
-		{dcrutil.CoinType(25), "SKA-25"},
-		{dcrutil.CoinType(255), "SKA-255"},
+		{cointype.CoinTypeVAR, "VAR"},
+		{cointype.CoinType(1), "SKA"}, // Backward compatibility
+		{cointype.CoinType(2), "SKA-2"},
+		{cointype.CoinType(25), "SKA-25"},
+		{cointype.CoinType(255), "SKA-255"},
 	}
 
 	for _, test := range tests {
@@ -210,33 +210,33 @@ func TestSKACoinTypeStringRepresentation(t *testing.T) {
 
 // TestSKACoinTypeProperties tests that all SKA variants have consistent properties.
 func TestSKACoinTypeProperties(t *testing.T) {
-	testCoinTypes := []dcrutil.CoinType{
-		dcrutil.CoinTypeSKA, // 1
-		dcrutil.CoinType(2),
-		dcrutil.CoinType(25),
-		dcrutil.CoinType(255),
+	testCoinTypes := []cointype.CoinType{
+		cointype.CoinType(1), // 1
+		cointype.CoinType(2),
+		cointype.CoinType(25),
+		cointype.CoinType(255),
 	}
 
 	for _, coinType := range testCoinTypes {
 		// Test AtomsPerCoin
 		atomsPerCoin := coinType.AtomsPerCoin()
-		if atomsPerCoin != int64(dcrutil.AtomsPerSKA) {
+		if atomsPerCoin != int64(cointype.AtomsPerSKA) {
 			t.Errorf("CoinType(%d).AtomsPerCoin() = %d, expected %d",
-				coinType, atomsPerCoin, int64(dcrutil.AtomsPerSKA))
+				coinType, atomsPerCoin, int64(cointype.AtomsPerSKA))
 		}
 
 		// Test MaxAtoms
 		maxAtoms := coinType.MaxAtoms()
-		if maxAtoms != int64(dcrutil.MaxSKAAtoms) {
+		if maxAtoms != int64(cointype.MaxSKAAtoms) {
 			t.Errorf("CoinType(%d).MaxAtoms() = %d, expected %d",
-				coinType, maxAtoms, int64(dcrutil.MaxSKAAtoms))
+				coinType, maxAtoms, int64(cointype.MaxSKAAtoms))
 		}
 
 		// Test MaxAmount
 		maxAmount := coinType.MaxAmount()
-		if maxAmount != dcrutil.MaxSKAAmount {
+		if maxAmount != cointype.MaxSKAAmount {
 			t.Errorf("CoinType(%d).MaxAmount() = %d, expected %d",
-				coinType, maxAmount, dcrutil.MaxSKAAmount)
+				coinType, maxAmount, cointype.MaxSKAAmount)
 		}
 
 		// Test IsValid
@@ -248,27 +248,27 @@ func TestSKACoinTypeProperties(t *testing.T) {
 
 // TestVARCoinTypeProperties tests VAR coin type properties.
 func TestVARCoinTypeProperties(t *testing.T) {
-	coinType := dcrutil.CoinTypeVAR
+	coinType := cointype.CoinTypeVAR
 
 	// Test AtomsPerCoin
 	atomsPerCoin := coinType.AtomsPerCoin()
-	if atomsPerCoin != int64(dcrutil.AtomsPerVAR) {
+	if atomsPerCoin != int64(cointype.AtomsPerVAR) {
 		t.Errorf("VAR AtomsPerCoin() = %d, expected %d",
-			atomsPerCoin, int64(dcrutil.AtomsPerVAR))
+			atomsPerCoin, int64(cointype.AtomsPerVAR))
 	}
 
 	// Test MaxAtoms
 	maxAtoms := coinType.MaxAtoms()
-	if maxAtoms != int64(dcrutil.MaxVARAtoms) {
+	if maxAtoms != int64(cointype.MaxVARAtoms) {
 		t.Errorf("VAR MaxAtoms() = %d, expected %d",
-			maxAtoms, int64(dcrutil.MaxVARAtoms))
+			maxAtoms, int64(cointype.MaxVARAtoms))
 	}
 
 	// Test MaxAmount
 	maxAmount := coinType.MaxAmount()
-	if maxAmount != dcrutil.MaxVARAmount {
+	if maxAmount != cointype.MaxVARAmount {
 		t.Errorf("VAR MaxAmount() = %d, expected %d",
-			maxAmount, dcrutil.MaxVARAmount)
+			maxAmount, cointype.MaxVARAmount)
 	}
 
 	// Test IsValid
@@ -297,7 +297,7 @@ func TestCoinTypeValidationRange(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		coinType := dcrutil.CoinType(test.coinType)
+		coinType := cointype.CoinType(test.coinType)
 		isValid := coinType.IsValid()
 		if isValid != test.isValid {
 			t.Errorf("%s: IsValid() = %t, expected %t",

@@ -18,6 +18,7 @@ import (
 	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/database/v3"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/gcs/v4/blockcf2"
@@ -987,7 +988,7 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 	}
 
 	// Track coin types we've seen to detect duplicates
-	seenCoinTypes := make(map[wire.CoinType]bool)
+	seenCoinTypes := make(map[cointype.CoinType]int)
 
 	// Track fee amounts we've found in outputs
 	foundFees := wire.NewFeesByType()
@@ -1003,12 +1004,18 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 		// Note: CoinType is uint8, so 0-255 range is enforced by type system
 		// No additional validation needed for coin type range
 
-		// Note: Multiple outputs of the same coin type are allowed in coinbase
-		// transactions (e.g., subsidy output + fee outputs for the same coin type)
-		seenCoinTypes[coinType] = true
+		// Track coin type occurrences
+		seenCoinTypes[coinType]++
+
+		// For non-VAR coin types, only one output per coin type is allowed
+		// VAR can have multiple outputs (subsidy + fees)
+		if coinType != cointype.CoinTypeVAR && seenCoinTypes[coinType] > 1 {
+			return ruleError(ErrBadCoinbaseOutputStructure,
+				fmt.Sprintf("coinbase has duplicate outputs for coin type %d", coinType))
+		}
 
 		// Identify subsidy output (should be VAR output with highest value)
-		if coinType == wire.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			if subsidyOutputIdx == -1 || output.Value > subsidyOutput.Value {
 				// First VAR output or a VAR output with higher value
 				if subsidyOutputIdx != -1 {
@@ -1036,25 +1043,25 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 	}
 
 	// Validate subsidy output amount (should be subsidy + VAR fees)
-	expectedSubsidyAmount := subsidyAmount + expectedFees.Get(wire.CoinTypeVAR)
-	
+	expectedSubsidyAmount := subsidyAmount + expectedFees.Get(cointype.CoinTypeVAR)
+
 	// DEBUG: Log validation details
 	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyOutput.Value=%d, expectedSubsidyAmount=%d", subsidyOutput.Value, expectedSubsidyAmount)
-	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyAmount=%d, VAR fees=%d", subsidyAmount, expectedFees.Get(wire.CoinTypeVAR))
+	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyAmount=%d, VAR fees=%d", subsidyAmount, expectedFees.Get(cointype.CoinTypeVAR))
 	log.Debugf("DEBUG: validateCoinbaseMultiOutput - coinbase has %d outputs:", len(coinbaseTx.TxOut))
 	for i, out := range coinbaseTx.TxOut {
 		log.Debugf("DEBUG: validateCoinbaseMultiOutput - Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
 	}
-	
+
 	if subsidyOutput.Value != expectedSubsidyAmount {
 		return ruleError(ErrBadCoinbaseFeeDistribution,
 			fmt.Sprintf("subsidy output amount mismatch: got %d, expected %d (subsidy %d + VAR fees %d)",
-				subsidyOutput.Value, expectedSubsidyAmount, subsidyAmount, expectedFees.Get(wire.CoinTypeVAR)))
+				subsidyOutput.Value, expectedSubsidyAmount, subsidyAmount, expectedFees.Get(cointype.CoinTypeVAR)))
 	}
 
 	// Validate fee outputs match expected fees exactly
 	for _, coinType := range expectedFees.Types() {
-		if coinType == wire.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			continue // Already validated above in subsidy output
 		}
 
@@ -1082,7 +1089,7 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 	var referenceScript []byte
 	var referenceVersion uint16
 	var referenceFound bool
-	
+
 	for _, output := range outputs {
 		if output.Value > 0 {
 			referenceScript = output.PkScript
@@ -1091,7 +1098,7 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 			break
 		}
 	}
-	
+
 	// If we have payment outputs, ensure they all use the same script
 	if referenceFound {
 		for i, output := range outputs {
@@ -1099,7 +1106,7 @@ func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesB
 			if output.Value == 0 {
 				continue
 			}
-			
+
 			if !bytes.Equal(output.PkScript, referenceScript) {
 				return ruleError(ErrBadCoinbaseMultiOutput,
 					fmt.Sprintf("coinbase output %d has different payment script than reference payment output", i))
@@ -1994,7 +2001,7 @@ func (b *BlockChain) checkMerkleRoots(block *wire.MsgBlock, prevNode *blockNode)
 		// Build the two merkle trees and use their calculated merkle roots as
 		// leaves to another merkle tree and ensure the final calculated merkle
 		// root matches the entry in the block header.
-		
+
 		// Debug logging for dual-coin transactions
 		for i, tx := range block.Transactions {
 			if len(tx.TxOut) > 0 && tx.TxOut[0].CoinType != 0 {
@@ -2002,7 +2009,7 @@ func (b *BlockChain) checkMerkleRoots(block *wire.MsgBlock, prevNode *blockNode)
 				log.Debugf("DEBUG: Block validation - tx[%d] hash=%x (dual-coin)", i, txHash[:8])
 			}
 		}
-		
+
 		wantMerkleRoot := standalone.CalcCombinedTxTreeMerkleRoot(
 			block.Transactions, block.STransactions)
 		if header.MerkleRoot != wantMerkleRoot {
@@ -3571,11 +3578,11 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 	// checks.
 	var totalVAROut, totalSKAOut int64
 	for _, txOut := range tx.MsgTx().TxOut {
-		coinType := dcrutil.CoinType(txOut.CoinType)
+		coinType := txOut.CoinType
 		switch {
-		case coinType == dcrutil.CoinTypeVAR:
+		case coinType == cointype.CoinTypeVAR:
 			totalVAROut += txOut.Value
-		case coinType >= dcrutil.CoinTypeSKA && coinType <= dcrutil.CoinTypeMax:
+		case coinType >= 1 && coinType <= 255:
 			// Check if this SKA coin type is active
 			if !chainParams.IsSKACoinTypeActive(coinType) {
 				str := fmt.Sprintf("transaction output uses inactive SKA coin type %d (%s)",
@@ -3642,9 +3649,9 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 		inputCoinType := utxoEntry.CoinType()
 
 		switch {
-		case inputCoinType == CoinTypeVAR:
+		case inputCoinType == cointype.CoinTypeVAR:
 			totalVARIn += inputAmount
-		case inputCoinType >= CoinTypeSKA && inputCoinType <= CoinTypeMax:
+		case inputCoinType >= 1 && inputCoinType <= cointype.CoinTypeMax:
 			totalSKAIn += inputAmount
 		default:
 			str := fmt.Sprintf("transaction input references UTXO with invalid "+
@@ -3683,7 +3690,7 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 				"which is not allowed", txHash)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
-		
+
 		// Calculate SKA fee (inputs - outputs)
 		txFeeInAtom := totalSKAIn - totalSKAOut
 		if txFeeInAtom < 0 {
@@ -4043,7 +4050,7 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 	totalFees := wire.NewFeesByType()
 	if inputFees > 0 {
 		// Carry forward stake tree fees (assumed to be VAR for now)
-		totalFees.Add(wire.CoinTypeVAR, int64(inputFees))
+		totalFees.Add(cointype.CoinTypeVAR, int64(inputFees))
 	}
 	prevHeader := node.parent.Header()
 	var cumulativeSigOps int
@@ -4175,7 +4182,7 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 		hasMultiCoinFees := len(totalFees.Types()) > 1
 		hasNonVAROutputs := false
 		for _, output := range coinbaseTx.TxOut {
-			if output.CoinType != wire.CoinTypeVAR {
+			if output.CoinType != cointype.CoinTypeVAR {
 				hasNonVAROutputs = true
 				break
 			}

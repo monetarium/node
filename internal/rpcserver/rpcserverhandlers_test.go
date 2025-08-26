@@ -30,6 +30,7 @@ import (
 	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/database/v3"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrjson/v4"
@@ -1374,7 +1375,7 @@ func hexToMsgTx(s string) *wire.MsgTx {
 
 	// Legacy test data - need to add CoinType field
 	for i := range msgTx.TxOut {
-		msgTx.TxOut[i].CoinType = wire.CoinTypeVAR
+		msgTx.TxOut[i].CoinType = cointype.CoinTypeVAR
 	}
 
 	return &msgTx
@@ -1404,13 +1405,13 @@ func cloneParams(params *chaincfg.Params) *chaincfg.Params {
 
 	// Deep copy SKA fields
 	if params.SKAEmissionKeys != nil {
-		result.SKAEmissionKeys = make(map[wire.CoinType]*secp256k1.PublicKey)
+		result.SKAEmissionKeys = make(map[cointype.CoinType]*secp256k1.PublicKey)
 		for k, v := range params.SKAEmissionKeys {
 			result.SKAEmissionKeys[k] = v
 		}
 	}
 	if params.SKAEmissionNonces != nil {
-		result.SKAEmissionNonces = make(map[wire.CoinType]uint64)
+		result.SKAEmissionNonces = make(map[cointype.CoinType]uint64)
 		for k, v := range params.SKAEmissionNonces {
 			result.SKAEmissionNonces[k] = v
 		}
@@ -1418,7 +1419,7 @@ func cloneParams(params *chaincfg.Params) *chaincfg.Params {
 
 	// Deep copy other maps as needed
 	if params.SKACoins != nil {
-		result.SKACoins = make(map[dcrutil.CoinType]*chaincfg.SKACoinConfig)
+		result.SKACoins = make(map[cointype.CoinType]*chaincfg.SKACoinConfig)
 		for k, v := range params.SKACoins {
 			configCopy := *v
 			result.SKACoins[k] = &configCopy
@@ -1426,7 +1427,7 @@ func cloneParams(params *chaincfg.Params) *chaincfg.Params {
 	}
 
 	if params.InitialSKATypes != nil {
-		result.InitialSKATypes = make([]dcrutil.CoinType, len(params.InitialSKATypes))
+		result.InitialSKATypes = make([]cointype.CoinType, len(params.InitialSKATypes))
 		copy(result.InitialSKATypes, params.InitialSKATypes)
 	}
 
@@ -1852,7 +1853,7 @@ func defaultMockFeeEstimator() *testFeeEstimator {
 // *testLogManager.
 func defaultMockLogManager() *testLogManager {
 	return &testLogManager{
-		supportedSubsystems: []string{"VARD", "PEER", "RPCS"},
+		supportedSubsystems: []string{"VAR", "PEER", "RPCS"},
 	}
 }
 
@@ -7781,7 +7782,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 	} else {
 		// Legacy test data - need to add CoinType field
 		for i := range tx.TxOut {
-			tx.TxOut[i].CoinType = wire.CoinTypeVAR
+			tx.TxOut[i].CoinType = cointype.CoinTypeVAR
 		}
 	}
 	// No need to manually set CoinType as it's already in the serialized data

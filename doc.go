@@ -72,7 +72,7 @@ Application Options:
 	                             (default: P-256)
 	    --altdnsnames            Specify additional dns names to use when
 	                             generating the rpc server certificate
-	                             [supports VARD_ALT_DNSNAMES environment variable]
+	                             [supports MONETARIUM_ALT_DNSNAMES environment variable]
 	    --notls                  Disable TLS for the RPC server -- NOTE: This is
 	                             only allowed if the RPC server is bound to
 	                             localhost

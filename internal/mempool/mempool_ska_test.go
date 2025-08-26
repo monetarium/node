@@ -9,6 +9,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -35,7 +36,7 @@ func TestSKATransactionValidation(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -55,7 +56,7 @@ func TestSKATransactionValidation(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -75,7 +76,7 @@ func TestSKATransactionValidation(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -92,7 +93,7 @@ func TestSKATransactionValidation(t *testing.T) {
 			// Check if transaction has SKA outputs
 			hasSKAOutputs := false
 			for _, txOut := range test.tx.TxOut {
-				if txOut.CoinType == wire.CoinTypeSKA {
+				if txOut.CoinType == cointype.CoinType(1) {
 					hasSKAOutputs = true
 					break
 				}
@@ -142,25 +143,25 @@ func TestSKAFeeCalculation(t *testing.T) {
 	tests := []struct {
 		name           string
 		serializedSize int64
-		coinType       wire.CoinType
+		coinType       cointype.CoinType
 		expectMinFee   int64
 	}{
 		{
 			name:           "VAR transaction fee",
 			serializedSize: 250, // 250 bytes
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			expectMinFee:   2500, // (250 * 10000) / 1000 = 2500 atoms
 		},
 		{
 			name:           "SKA transaction fee",
 			serializedSize: 250, // 250 bytes
-			coinType:       wire.CoinTypeSKA,
+			coinType:       cointype.CoinType(1),
 			expectMinFee:   250, // SKA uses 1e3 fee rate, so (250 * 1000) / 1000 = 250
 		},
 		{
 			name:           "Large transaction fee",
 			serializedSize: 1000, // 1000 bytes
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			expectMinFee:   10000, // (1000 * 10000) / 1000 = 10000 atoms
 		},
 	}
@@ -183,25 +184,25 @@ func TestMixedCoinTypeTransaction(t *testing.T) {
 		name            string
 		varOutputCount  int
 		skaOutputCount  int
-		expectedPrimary wire.CoinType
+		expectedPrimary cointype.CoinType
 	}{
 		{
 			name:            "More VAR outputs",
 			varOutputCount:  3,
 			skaOutputCount:  1,
-			expectedPrimary: wire.CoinTypeVAR,
+			expectedPrimary: cointype.CoinTypeVAR,
 		},
 		{
 			name:            "More SKA outputs",
 			varOutputCount:  1,
 			skaOutputCount:  3,
-			expectedPrimary: wire.CoinTypeSKA,
+			expectedPrimary: cointype.CoinType(1),
 		},
 		{
 			name:            "Equal outputs (default to VAR)",
 			varOutputCount:  2,
 			skaOutputCount:  2,
-			expectedPrimary: wire.CoinTypeVAR,
+			expectedPrimary: cointype.CoinTypeVAR,
 		},
 	}
 
@@ -214,7 +215,7 @@ func TestMixedCoinTypeTransaction(t *testing.T) {
 			for i := 0; i < test.varOutputCount; i++ {
 				tx.TxOut = append(tx.TxOut, &wire.TxOut{
 					Value:    100000000,
-					CoinType: wire.CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				})
 			}
@@ -223,7 +224,7 @@ func TestMixedCoinTypeTransaction(t *testing.T) {
 			for i := 0; i < test.skaOutputCount; i++ {
 				tx.TxOut = append(tx.TxOut, &wire.TxOut{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				})
 			}
@@ -232,15 +233,15 @@ func TestMixedCoinTypeTransaction(t *testing.T) {
 			hasSKAOutputs := false
 			skaOutputCount := 0
 			for _, txOut := range tx.TxOut {
-				if txOut.CoinType == wire.CoinTypeSKA {
+				if txOut.CoinType == cointype.CoinType(1) {
 					hasSKAOutputs = true
 					skaOutputCount++
 				}
 			}
 
-			primaryCoinType := wire.CoinTypeVAR // Default
+			primaryCoinType := cointype.CoinTypeVAR // Default
 			if hasSKAOutputs && skaOutputCount > len(tx.TxOut)/2 {
-				primaryCoinType = wire.CoinTypeSKA
+				primaryCoinType = cointype.CoinType(1)
 			}
 
 			if primaryCoinType != test.expectedPrimary {

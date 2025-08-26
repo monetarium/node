@@ -17,6 +17,7 @@ import (
 	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/crypto/rand"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/gcs/v4/blockcf2"
@@ -528,7 +529,7 @@ func calcBlockMerkleRoot(regularTxns, stakeTxns []*wire.MsgTx, hdrCmtActive bool
 			log.Debugf("DEBUG: Block template - tx[%d] hash=%x (dual-coin)", i, txHash[:8])
 		}
 	}
-	
+
 	if !hdrCmtActive {
 		merkleRoot := standalone.CalcTxTreeMerkleRoot(regularTxns)
 		log.Debugf("DEBUG: Block template merkle root (old method)=%x", merkleRoot[:8])
@@ -583,7 +584,7 @@ func createCoinbaseTx(subsidyCache *standalone.SubsidyCache,
 		for _, payout := range params.BlockOneLedger {
 			tx.AddTxOut(&wire.TxOut{
 				Value:    payout.Amount,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  payout.ScriptVersion,
 				PkScript: payout.Script,
 			})
@@ -653,27 +654,27 @@ func createCoinbaseTx(subsidyCache *standalone.SubsidyCache,
 	tx.TxIn[0].ValueIn = workSubsidy + treasurySubsidy
 	if treasuryOutput != nil {
 		// Add CoinType to treasury output
-		treasuryOutput.CoinType = wire.CoinTypeVAR
+		treasuryOutput.CoinType = cointype.CoinTypeVAR
 		tx.AddTxOut(treasuryOutput)
 	}
 	tx.AddTxOut(&wire.TxOut{
 		Value:    0,
-		CoinType: wire.CoinTypeVAR,
+		CoinType: cointype.CoinTypeVAR,
 		PkScript: opReturnPkScript,
 	})
 	tx.AddTxOut(&wire.TxOut{
 		Value:    workSubsidy,
-		CoinType: wire.CoinTypeVAR,
+		CoinType: cointype.CoinTypeVAR,
 		Version:  workSubsidyScriptVer,
 		PkScript: workSubsidyScript,
 	})
-	
+
 	// DEBUG: Log coinbase outputs before returning
 	log.Debugf("DEBUG: createCoinbaseTx - Created coinbase with %d outputs:", len(tx.TxOut))
 	for i, out := range tx.TxOut {
 		log.Debugf("DEBUG: createCoinbaseTx - Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
 	}
-	
+
 	return dcrutil.NewTx(tx)
 }
 
@@ -718,13 +719,13 @@ func createTreasuryBaseTx(subsidyCache *standalone.SubsidyCache, nextBlockHeight
 	tx.TxIn[0].ValueIn = trsySubsidy
 	tx.AddTxOut(&wire.TxOut{
 		Value:    trsySubsidy,
-		CoinType: wire.CoinTypeVAR,
+		CoinType: cointype.CoinTypeVAR,
 		Version:  0,
 		PkScript: []byte{txscript.OP_TADD},
 	})
 	tx.AddTxOut(&wire.TxOut{
 		Value:    0,
-		CoinType: wire.CoinTypeVAR,
+		CoinType: cointype.CoinTypeVAR,
 		PkScript: opReturnTreasury,
 	})
 	retTx := dcrutil.NewTx(tx)
@@ -1143,7 +1144,7 @@ func calcFeePerKb(txDesc *TxDesc, ancestorStats *TxAncestorStats) float64 {
 // the transaction's coin type. This enables intelligent prioritization where
 // each coin type can have its own fee market.
 func calcCoinTypeAwareFeePerKb(txDesc *TxDesc, ancestorStats *TxAncestorStats,
-	coinType wire.CoinType, feeCalc *fees.CoinTypeFeeCalculator) float64 {
+	coinType cointype.CoinType, feeCalc *fees.CoinTypeFeeCalculator) float64 {
 
 	// Get base fee rate using standard calculation
 	baseFeeRate := calcFeePerKb(txDesc, ancestorStats)
@@ -1235,15 +1236,15 @@ func calcCoinTypeAwareFeePerKb(txDesc *TxDesc, ancestorStats *TxAncestorStats,
 // VAR fees are added to the existing PoW output, while other coin types get new outputs.
 func addFeesToCoinbase(coinbaseTx *wire.MsgTx, totalFees wire.FeesByType, powOutputIdx int, payToAddress stdaddr.Address) error {
 	log.Debugf("DEBUG: addFeesToCoinbase - powOutputIdx=%d, totalFees=%v", powOutputIdx, totalFees)
-	
+
 	// Log initial coinbase outputs
 	log.Debugf("DEBUG: addFeesToCoinbase - Initial coinbase has %d outputs:", len(coinbaseTx.TxOut))
 	for i, out := range coinbaseTx.TxOut {
 		log.Debugf("DEBUG: addFeesToCoinbase - Initial Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
 	}
-	
+
 	// Add VAR fees to existing PoW output
-	varFees := totalFees.Get(wire.CoinTypeVAR)
+	varFees := totalFees.Get(cointype.CoinTypeVAR)
 	if varFees > 0 {
 		log.Debugf("DEBUG: addFeesToCoinbase - Adding VAR fees %d to output[%d]", varFees, powOutputIdx)
 		coinbaseTx.TxOut[powOutputIdx].Value += varFees
@@ -1251,7 +1252,7 @@ func addFeesToCoinbase(coinbaseTx *wire.MsgTx, totalFees wire.FeesByType, powOut
 
 	// Create new outputs for other coin types
 	for _, coinType := range totalFees.Types() {
-		if coinType == wire.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			continue // Already handled above
 		}
 
@@ -1514,7 +1515,7 @@ mempoolLoop:
 		prioItem := &txPrioItem{
 			txDesc:   txDesc,
 			txType:   txDesc.Type,
-			coinType: wire.CoinType(primaryCoinType),
+			coinType: primaryCoinType,
 		}
 		for i, txIn := range tx.MsgTx().TxIn {
 			// Evaluate if this is a stakebase input or not. If it is, continue
@@ -1859,9 +1860,9 @@ nextPriorityQueueItem:
 
 		// Check if transaction fits within coin type allocation
 		coinType := GetTransactionCoinType(tx)
-		log.Debugf("DEBUG: Evaluating transaction %s (coinType=%d, size=%d) for block inclusion", 
+		log.Debugf("DEBUG: Evaluating transaction %s (coinType=%d, size=%d) for block inclusion",
 			tx.Hash(), coinType, txSize)
-		
+
 		if !transactionTracker.CanAddTransaction(tx) {
 			log.Tracef("Skipping tx %s (coin type %d, size %v) because it "+
 				"would exceed the coin type allocation; cur block "+
@@ -1876,7 +1877,7 @@ nextPriorityQueueItem:
 		// for overflow.
 		numSigOps := int64(prioItem.txDesc.TotalSigOps)
 		numSigOpsBundle := numSigOps + int64(ancestorStats.TotalSigOps)
-		log.Debugf("DEBUG: Checking sigops for tx %s - numSigOps=%d, numSigOpsBundle=%d, blockSigOps=%d, max=%d", 
+		log.Debugf("DEBUG: Checking sigops for tx %s - numSigOps=%d, numSigOpsBundle=%d, blockSigOps=%d, max=%d",
 			tx.Hash(), numSigOps, numSigOpsBundle, blockSigOps, blockchain.MaxSigOpsPerBlock)
 		if blockSigOps+numSigOpsBundle < blockSigOps ||
 			blockSigOps+numSigOpsBundle > blockchain.MaxSigOpsPerBlock {
@@ -1911,13 +1912,13 @@ nextPriorityQueueItem:
 		// transactions and SKA emission transactions. Use coin-type-aware fee validation when available.
 		skipForLowFee := false
 		isSKAEmission := wire.IsSKAEmissionTransaction(tx.MsgTx())
-		log.Debugf("DEBUG: Fee validation check for tx %s - tree=%d, isSKAEmission=%v", 
+		log.Debugf("DEBUG: Fee validation check for tx %s - tree=%d, isSKAEmission=%v",
 			tx.Hash(), tx.Tree(), isSKAEmission)
 		if tx.Tree() != wire.TxTreeStake && !isSKAEmission {
 			if g.cfg.FeeCalculator != nil {
 				// Use coin-type-specific fee validation
 				txSize := int64(tx.MsgTx().SerializeSize())
-				log.Debugf("DEBUG: Validating fees for tx %s - fee=%d, size=%d, coinType=%d", 
+				log.Debugf("DEBUG: Validating fees for tx %s - fee=%d, size=%d, coinType=%d",
 					tx.Hash(), prioItem.txDesc.Fee, txSize, prioItem.coinType)
 				err := g.cfg.FeeCalculator.ValidateTransactionFees(prioItem.txDesc.Fee,
 					txSize, prioItem.coinType, false)
@@ -1931,7 +1932,7 @@ nextPriorityQueueItem:
 				}
 			} else {
 				// Fallback to standard fee validation
-				log.Debugf("DEBUG: Using fallback fee validation for tx %s - feePerKB=%.2f, min=%d", 
+				log.Debugf("DEBUG: Using fallback fee validation for tx %s - feePerKB=%.2f, min=%d",
 					tx.Hash(), prioItem.feePerKB, g.cfg.Policy.TxMinFreeFee)
 				if prioItem.feePerKB < float64(g.cfg.Policy.TxMinFreeFee) {
 					log.Debugf("DEBUG: Transaction %s REJECTED due to low fee per KB", tx.Hash())
@@ -1956,7 +1957,7 @@ nextPriorityQueueItem:
 			// preconditions before allowing it to be added to the block.
 			// The fraud proof is not checked because it will be filled in
 			// by the miner.
-			log.Debugf("DEBUG: Calling CheckTransactionInputs for tx %s (coinType=%d)", 
+			log.Debugf("DEBUG: Calling CheckTransactionInputs for tx %s (coinType=%d)",
 				bundledTx.Tx.Hash(), GetTransactionCoinType(bundledTx.Tx))
 			_, err = g.cfg.CheckTransactionInputs(bundledTx.Tx, nextBlockHeight,
 				blockUtxos, false, &bestHeader, isTreasuryEnabled,
@@ -2010,7 +2011,7 @@ nextPriorityQueueItem:
 			if g.cfg.FeeCalculator != nil {
 				bundledCoinType := GetTransactionCoinType(bundledTx)
 				bundledSize := int64(bundledTx.MsgTx().SerializeSize())
-				g.cfg.FeeCalculator.RecordTransactionFee(wire.CoinType(bundledCoinType),
+				g.cfg.FeeCalculator.RecordTransactionFee(bundledCoinType,
 					bundledTxDesc.Fee, bundledSize, true)
 			}
 
@@ -2114,7 +2115,7 @@ nextPriorityQueueItem:
 				}
 			}
 
-			g.cfg.FeeCalculator.UpdateUtilization(wire.CoinType(coinType),
+			g.cfg.FeeCalculator.UpdateUtilization(coinType,
 				pendingCount, pendingSize, utilizationRate)
 		}
 	}

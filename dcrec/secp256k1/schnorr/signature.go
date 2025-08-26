@@ -22,11 +22,11 @@ const (
 
 var (
 	// rfc6979ExtraDataV0 is the extra data to feed to RFC6979 when generating
-	// the deterministic nonce for the EC-Schnorr-VARv0 scheme.  This ensures
+	// the deterministic nonce for the EC-Schnorr-DCRv0 scheme.  This ensures
 	// the same nonce is not generated for the same message and key as for other
 	// signing algorithms such as ECDSA.
 	//
-	// It is equal to BLAKE-256([]byte("EC-Schnorr-VARv0")).
+	// It is equal to BLAKE-256([]byte("EC-Schnorr-DCRv0")).
 	rfc6979ExtraDataV0 = [32]byte{
 		0x0b, 0x75, 0xf9, 0x7b, 0x60, 0xe8, 0xa5, 0x76,
 		0x28, 0x76, 0xc0, 0x04, 0x82, 0x9e, 0xe9, 0xb9,
@@ -73,7 +73,7 @@ func (sig Signature) Serialize() []byte {
 	return b[:]
 }
 
-// ParseSignature parses a signature according to the EC-Schnorr-VARv0
+// ParseSignature parses a signature according to the EC-Schnorr-DCRv0
 // specification and enforces the following additional restrictions specific to
 // secp256k1:
 //
@@ -127,7 +127,7 @@ func (sig Signature) IsEqual(otherSig *Signature) bool {
 // error to support better testing while the exported method simply returns a
 // bool indicating success or failure.
 func schnorrVerify(sig *Signature, hash []byte, pubKey *secp256k1.PublicKey) error {
-	// The algorithm for producing a EC-Schnorr-VARv0 signature is described in
+	// The algorithm for producing a EC-Schnorr-DCRv0 signature is described in
 	// README.md and is reproduced here for reference:
 	//
 	//
@@ -242,7 +242,7 @@ func zeroArray(a *[scalarSize]byte) {
 	}
 }
 
-// schnorrSign generates an EC-Schnorr-VARv0 signature over the secp256k1 curve
+// schnorrSign generates an EC-Schnorr-DCRv0 signature over the secp256k1 curve
 // for the provided hash (which should be the result of hashing a larger
 // message) using the given nonce and private key.  The produced signature is
 // deterministic (same message, nonce, and key yield the same signature) and
@@ -252,7 +252,7 @@ func zeroArray(a *[scalarSize]byte) {
 // NOT be 0.  Since this is an internal use function, these preconditions MUST
 // be satisified by the caller.
 func schnorrSign(privKey, nonce *secp256k1.ModNScalar, hash []byte) (*Signature, error) {
-	// The algorithm for producing a EC-Schnorr-VARv0 signature is described in
+	// The algorithm for producing a EC-Schnorr-DCRv0 signature is described in
 	// README.md and is reproduced here for reference:
 	//
 	// G = curve generator
@@ -328,7 +328,7 @@ func schnorrSign(privKey, nonce *secp256k1.ModNScalar, hash []byte) (*Signature,
 	return NewSignature(r, s), nil
 }
 
-// Sign generates an EC-Schnorr-VARv0 signature over the secp256k1 curve for the
+// Sign generates an EC-Schnorr-DCRv0 signature over the secp256k1 curve for the
 // provided hash (which should be the result of hashing a larger message) using
 // the given private key.  The produced signature is deterministic (same message
 // and same key yield the same signature) and canonical.
@@ -339,7 +339,7 @@ func schnorrSign(privKey, nonce *secp256k1.ModNScalar, hash []byte) (*Signature,
 // should not be used in situations where there is the possibility of someone
 // having EM field/cache/etc access.
 func Sign(privKey *secp256k1.PrivateKey, hash []byte) (*Signature, error) {
-	// The algorithm for producing a EC-Schnorr-VARv0 signature is described in
+	// The algorithm for producing a EC-Schnorr-DCRv0 signature is described in
 	// README.md and is reproduced here for reference:
 	//
 	// G = curve generator

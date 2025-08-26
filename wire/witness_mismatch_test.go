@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 )
 
 // TestWitnessMismatchBug reproduces the issue where transactions serialized
@@ -26,11 +27,11 @@ func TestWitnessMismatchBug(t *testing.T) {
 	tx.AddTxIn(txIn)
 
 	// Add VAR output
-	varOutput := NewTxOutWithCoinType(100000000, CoinTypeVAR, []byte{0x76, 0xa9, 0x14})
+	varOutput := NewTxOutWithCoinType(100000000, cointype.CoinTypeVAR, []byte{0x76, 0xa9, 0x14})
 	tx.AddTxOut(varOutput)
 
 	// Add SKA output
-	skaOutput := NewTxOutWithCoinType(50000000, CoinTypeSKA, []byte{0x76, 0xa9, 0x14})
+	skaOutput := NewTxOutWithCoinType(50000000, cointype.CoinType(1), []byte{0x76, 0xa9, 0x14})
 	tx.AddTxOut(skaOutput)
 
 	// Test serialization with DualCoinVersion
@@ -97,9 +98,9 @@ func TestProtocolVersionCompatibility(t *testing.T) {
 		t.Fatalf("Failed to serialize with DualCoinVersion: %v", err)
 	}
 
-	// The sizes should be different due to CoinType field
+	// The sizes should be different due to cointype.CoinType field
 	if len(bufOld.Bytes()) >= len(bufNew.Bytes()) {
-		t.Errorf("Expected DualCoinVersion serialization to be larger due to CoinType field")
+		t.Errorf("Expected DualCoinVersion serialization to be larger due to cointype.CoinType field")
 	}
 
 	// Test cross-compatibility: deserialize old format with old version (should work)
@@ -109,8 +110,8 @@ func TestProtocolVersionCompatibility(t *testing.T) {
 		t.Errorf("Failed to deserialize old format with old protocol version: %v", err)
 	} else {
 		// Should default to VAR for old protocol version
-		if txFromOld.TxOut[0].CoinType != CoinTypeVAR {
-			t.Errorf("Expected CoinType to default to VAR, got %d", txFromOld.TxOut[0].CoinType)
+		if txFromOld.TxOut[0].CoinType != cointype.CoinTypeVAR {
+			t.Errorf("Expected cointype.CoinType to default to VAR, got %d", txFromOld.TxOut[0].CoinType)
 		}
 	}
 

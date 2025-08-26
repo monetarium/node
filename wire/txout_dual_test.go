@@ -7,6 +7,8 @@ package wire
 import (
 	"bytes"
 	"testing"
+
+	"github.com/decred/dcrd/cointype"
 )
 
 // TestNewTxOutWithCoinType tests the NewTxOutWithCoinType function.
@@ -17,11 +19,11 @@ func TestNewTxOutWithCoinType(t *testing.T) {
 	tests := []struct {
 		name     string
 		value    int64
-		coinType CoinType
+		coinType cointype.CoinType
 		pkScript []byte
 	}{
-		{"VAR TxOut", value, CoinTypeVAR, pkScript},
-		{"SKA TxOut", value, CoinTypeSKA, pkScript},
+		{"VAR TxOut", value, cointype.CoinTypeVAR, pkScript},
+		{"SKA TxOut", value, cointype.CoinType(1), pkScript},
 	}
 
 	for _, test := range tests {
@@ -50,7 +52,7 @@ func TestNewTxOutBackwardCompatibility(t *testing.T) {
 
 	txOut := NewTxOut(value, pkScript)
 
-	if txOut.CoinType != CoinTypeVAR {
+	if txOut.CoinType != cointype.CoinTypeVAR {
 		t.Errorf("Expected NewTxOut to default to VAR, got %d", txOut.CoinType)
 	}
 }
@@ -62,10 +64,10 @@ func TestTxOutSerialization(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		coinType CoinType
+		coinType cointype.CoinType
 	}{
-		{"VAR serialization", CoinTypeVAR},
-		{"SKA serialization", CoinTypeSKA},
+		{"VAR serialization", cointype.CoinTypeVAR},
+		{"SKA serialization", cointype.CoinType(1)},
 	}
 
 	for _, test := range tests {
@@ -93,7 +95,7 @@ func TestTxOutSerialization(t *testing.T) {
 			}
 
 			if deserializedTxOut.CoinType != txOut.CoinType {
-				t.Errorf("CoinType mismatch: expected %d, got %d", txOut.CoinType, deserializedTxOut.CoinType)
+				t.Errorf("cointype.CoinType mismatch: expected %d, got %d", txOut.CoinType, deserializedTxOut.CoinType)
 			}
 
 			if deserializedTxOut.Version != txOut.Version {
@@ -112,7 +114,7 @@ func TestTxOutSerializeSize(t *testing.T) {
 	pkScript := []byte{0x76, 0xa9, 0x14, 0x01, 0x02} // 5 bytes
 	value := int64(100000000)
 
-	txOut := NewTxOutWithCoinType(value, CoinTypeVAR, pkScript)
+	txOut := NewTxOutWithCoinType(value, cointype.CoinTypeVAR, pkScript)
 
 	// Expected size: 8 (value) + 1 (cointype) + 2 (version) + 1 (varint len) + 5 (script) = 17
 	expectedSize := 8 + 1 + 2 + 1 + len(pkScript)
@@ -125,11 +127,11 @@ func TestTxOutSerializeSize(t *testing.T) {
 
 // TestCoinTypeConstants tests the coin type constants.
 func TestCoinTypeConstants(t *testing.T) {
-	if CoinTypeVAR != 0 {
-		t.Errorf("Expected CoinTypeVAR to be 0, got %d", CoinTypeVAR)
+	if cointype.CoinTypeVAR != 0 {
+		t.Errorf("Expected cointype.CoinTypeVAR to be 0, got %d", cointype.CoinTypeVAR)
 	}
 
-	if CoinTypeSKA != 1 {
-		t.Errorf("Expected CoinTypeSKA to be 1, got %d", CoinTypeSKA)
+	if cointype.CoinType(1) != 1 {
+		t.Errorf("Expected cointype.CoinType(1) to be 1, got %d", cointype.CoinType(1))
 	}
 }

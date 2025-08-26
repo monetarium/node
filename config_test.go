@@ -28,7 +28,7 @@ func TestMain(m *testing.M) {
 //
 // For environment variables, use the following to set the variable before the
 // func that loads the configuration is called:
-//   os.Setenv("VARD_ALT_DNSNAMES", "hostname1,hostname2")
+//   os.Setenv("MONETARIUM_ALT_DNSNAMES", "hostname1,hostname2")
 //
 // These args and env variables will then get parsed during configuration load.
 
@@ -56,12 +56,12 @@ func TestDefaultAltDNSNames(t *testing.T) {
 	}
 }
 
-// TestAltDNSNamesWithEnv ensures the VARD_ALT_DNSNAMES environment variable is
+// TestAltDNSNamesWithEnv ensures the MONETARIUM_ALT_DNSNAMES environment variable is
 // parsed into a slice of additional hostnames as intended.
 func TestAltDNSNamesWithEnv(t *testing.T) {
 	appName := filepath.Base(os.Args[0])
 	appName = strings.TrimSuffix(appName, filepath.Ext(appName))
-	t.Setenv("VARD_ALT_DNSNAMES", "hostname1,hostname2")
+	t.Setenv("MONETARIUM_ALT_DNSNAMES", "hostname1,hostname2")
 	cfg, _, err := loadConfig(appName)
 	if err != nil {
 		t.Fatalf("Failed to load dcrd config: %s", err)

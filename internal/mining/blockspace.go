@@ -6,9 +6,9 @@ package mining
 
 import (
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/internal/fees"
-	"github.com/decred/dcrd/wire"
 )
 
 // BlockSpaceAllocator manages the allocation of block space among different coin types
@@ -61,7 +61,7 @@ func (bsa *BlockSpaceAllocator) SetFeeCalculator(feeCalculator *fees.CoinTypeFee
 
 // CoinTypeAllocation represents the space allocation for a specific coin type.
 type CoinTypeAllocation struct {
-	CoinType        dcrutil.CoinType
+	CoinType        cointype.CoinType
 	BaseAllocation  uint32 // Guaranteed space allocation
 	FinalAllocation uint32 // Final space after overflow distribution
 	PendingBytes    uint32 // Bytes of transactions pending for this coin type
@@ -70,7 +70,7 @@ type CoinTypeAllocation struct {
 
 // AllocationResult contains the complete block space allocation for all coin types.
 type AllocationResult struct {
-	Allocations     map[dcrutil.CoinType]*CoinTypeAllocation
+	Allocations     map[cointype.CoinType]*CoinTypeAllocation
 	TotalAllocated  uint32
 	TotalUsed       uint32
 	OverflowHandled uint32
@@ -78,12 +78,12 @@ type AllocationResult struct {
 
 // AllocateBlockSpace calculates the optimal block space allocation given pending
 // transaction sizes for each coin type. Returns allocation details for all coin types.
-func (bsa *BlockSpaceAllocator) AllocateBlockSpace(pendingTxBytes map[dcrutil.CoinType]uint32) *AllocationResult {
+func (bsa *BlockSpaceAllocator) AllocateBlockSpace(pendingTxBytes map[cointype.CoinType]uint32) *AllocationResult {
 	// Phase 1: Calculate base allocations
 	baseAllocations := bsa.calculateBaseAllocations()
 
 	// Phase 2: Fill base allocations and calculate usage
-	allocations := make(map[dcrutil.CoinType]*CoinTypeAllocation)
+	allocations := make(map[cointype.CoinType]*CoinTypeAllocation)
 	totalOverflow := uint32(0)
 
 	for coinType, baseSpace := range baseAllocations {
@@ -134,12 +134,12 @@ func (bsa *BlockSpaceAllocator) AllocateBlockSpace(pendingTxBytes map[dcrutil.Co
 }
 
 // calculateBaseAllocations determines the guaranteed space allocation for each coin type.
-func (bsa *BlockSpaceAllocator) calculateBaseAllocations() map[dcrutil.CoinType]uint32 {
-	allocations := make(map[dcrutil.CoinType]uint32)
+func (bsa *BlockSpaceAllocator) calculateBaseAllocations() map[cointype.CoinType]uint32 {
+	allocations := make(map[cointype.CoinType]uint32)
 
 	// VAR gets fixed 10% allocation
 	varSpace := uint32(float64(bsa.maxBlockSize) * bsa.varAllocation)
-	allocations[dcrutil.CoinTypeVAR] = varSpace
+	allocations[cointype.CoinTypeVAR] = varSpace
 
 	// SKA types share 90% equally among active types
 	activeSKATypes := bsa.chainParams.GetActiveSKATypes()
@@ -158,10 +158,10 @@ func (bsa *BlockSpaceAllocator) calculateBaseAllocations() map[dcrutil.CoinType]
 // identifyActivePendingTypes finds coin types that have pending transactions
 // after their base allocation is filled.
 func (bsa *BlockSpaceAllocator) identifyActivePendingTypes(
-	pendingTxBytes map[dcrutil.CoinType]uint32,
-	allocations map[dcrutil.CoinType]*CoinTypeAllocation) []dcrutil.CoinType {
+	pendingTxBytes map[cointype.CoinType]uint32,
+	allocations map[cointype.CoinType]*CoinTypeAllocation) []cointype.CoinType {
 
-	var activePending []dcrutil.CoinType
+	var activePending []cointype.CoinType
 
 	for coinType, allocation := range allocations {
 		remainingDemand := allocation.PendingBytes - allocation.UsedBytes
@@ -176,16 +176,16 @@ func (bsa *BlockSpaceAllocator) identifyActivePendingTypes(
 // distributeOverflow distributes unused block space among coin types with pending
 // transactions using the same 10%/90% proportional strategy.
 func (bsa *BlockSpaceAllocator) distributeOverflow(
-	allocations map[dcrutil.CoinType]*CoinTypeAllocation,
+	allocations map[cointype.CoinType]*CoinTypeAllocation,
 	totalOverflow uint32,
-	activePendingTypes []dcrutil.CoinType) {
+	activePendingTypes []cointype.CoinType) {
 
 	// Count active pending types by category
 	hasVARPending := false
 	activeSKACount := 0
 
 	for _, coinType := range activePendingTypes {
-		if coinType == dcrutil.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			hasVARPending = true
 		} else {
 			activeSKACount++
@@ -218,7 +218,7 @@ func (bsa *BlockSpaceAllocator) distributeOverflow(
 		remainingDemand := allocation.PendingBytes - allocation.UsedBytes
 
 		var availableOverflow uint32
-		if coinType == dcrutil.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			availableOverflow = varOverflow
 		} else {
 			availableOverflow = skaOverflowPerType
@@ -232,7 +232,7 @@ func (bsa *BlockSpaceAllocator) distributeOverflow(
 }
 
 // GetAllocationForCoinType returns the space allocation for a specific coin type.
-func (result *AllocationResult) GetAllocationForCoinType(coinType dcrutil.CoinType) *CoinTypeAllocation {
+func (result *AllocationResult) GetAllocationForCoinType(coinType cointype.CoinType) *CoinTypeAllocation {
 	return result.Allocations[coinType]
 }
 
@@ -254,20 +254,20 @@ func min(a, b uint32) uint32 {
 
 // GetTransactionCoinType determines the primary coin type of a transaction
 // based on the majority of its outputs.
-func GetTransactionCoinType(tx *dcrutil.Tx) dcrutil.CoinType {
+func GetTransactionCoinType(tx *dcrutil.Tx) cointype.CoinType {
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxOut) == 0 {
-		return dcrutil.CoinTypeVAR // Default to VAR for transactions with no outputs
+		return cointype.CoinTypeVAR // Default to VAR for transactions with no outputs
 	}
 
 	// Count outputs by coin type
-	coinTypeCounts := make(map[wire.CoinType]int)
+	coinTypeCounts := make(map[cointype.CoinType]int)
 	for _, txOut := range msgTx.TxOut {
 		coinTypeCounts[txOut.CoinType]++
 	}
 
 	// Find the coin type with the most outputs
-	var primaryCoinType wire.CoinType = wire.CoinTypeVAR
+	var primaryCoinType cointype.CoinType = cointype.CoinTypeVAR
 	maxCount := 0
 
 	for coinType, count := range coinTypeCounts {
@@ -277,19 +277,19 @@ func GetTransactionCoinType(tx *dcrutil.Tx) dcrutil.CoinType {
 		}
 	}
 
-	return dcrutil.CoinType(primaryCoinType)
+	return primaryCoinType
 }
 
 // TransactionSizeTracker tracks transaction sizes by coin type for block space allocation.
 type TransactionSizeTracker struct {
-	sizesByCoinType map[dcrutil.CoinType]uint32
+	sizesByCoinType map[cointype.CoinType]uint32
 	allocator       *BlockSpaceAllocator
 }
 
 // NewTransactionSizeTracker creates a new transaction size tracker.
 func NewTransactionSizeTracker(allocator *BlockSpaceAllocator) *TransactionSizeTracker {
 	return &TransactionSizeTracker{
-		sizesByCoinType: make(map[dcrutil.CoinType]uint32),
+		sizesByCoinType: make(map[cointype.CoinType]uint32),
 		allocator:       allocator,
 	}
 }
@@ -312,7 +312,7 @@ func (tst *TransactionSizeTracker) CanAddTransaction(tx *dcrutil.Tx) bool {
 	txSize := uint32(tx.MsgTx().SerializeSize())
 
 	// Create a temporary copy of current sizes to test the addition
-	testSizes := make(map[dcrutil.CoinType]uint32)
+	testSizes := make(map[cointype.CoinType]uint32)
 	for ct, size := range tst.sizesByCoinType {
 		testSizes[ct] = size
 	}
@@ -323,13 +323,13 @@ func (tst *TransactionSizeTracker) CanAddTransaction(tx *dcrutil.Tx) bool {
 
 	// Check if this coin type would exceed its final allocation
 	coinAllocation := allocation.GetAllocationForCoinType(coinType)
-	
+
 	// DEBUG: Log allocation check details
 	if coinAllocation == nil {
 		log.Debugf("DEBUG: Transaction rejected - no allocation for coinType %d", coinType)
 		return false
 	} else {
-		log.Debugf("DEBUG: Transaction coinType %d - allocation exists, finalAllocation=%d, testSize=%d", 
+		log.Debugf("DEBUG: Transaction coinType %d - allocation exists, finalAllocation=%d, testSize=%d",
 			coinType, coinAllocation.FinalAllocation, testSizes[coinType])
 	}
 
@@ -337,18 +337,18 @@ func (tst *TransactionSizeTracker) CanAddTransaction(tx *dcrutil.Tx) bool {
 }
 
 // GetSizeForCoinType returns the current size tracked for a specific coin type.
-func (tst *TransactionSizeTracker) GetSizeForCoinType(coinType dcrutil.CoinType) uint32 {
+func (tst *TransactionSizeTracker) GetSizeForCoinType(coinType cointype.CoinType) uint32 {
 	return tst.sizesByCoinType[coinType]
 }
 
 // Reset clears all tracked transaction sizes.
 func (tst *TransactionSizeTracker) Reset() {
-	tst.sizesByCoinType = make(map[dcrutil.CoinType]uint32)
+	tst.sizesByCoinType = make(map[cointype.CoinType]uint32)
 }
 
 // updateFeeCalculatorUtilization updates the fee calculator with current network utilization stats
-func (bsa *BlockSpaceAllocator) updateFeeCalculatorUtilization(allocations map[dcrutil.CoinType]*CoinTypeAllocation,
-	pendingTxBytes map[dcrutil.CoinType]uint32) {
+func (bsa *BlockSpaceAllocator) updateFeeCalculatorUtilization(allocations map[cointype.CoinType]*CoinTypeAllocation,
+	pendingTxBytes map[cointype.CoinType]uint32) {
 
 	// Count pending transactions (estimate based on average transaction size)
 	const avgTxSize = 250 // Average transaction size in bytes
@@ -364,13 +364,13 @@ func (bsa *BlockSpaceAllocator) updateFeeCalculatorUtilization(allocations map[d
 		}
 
 		// Update fee calculator with utilization data
-		bsa.feeCalculator.UpdateUtilization(wire.CoinType(coinType), pendingTxCount,
+		bsa.feeCalculator.UpdateUtilization(coinType, pendingTxCount,
 			int64(pending), blockSpaceUsed)
 	}
 }
 
 // RecordTransactionFee records a transaction fee for fee estimation (called from mining integration)
-func (bsa *BlockSpaceAllocator) RecordTransactionFee(coinType wire.CoinType, fee int64, size int64, confirmed bool) {
+func (bsa *BlockSpaceAllocator) RecordTransactionFee(coinType cointype.CoinType, fee int64, size int64, confirmed bool) {
 	if bsa.feeCalculator != nil {
 		bsa.feeCalculator.RecordTransactionFee(coinType, fee, size, confirmed)
 	}
@@ -378,7 +378,7 @@ func (bsa *BlockSpaceAllocator) RecordTransactionFee(coinType wire.CoinType, fee
 
 // ValidateTransactionFees validates fees for a transaction using the integrated fee calculator
 func (bsa *BlockSpaceAllocator) ValidateTransactionFees(txFee int64, serializedSize int64,
-	coinType wire.CoinType, allowHighFees bool) error {
+	coinType cointype.CoinType, allowHighFees bool) error {
 	if bsa.feeCalculator != nil {
 		return bsa.feeCalculator.ValidateTransactionFees(txFee, serializedSize, coinType, allowHighFees)
 	}
@@ -387,7 +387,7 @@ func (bsa *BlockSpaceAllocator) ValidateTransactionFees(txFee int64, serializedS
 }
 
 // GetFeeEstimate returns fee estimate for a coin type and target confirmations
-func (bsa *BlockSpaceAllocator) GetFeeEstimate(coinType wire.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
+func (bsa *BlockSpaceAllocator) GetFeeEstimate(coinType cointype.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
 	if bsa.feeCalculator != nil {
 		return bsa.feeCalculator.EstimateFeeRate(coinType, targetConfirmations)
 	}

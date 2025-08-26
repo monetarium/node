@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -48,7 +49,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1000000, // 1 DCR subsidy
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -71,19 +72,19 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1010000, // 1 DCR subsidy + 0.1 DCR VAR fees
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    5000, // SKA-1 fees
-				CoinType: wire.CoinType(1),
+				CoinType: cointype.CoinType(1),
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    3000, // SKA-2 fees
-				CoinType: wire.CoinType(2),
+				CoinType: cointype.CoinType(2),
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -91,9 +92,9 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 
 		coinbase := createCoinbase(outputs)
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinTypeVAR, 10000) // 0.1 DCR VAR fees
-		expectedFees.Add(wire.CoinType(1), 5000)  // SKA-1 fees
-		expectedFees.Add(wire.CoinType(2), 3000)  // SKA-2 fees
+		expectedFees.Add(cointype.CoinTypeVAR, 10000) // 0.1 DCR VAR fees
+		expectedFees.Add(cointype.CoinType(1), 5000)  // SKA-1 fees
+		expectedFees.Add(cointype.CoinType(2), 3000)  // SKA-2 fees
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)
@@ -126,7 +127,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    5000,
-				CoinType: wire.CoinType(1),
+				CoinType: cointype.CoinType(1),
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -134,7 +135,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 
 		coinbase := createCoinbase(outputs)
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinType(1), 5000)
+		expectedFees.Add(cointype.CoinType(1), 5000)
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)
@@ -154,19 +155,19 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1000000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    5000,
-				CoinType: wire.CoinType(1),
+				CoinType: cointype.CoinType(1),
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    3000,
-				CoinType: wire.CoinType(1), // Duplicate!
+				CoinType: cointype.CoinType(1), // Duplicate!
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -174,7 +175,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 
 		coinbase := createCoinbase(outputs)
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinType(1), 8000)
+		expectedFees.Add(cointype.CoinType(1), 8000)
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)
@@ -194,7 +195,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    900000, // Wrong amount (should be 1000000 + VAR fees)
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -202,7 +203,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 
 		coinbase := createCoinbase(outputs)
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinTypeVAR, 10000)
+		expectedFees.Add(cointype.CoinTypeVAR, 10000)
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)
@@ -222,13 +223,13 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1000000, // Correct subsidy (no VAR fees)
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    3000, // Wrong amount (expected 5000)
-				CoinType: wire.CoinType(1),
+				CoinType: cointype.CoinType(1),
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -236,7 +237,7 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 
 		coinbase := createCoinbase(outputs)
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinType(1), 5000) // Expected 5000, got 3000
+		expectedFees.Add(cointype.CoinType(1), 5000) // Expected 5000, got 3000
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)
@@ -256,13 +257,13 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1000000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    5000, // Unexpected output
-				CoinType: wire.CoinType(1),
+				CoinType: cointype.CoinType(1),
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -293,13 +294,13 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1005000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    5000,
-				CoinType: wire.CoinType(1),
+				CoinType: cointype.CoinType(1),
 				Version:  0,
 				PkScript: altPayScript, // Different script!
 			},
@@ -307,8 +308,8 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 
 		coinbase := createCoinbase(outputs)
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinTypeVAR, 5000)
-		expectedFees.Add(wire.CoinType(1), 5000)
+		expectedFees.Add(cointype.CoinTypeVAR, 5000)
+		expectedFees.Add(cointype.CoinType(1), 5000)
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)
@@ -333,24 +334,24 @@ func TestValidateCoinbaseMultiOutput(t *testing.T) {
 		// Add VAR subsidy + fees
 		outputs = append(outputs, &wire.TxOut{
 			Value:    1050000, // 1 DCR subsidy + 0.5 DCR VAR fees
-			CoinType: wire.CoinTypeVAR,
+			CoinType: cointype.CoinTypeVAR,
 			Version:  0,
 			PkScript: payScript,
 		})
 
 		// Add multiple SKA coin types
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinTypeVAR, 50000)
+		expectedFees.Add(cointype.CoinTypeVAR, 50000)
 
 		for i := 1; i <= 10; i++ {
 			feeAmount := int64(i * 1000) // Varying fee amounts
 			outputs = append(outputs, &wire.TxOut{
 				Value:    feeAmount,
-				CoinType: wire.CoinType(i),
+				CoinType: cointype.CoinType(i),
 				Version:  0,
 				PkScript: payScript,
 			})
-			expectedFees.Add(wire.CoinType(i), feeAmount)
+			expectedFees.Add(cointype.CoinType(i), feeAmount)
 		}
 
 		coinbase := createCoinbase(outputs)
@@ -381,7 +382,7 @@ func TestValidateCoinbaseMultiOutputEdgeCases(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1000000, // Just subsidy, no fees
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -418,13 +419,13 @@ func TestValidateCoinbaseMultiOutputEdgeCases(t *testing.T) {
 		outputs := []*wire.TxOut{
 			{
 				Value:    1000000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: payScript,
 			},
 			{
 				Value:    1000,
-				CoinType: wire.CoinType(255), // Maximum valid coin type
+				CoinType: cointype.CoinType(255), // Maximum valid coin type
 				Version:  0,
 				PkScript: payScript,
 			},
@@ -446,7 +447,7 @@ func TestValidateCoinbaseMultiOutputEdgeCases(t *testing.T) {
 		}
 
 		expectedFees := wire.NewFeesByType()
-		expectedFees.Add(wire.CoinType(255), 1000)
+		expectedFees.Add(cointype.CoinType(255), 1000)
 		subsidyAmount := int64(1000000)
 
 		err := validateCoinbaseMultiOutput(coinbase, expectedFees, subsidyAmount)

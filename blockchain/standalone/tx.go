@@ -10,6 +10,7 @@ import (
 	"math"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -39,15 +40,6 @@ const (
 	maxSKAAtoms = 10e6 * atomsPerSKA
 )
 
-// CoinType represents the type of coin in a transaction output.
-// Defined locally to avoid import cycles with dcrutil package.
-type CoinType uint8
-
-const (
-	CoinTypeVAR CoinType = 0 // Varta - mined coins
-	CoinTypeSKA CoinType = 1 // Skarb - asset-backed coins
-)
-
 var (
 	// zeroHash is the zero value for a chainhash.Hash and is defined as a
 	// package level variable to avoid the need to create a new instance every
@@ -55,19 +47,24 @@ var (
 	zeroHash = chainhash.Hash{}
 )
 
-// isValidCoinType checks if the given coin type is valid.
-func isValidCoinType(coinType CoinType) bool {
-	return coinType == CoinTypeVAR || coinType == CoinTypeSKA
+// isValidCoinType checks if the given coin type is within valid range.
+// Note: This only validates range (0-255). For activation-aware validation,
+// use the cointype package with chain parameters.
+func isValidCoinType(_ cointype.CoinType) bool {
+	// Valid range is 0-255 (enforced by uint8, but explicit for clarity)
+	return true // All uint8 values (0-255) are valid coin type numbers
 }
 
 // getMaxAtomsForCoinType returns the maximum atoms allowed for a given coin type.
-func getMaxAtomsForCoinType(coinType CoinType) int64 {
+func getMaxAtomsForCoinType(coinType cointype.CoinType) int64 {
 	switch coinType {
-	case CoinTypeVAR:
+	case cointype.CoinTypeVAR:
 		return maxAtoms
-	case CoinTypeSKA:
-		return maxSKAAtoms
 	default:
+		// All SKA coin types (1-255) have the same max atoms
+		if coinType >= 1 {
+			return maxSKAAtoms
+		}
 		return 0
 	}
 }
@@ -202,7 +199,7 @@ func CheckTransactionSanity(tx *wire.MsgTx, maxTxSize uint64) error {
 	var totalVARAtoms, totalSKAAtoms int64
 	for _, txOut := range tx.TxOut {
 		atoms := txOut.Value
-		coinType := CoinType(uint8(txOut.CoinType))
+		coinType := cointype.CoinType(uint8(txOut.CoinType))
 
 		// Validate coin type
 		if !isValidCoinType(coinType) {
@@ -227,7 +224,7 @@ func CheckTransactionSanity(tx *wire.MsgTx, maxTxSize uint64) error {
 
 		// Track totals by coin type
 		switch coinType {
-		case CoinTypeVAR:
+		case cointype.CoinTypeVAR:
 			// Two's complement int64 overflow guarantees that any overflow is
 			// detected and reported.
 			totalVARAtoms += atoms
@@ -242,18 +239,21 @@ func CheckTransactionSanity(tx *wire.MsgTx, maxTxSize uint64) error {
 					maxAtoms)
 				return ruleError(ErrBadTxOutValue, str)
 			}
-		case CoinTypeSKA:
-			totalSKAAtoms += atoms
-			if totalSKAAtoms < 0 {
-				str := fmt.Sprintf("total value of all SKA transaction outputs "+
-					"exceeds max allowed value of %v", maxSKAAtoms)
-				return ruleError(ErrBadTxOutValue, str)
-			}
-			if totalSKAAtoms > maxSKAAtoms {
-				str := fmt.Sprintf("total value of all SKA transaction outputs is %v "+
-					"which is higher than max allowed value of %v", totalSKAAtoms,
-					maxSKAAtoms)
-				return ruleError(ErrBadTxOutValue, str)
+		default:
+			// All SKA coin types (1-255) use the same validation
+			if coinType >= 1 {
+				totalSKAAtoms += atoms
+				if totalSKAAtoms < 0 {
+					str := fmt.Sprintf("total value of all SKA transaction outputs "+
+						"exceeds max allowed value of %v", maxSKAAtoms)
+					return ruleError(ErrBadTxOutValue, str)
+				}
+				if totalSKAAtoms > maxSKAAtoms {
+					str := fmt.Sprintf("total value of all SKA transaction outputs is %v "+
+						"which is higher than max allowed value of %v", totalSKAAtoms,
+						maxSKAAtoms)
+					return ruleError(ErrBadTxOutValue, str)
+				}
 			}
 		}
 	}

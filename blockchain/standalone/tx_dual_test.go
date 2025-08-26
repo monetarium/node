@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -40,7 +41,7 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				TxOut: []*wire.TxOut{
 					{
 						Value:    100000000, // 1 VAR
-						CoinType: wire.CoinType(CoinTypeVAR),
+						CoinType: cointype.CoinTypeVAR,
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
@@ -66,7 +67,7 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				TxOut: []*wire.TxOut{
 					{
 						Value:    50000000, // 0.5 SKA
-						CoinType: wire.CoinType(CoinTypeSKA),
+						CoinType: cointype.CoinType(1),
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 					},
@@ -92,13 +93,13 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				TxOut: []*wire.TxOut{
 					{
 						Value:    100000000, // 1 VAR
-						CoinType: wire.CoinType(CoinTypeVAR),
+						CoinType: cointype.CoinTypeVAR,
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
 					{
 						Value:    200000000, // 2 SKA
-						CoinType: wire.CoinType(CoinTypeSKA),
+						CoinType: cointype.CoinType(1),
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 					},
@@ -107,7 +108,7 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Invalid coin type",
+			name: "Valid SKA coin type 99",
 			tx: &wire.MsgTx{
 				Version: 1,
 				TxIn: []*wire.TxIn{
@@ -124,14 +125,13 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				TxOut: []*wire.TxOut{
 					{
 						Value:    100000000,
-						CoinType: wire.CoinType(99), // Invalid coin type
+						CoinType: cointype.CoinType(99), // Valid SKA coin type
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
 				},
 			},
-			expectError: true,
-			errorType:   "ErrBadTxOutValue",
+			expectError: false, // Now valid coin type range
 		},
 		{
 			name: "VAR amount exceeds maximum",
@@ -150,8 +150,8 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				},
 				TxOut: []*wire.TxOut{
 					{
-						Value:    maxAtoms + 1, // Exceeds VAR maximum
-						CoinType: wire.CoinType(CoinTypeVAR),
+						Value:    cointype.MaxVARAtoms + 1, // Exceeds VAR maximum
+						CoinType: cointype.CoinTypeVAR,
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
@@ -177,8 +177,8 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				},
 				TxOut: []*wire.TxOut{
 					{
-						Value:    maxSKAAtoms + 1, // Exceeds SKA maximum
-						CoinType: wire.CoinType(CoinTypeSKA),
+						Value:    cointype.MaxSKAAtoms + 1, // Exceeds SKA maximum
+						CoinType: cointype.CoinType(1),
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 					},
@@ -205,7 +205,7 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				TxOut: []*wire.TxOut{
 					{
 						Value:    -1, // Negative amount
-						CoinType: wire.CoinType(CoinTypeVAR),
+						CoinType: cointype.CoinTypeVAR,
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
@@ -231,14 +231,14 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				},
 				TxOut: []*wire.TxOut{
 					{
-						Value:    maxAtoms/2 + 1,
-						CoinType: wire.CoinType(CoinTypeVAR),
+						Value:    cointype.MaxVARAtoms/2 + 1,
+						CoinType: cointype.CoinTypeVAR,
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
 					{
-						Value:    maxAtoms/2 + 1,
-						CoinType: wire.CoinType(CoinTypeVAR),
+						Value:    cointype.MaxVARAtoms/2 + 1,
+						CoinType: cointype.CoinTypeVAR,
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 					},
@@ -264,14 +264,14 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 				},
 				TxOut: []*wire.TxOut{
 					{
-						Value:    maxSKAAtoms/2 + 1,
-						CoinType: wire.CoinType(CoinTypeSKA),
+						Value:    cointype.MaxSKAAtoms/2 + 1,
+						CoinType: cointype.CoinType(1),
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 					},
 					{
-						Value:    maxSKAAtoms/2 + 1,
-						CoinType: wire.CoinType(CoinTypeSKA),
+						Value:    cointype.MaxSKAAtoms/2 + 1,
+						CoinType: cointype.CoinType(1),
 						Version:  0,
 						PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 					},
@@ -308,14 +308,14 @@ func TestCheckTransactionSanityDualCoin(t *testing.T) {
 func TestCoinTypeValidation(t *testing.T) {
 	tests := []struct {
 		name     string
-		coinType CoinType
+		coinType cointype.CoinType
 		isValid  bool
 		maxAtoms int64
 	}{
-		{"VAR coin type", CoinTypeVAR, true, maxAtoms},
-		{"SKA coin type", CoinTypeSKA, true, maxSKAAtoms},
-		{"Invalid coin type 2", CoinType(2), false, 0},
-		{"Invalid coin type 99", CoinType(99), false, 0},
+		{"VAR coin type", cointype.CoinTypeVAR, true, cointype.MaxVARAtoms},
+		{"SKA coin type", 1, true, cointype.MaxSKAAtoms},
+		{"SKA coin type 2", cointype.CoinType(2), true, cointype.MaxSKAAtoms},
+		{"SKA coin type 99", cointype.CoinType(99), true, cointype.MaxSKAAtoms},
 	}
 
 	for _, test := range tests {

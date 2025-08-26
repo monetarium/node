@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -215,7 +216,7 @@ func deserializeUtxoEntry(serialized []byte, txOutIndex uint32) (*UtxoEntry, err
 
 	// Try to deserialize coin type for version 4+ format.
 	// If this fails, we assume it's a version 3 entry and default to VAR.
-	var coinType CoinType = CoinTypeVAR // Default for legacy entries
+	var coinType cointype.CoinType = cointype.CoinTypeVAR // Default for legacy entries
 
 	coinTypeVal, bytesRead := deserializeVLQ(serialized[offset:])
 	nextOffset := offset + bytesRead
@@ -226,7 +227,7 @@ func deserializeUtxoEntry(serialized []byte, txOutIndex uint32) (*UtxoEntry, err
 		_, _, _, _, err := decodeCompressedTxOut(serialized[nextOffset:], true)
 		if err == nil {
 			// Successfully decoded with coin type, this is version 4+ format
-			coinType = CoinType(coinTypeVal)
+			coinType = cointype.CoinType(coinTypeVal)
 			offset = nextOffset
 		}
 		// If decoding failed, this is likely version 3 format, continue without coin type

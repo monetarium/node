@@ -12,6 +12,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
 	"github.com/decred/dcrd/dcrutil/v4"
@@ -21,7 +22,7 @@ import (
 
 // isSKAEmissionWindow returns whether the provided block height is within
 // the emission window for the specified SKA coin type.
-func isSKAEmissionWindow(blockHeight int64, coinType dcrutil.CoinType, chainParams *chaincfg.Params) bool {
+func isSKAEmissionWindow(blockHeight int64, coinType cointype.CoinType, chainParams *chaincfg.Params) bool {
 	config, exists := chainParams.SKACoins[coinType]
 	if !exists {
 		return false
@@ -47,7 +48,7 @@ func isSKAEmissionWindowActive(blockHeight int64, chainParams *chaincfg.Params) 
 // CheckSKAEmissionAlreadyExists checks if a coin type has already been emitted
 // in the blockchain by scanning emission window blocks for existing emissions.
 // This implements secure "first valid emission wins" logic using blockchain state.
-func CheckSKAEmissionAlreadyExists(coinType dcrutil.CoinType, chain *BlockChain, chainParams *chaincfg.Params) bool {
+func CheckSKAEmissionAlreadyExists(coinType cointype.CoinType, chain *BlockChain, chainParams *chaincfg.Params) bool {
 	// Check if coin type is configured
 	config, exists := chainParams.SKACoins[coinType]
 	if !exists {
@@ -94,7 +95,7 @@ func CheckSKAEmissionAlreadyExists(coinType dcrutil.CoinType, chain *BlockChain,
 			if wire.IsSKAEmissionTransaction(msgTx) {
 				// Check if this emission transaction contains outputs for our target coin type
 				for _, txOut := range msgTx.TxOut {
-					if dcrutil.CoinType(txOut.CoinType) == coinType {
+					if txOut.CoinType == coinType {
 						// Found an existing emission for this coin type
 						return true
 					}
@@ -182,7 +183,7 @@ func CreateSKAEmissionTransaction(emissionAddresses []string, amounts []int64,
 		// Add SKA output
 		tx.TxOut = append(tx.TxOut, &wire.TxOut{
 			Value:    amounts[i],
-			CoinType: wire.CoinTypeSKA, // This is an SKA emission
+			CoinType: cointype.CoinType(1), // This is an SKA emission
 			Version:  0,
 			PkScript: pkScript,
 		})
@@ -228,9 +229,11 @@ func CreateAuthorizedSKAEmissionTransaction(auth *chaincfg.SKAEmissionAuth,
 		return nil, fmt.Errorf("unauthorized emission key for coin type %d", auth.CoinType)
 	}
 
-	// Check nonce - must always be 1 for emissions (only one emission per coin type allowed)
-	if auth.Nonce != 1 {
-		return nil, fmt.Errorf("invalid nonce: expected 1, got %d", auth.Nonce)
+	// Check nonce for replay protection - must be exactly one more than the current nonce
+	currentNonce := chainParams.GetSKAEmissionNonce(auth.CoinType)
+	expectedNonce := currentNonce + 1
+	if auth.Nonce != expectedNonce {
+		return nil, fmt.Errorf("invalid nonce: expected %d, got %d", expectedNonce, auth.Nonce)
 	}
 
 	// Validate emission amounts
@@ -421,7 +424,7 @@ func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	}
 
 	// Get the coin type from the first output
-	coinType := dcrutil.CoinType(tx.TxOut[0].CoinType)
+	coinType := tx.TxOut[0].CoinType
 	if !isSKAEmissionWindow(blockHeight, coinType, chainParams) {
 		return fmt.Errorf("SKA emission transaction at invalid height %d for coin type %d",
 			blockHeight, coinType)
@@ -454,7 +457,7 @@ func ValidateSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	// Validate all outputs are SKA outputs
 	var totalEmissionAmount int64
 	for i, txOut := range tx.TxOut {
-		if txOut.CoinType != wire.CoinTypeSKA {
+		if !txOut.CoinType.IsSKA() {
 			return fmt.Errorf("SKA emission transaction output %d is not SKA coin type", i)
 		}
 
@@ -502,7 +505,7 @@ func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	}
 
 	// Get the coin type from the first output
-	coinType := dcrutil.CoinType(tx.TxOut[0].CoinType)
+	coinType := tx.TxOut[0].CoinType
 	if !isSKAEmissionWindow(blockHeight, coinType, chainParams) {
 		return fmt.Errorf("SKA emission transaction at invalid height %d for coin type %d",
 			blockHeight, coinType)
@@ -532,7 +535,7 @@ func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	}
 
 	// Determine expected coin type from first output
-	var emissionCoinType wire.CoinType
+	var emissionCoinType cointype.CoinType
 	var totalEmissionAmount int64
 
 	// Validate all outputs have consistent coin type and valid amounts
@@ -637,7 +640,7 @@ func extractEmissionAuthorization(sigScript []byte) (*chaincfg.SKAEmissionAuth, 
 	if len(sigScript) < offset+1 {
 		return nil, fmt.Errorf("insufficient data for coin type")
 	}
-	coinType := wire.CoinType(sigScript[offset])
+	coinType := cointype.CoinType(sigScript[offset])
 	log.Debugf("Coin type: %d from byte %x at offset %d", coinType, sigScript[offset], offset)
 	offset++
 
@@ -723,9 +726,11 @@ func validateEmissionAuthorization(auth *chaincfg.SKAEmissionAuth, chainParams *
 		return fmt.Errorf("unauthorized emission key for coin type %d", auth.CoinType)
 	}
 
-	// Check nonce - must always be 1 for emissions (only one emission per coin type allowed)
-	if auth.Nonce != 1 {
-		return fmt.Errorf("invalid nonce: expected 1, got %d", auth.Nonce)
+	// Check nonce for replay protection - must be exactly one more than the current nonce
+	currentNonce := chainParams.GetSKAEmissionNonce(auth.CoinType)
+	expectedNonce := currentNonce + 1
+	if auth.Nonce != expectedNonce {
+		return fmt.Errorf("invalid nonce: expected %d, got %d", expectedNonce, auth.Nonce)
 	}
 
 	return nil
@@ -747,7 +752,7 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 
 	var emissionTxCount int
 	var skaTxCount int
-	emissionTxCoinTypes := make(map[dcrutil.CoinType]bool)
+	emissionTxCoinTypes := make(map[cointype.CoinType]bool)
 
 	// Check all transactions in the block
 	for i, tx := range block.Transactions() {
@@ -767,7 +772,7 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 
 			// Track which coin types are being emitted and check for previous emissions
 			for _, txOut := range msgTx.TxOut {
-				coinType := dcrutil.CoinType(txOut.CoinType)
+				coinType := txOut.CoinType
 
 				// Check for multiple emission transactions in the same block
 				if emissionTxCoinTypes[coinType] {
@@ -811,7 +816,7 @@ func CheckSKAEmissionInBlock(block *dcrutil.Block, blockHeight int64,
 		// Count transactions with SKA outputs (excluding emission transactions)
 		if !wire.IsSKAEmissionTransaction(msgTx) {
 			for _, txOut := range msgTx.TxOut {
-				if txOut.CoinType == wire.CoinTypeSKA {
+				if txOut.CoinType.IsSKA() {
 					skaTxCount++
 					break
 				}

@@ -26,6 +26,7 @@ import (
 	"github.com/decred/dcrd/blockchain/v5/chaingen"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/database/v3"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/txscript/v4"
@@ -2493,7 +2494,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				entry := &UtxoEntry{
 					amount:      1000000000, // 10 VAR
-					coinType:    CoinTypeVAR,
+					coinType:    cointype.CoinTypeVAR,
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[outpoint] = entry
@@ -2513,7 +2514,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 						Value:    999000000, // 9.99 VAR (0.01 VAR fee)
 						Version:  0,
 						PkScript: createP2PKHScript(),
-						CoinType: wire.CoinTypeVAR,
+						CoinType: cointype.CoinTypeVAR,
 					}},
 				}
 				return tx
@@ -2532,7 +2533,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				entry := &UtxoEntry{
 					amount:      5000000000, // 50 SKA
-					coinType:    CoinTypeSKA,
+					coinType:    cointype.CoinType(1),
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[outpoint] = entry
@@ -2552,7 +2553,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 						Value:    5000000000, // 50 SKA (no fees for SKA)
 						Version:  0,
 						PkScript: createP2PKHScript(),
-						CoinType: wire.CoinTypeSKA,
+						CoinType: cointype.CoinType(1),
 					}},
 				}
 				return tx
@@ -2571,7 +2572,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				entry := &UtxoEntry{
 					amount:      500000000, // 5 VAR
-					coinType:    CoinTypeVAR,
+					coinType:    cointype.CoinTypeVAR,
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[outpoint] = entry
@@ -2591,7 +2592,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 						Value:    1000000000, // 10 VAR (more than input)
 						Version:  0,
 						PkScript: createP2PKHScript(),
-						CoinType: wire.CoinTypeVAR,
+						CoinType: cointype.CoinTypeVAR,
 					}},
 				}
 				return tx
@@ -2610,7 +2611,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				entry := &UtxoEntry{
 					amount:      5000000000, // 50 SKA
-					coinType:    CoinTypeSKA,
+					coinType:    cointype.CoinType(1),
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[outpoint] = entry
@@ -2630,7 +2631,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 						Value:    4000000000, // 40 SKA (less than input)
 						Version:  0,
 						PkScript: createP2PKHScript(),
-						CoinType: wire.CoinTypeSKA,
+						CoinType: cointype.CoinType(1),
 					}},
 				}
 				return tx
@@ -2649,7 +2650,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				varEntry := &UtxoEntry{
 					amount:      1000000000,
-					coinType:    CoinTypeVAR,
+					coinType:    cointype.CoinTypeVAR,
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[varOutpoint] = varEntry
@@ -2661,7 +2662,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				skaEntry := &UtxoEntry{
 					amount:      5000000000,
-					coinType:    CoinTypeSKA,
+					coinType:    cointype.CoinType(1),
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[skaOutpoint] = skaEntry
@@ -2692,13 +2693,13 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 							Value:    999000000, // VAR output
 							Version:  0,
 							PkScript: createP2PKHScript(),
-							CoinType: wire.CoinTypeVAR,
+							CoinType: cointype.CoinTypeVAR,
 						},
 						{
 							Value:    5000000000, // SKA output
 							Version:  0,
 							PkScript: createP2PKHScript(),
-							CoinType: wire.CoinTypeSKA,
+							CoinType: cointype.CoinType(1),
 						},
 					},
 				}
@@ -2718,7 +2719,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 				}
 				entry := &UtxoEntry{
 					amount:      1000000000,
-					coinType:    CoinTypeVAR,
+					coinType:    cointype.CoinTypeVAR,
 					packedFlags: encodeUtxoFlags(false, false, 0),
 				}
 				view.entries[outpoint] = entry
@@ -2738,7 +2739,7 @@ func TestDualCoinTransactionValidation(t *testing.T) {
 						Value:    1000000000, // SKA output from VAR input
 						Version:  0,
 						PkScript: createP2PKHScript(),
-						CoinType: wire.CoinTypeSKA,
+						CoinType: cointype.CoinType(1),
 					}},
 				}
 				return tx

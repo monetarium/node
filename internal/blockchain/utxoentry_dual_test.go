@@ -7,17 +7,19 @@ package blockchain
 import (
 	"reflect"
 	"testing"
+
+	"github.com/decred/dcrd/cointype"
 )
 
 // TestCoinTypeString tests the String method of CoinType.
 func TestCoinTypeString(t *testing.T) {
 	tests := []struct {
-		coinType CoinType
+		coinType cointype.CoinType
 		expected string
 	}{
-		{CoinTypeVAR, "VAR"},
-		{CoinTypeSKA, "SKA"},
-		{CoinType(99), "Unknown"},
+		{cointype.CoinTypeVAR, "VAR"},
+		{cointype.CoinType(1), "SKA"},
+		{cointype.CoinType(99), "SKA-99"},
 	}
 
 	for i, test := range tests {
@@ -33,14 +35,14 @@ func TestCoinTypeString(t *testing.T) {
 // all possible uint8 values are now valid coin types.
 func TestCoinTypeIsValid(t *testing.T) {
 	tests := []struct {
-		coinType CoinType
+		coinType cointype.CoinType
 		expected bool
 	}{
-		{CoinTypeVAR, true},   // VAR coin (0)
-		{CoinTypeSKA, true},   // SKA-1 coin (1)
-		{CoinType(2), true},   // SKA-2 coin (2)
-		{CoinType(99), true},  // SKA-99 coin (99)
-		{CoinType(255), true}, // SKA-255 coin (255) - maximum
+		{cointype.CoinTypeVAR, true},   // VAR coin (0)
+		{cointype.CoinType(1), true},   // SKA-1 coin (1)
+		{cointype.CoinType(2), true},   // SKA-2 coin (2)
+		{cointype.CoinType(99), true},  // SKA-99 coin (99)
+		{cointype.CoinType(255), true}, // SKA-255 coin (255) - maximum
 	}
 
 	for i, test := range tests {
@@ -55,10 +57,10 @@ func TestCoinTypeIsValid(t *testing.T) {
 func TestUtxoEntryCoinType(t *testing.T) {
 	tests := []struct {
 		name     string
-		coinType CoinType
+		coinType cointype.CoinType
 	}{
-		{"VAR entry", CoinTypeVAR},
-		{"SKA entry", CoinTypeSKA},
+		{"VAR entry", cointype.CoinTypeVAR},
+		{"SKA entry", cointype.CoinType(1)},
 	}
 
 	for _, test := range tests {
@@ -81,10 +83,10 @@ func TestUtxoEntryAmountWithCoinType(t *testing.T) {
 	tests := []struct {
 		name     string
 		amount   int64
-		coinType CoinType
+		coinType cointype.CoinType
 	}{
-		{"VAR 1 coin", 100000000, CoinTypeVAR},
-		{"SKA 0.5 coin", 50000000, CoinTypeSKA},
+		{"VAR 1 coin", 100000000, cointype.CoinTypeVAR},
+		{"SKA 0.5 coin", 50000000, cointype.CoinType(1)},
 	}
 
 	for _, test := range tests {
@@ -113,7 +115,7 @@ func TestUtxoEntryClone(t *testing.T) {
 		blockHeight:   12345,
 		blockIndex:    2,
 		scriptVersion: 0,
-		coinType:      CoinTypeSKA,
+		coinType:      cointype.CoinType(1),
 		state:         0,
 		packedFlags:   0,
 	}

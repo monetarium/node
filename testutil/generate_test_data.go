@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -33,12 +34,12 @@ func main() {
 	// Ensure all TxOut entries have CoinType set to VAR for consistency with current protocol
 	for _, tx := range block.Transactions {
 		for i := range tx.TxOut {
-			tx.TxOut[i].CoinType = wire.CoinTypeVAR
+			tx.TxOut[i].CoinType = cointype.CoinTypeVAR
 		}
 	}
 	for _, stx := range block.STransactions {
 		for i := range stx.TxOut {
-			stx.TxOut[i].CoinType = wire.CoinTypeVAR
+			stx.TxOut[i].CoinType = cointype.CoinTypeVAR
 		}
 	}
 

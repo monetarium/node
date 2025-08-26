@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -106,13 +107,13 @@ func TestValidateTransactionOutputsCoinType(t *testing.T) {
 			outputs: []*wire.TxOut{
 				{
 					Value:    100000000, // 1 VAR
-					CoinType: wire.CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					Version:  0,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				},
 				{
 					Value:    50000000, // 0.5 VAR
-					CoinType: wire.CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					Version:  0,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 				},
@@ -126,7 +127,7 @@ func TestValidateTransactionOutputsCoinType(t *testing.T) {
 			outputs: []*wire.TxOut{
 				{
 					Value:    200000000, // 2 SKA
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					Version:  0,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				},
@@ -140,13 +141,13 @@ func TestValidateTransactionOutputsCoinType(t *testing.T) {
 			outputs: []*wire.TxOut{
 				{
 					Value:    100000000, // 1 VAR
-					CoinType: wire.CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					Version:  0,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				},
 				{
 					Value:    300000000, // 3 SKA
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					Version:  0,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x04, 0x05, 0x06},
 				},
@@ -160,7 +161,7 @@ func TestValidateTransactionOutputsCoinType(t *testing.T) {
 			outputs: []*wire.TxOut{
 				{
 					Value:    100000000,
-					CoinType: wire.CoinType(99), // Invalid
+					CoinType: cointype.CoinType(99), // Invalid
 					Version:  0,
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				},
@@ -179,9 +180,9 @@ func TestValidateTransactionOutputsCoinType(t *testing.T) {
 			// Simulate the coin type validation logic from CheckTransactionInputs
 			for _, output := range test.outputs {
 				switch output.CoinType {
-				case wire.CoinTypeVAR:
+				case cointype.CoinTypeVAR:
 					totalVAR += output.Value
-				case wire.CoinTypeSKA:
+				case cointype.CoinType(1):
 					totalSKA += output.Value
 				default:
 					err = ruleError(ErrBadTxOutValue, "invalid coin type")

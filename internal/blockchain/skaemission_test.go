@@ -10,9 +10,9 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -137,7 +137,7 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -164,7 +164,7 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 				},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -182,7 +182,7 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -200,7 +200,7 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeSKA,
+					CoinType: cointype.CoinType(1),
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -218,7 +218,7 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 				}},
 				TxOut: []*wire.TxOut{{
 					Value:    100000000,
-					CoinType: wire.CoinTypeVAR, // Wrong coin type
+					CoinType: cointype.CoinTypeVAR, // Wrong coin type
 					PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03},
 				}},
 			},
@@ -263,10 +263,10 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 	pubKey := privKey.PubKey()
 
 	// Initialize emission keys and nonces for coin type 1
-	params.SKAEmissionKeys = map[wire.CoinType]*secp256k1.PublicKey{
+	params.SKAEmissionKeys = map[cointype.CoinType]*secp256k1.PublicKey{
 		1: pubKey,
 	}
-	params.SKAEmissionNonces = map[wire.CoinType]uint64{
+	params.SKAEmissionNonces = map[cointype.CoinType]uint64{
 		1: 0,
 	}
 
@@ -387,7 +387,7 @@ func indexStr(s, substr string) int {
 func TestSKAEmissionWindow(t *testing.T) {
 	// Create test parameters with emission windows
 	params := &chaincfg.Params{
-		SKACoins: map[dcrutil.CoinType]*chaincfg.SKACoinConfig{
+		SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{
 			1: {
 				CoinType:       1,
 				EmissionHeight: 100,
@@ -409,7 +409,7 @@ func TestSKAEmissionWindow(t *testing.T) {
 	tests := []struct {
 		name        string
 		blockHeight int64
-		coinType    dcrutil.CoinType
+		coinType    cointype.CoinType
 		expected    bool
 	}{
 		// SKA-1 tests (emission window 100-150)
@@ -511,7 +511,7 @@ func TestSKAEmissionWindow(t *testing.T) {
 func TestSKAEmissionWindowActive(t *testing.T) {
 	// Create test parameters with emission windows
 	params := &chaincfg.Params{
-		SKACoins: map[dcrutil.CoinType]*chaincfg.SKACoinConfig{
+		SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{
 			1: {
 				CoinType:       1,
 				EmissionHeight: 100,
@@ -582,7 +582,7 @@ func TestSKAEmissionWindowActive(t *testing.T) {
 func TestSKAEmissionWindowEdgeCases(t *testing.T) {
 	// Test with empty parameters
 	emptyParams := &chaincfg.Params{
-		SKACoins: map[dcrutil.CoinType]*chaincfg.SKACoinConfig{},
+		SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{},
 	}
 
 	// Test with nil parameters
@@ -592,7 +592,7 @@ func TestSKAEmissionWindowEdgeCases(t *testing.T) {
 
 	// Test with very large emission window
 	largeWindowParams := &chaincfg.Params{
-		SKACoins: map[dcrutil.CoinType]*chaincfg.SKACoinConfig{
+		SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{
 			1: {
 				CoinType:       1,
 				EmissionHeight: 100,
@@ -607,7 +607,7 @@ func TestSKAEmissionWindowEdgeCases(t *testing.T) {
 
 	// Test with zero emission height
 	zeroHeightParams := &chaincfg.Params{
-		SKACoins: map[dcrutil.CoinType]*chaincfg.SKACoinConfig{
+		SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{
 			1: {
 				CoinType:       1,
 				EmissionHeight: 0,

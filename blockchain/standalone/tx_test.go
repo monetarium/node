@@ -10,6 +10,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -30,7 +31,7 @@ func parseTxWithFallback(txBytes []byte) (*wire.MsgTx, error) {
 	} else {
 		// Legacy transaction data - need to add CoinType field for compatibility
 		for i := range tx.TxOut {
-			tx.TxOut[i].CoinType = wire.CoinTypeVAR
+			tx.TxOut[i].CoinType = cointype.CoinTypeVAR
 		}
 	}
 

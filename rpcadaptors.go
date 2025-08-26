@@ -13,6 +13,7 @@ import (
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/connmgr/v3"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/internal/blockchain"
@@ -640,12 +641,12 @@ type rpcCoinTypeFeeCalculator struct {
 var _ rpcserver.CoinTypeFeeCalculator = (*rpcCoinTypeFeeCalculator)(nil)
 
 // GetFeeStats returns comprehensive fee statistics for a specific coin type.
-func (r *rpcCoinTypeFeeCalculator) GetFeeStats(coinType wire.CoinType) (*rpcserver.CoinTypeFeeStats, error) {
+func (r *rpcCoinTypeFeeCalculator) GetFeeStats(coinType cointype.CoinType) (*rpcserver.CoinTypeFeeStats, error) {
 	stats, err := r.calc.GetFeeStats(coinType)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Convert from fees.CoinTypeFeeStats to rpcserver.CoinTypeFeeStats
 	return &rpcserver.CoinTypeFeeStats{
 		CoinType:             stats.CoinType,
@@ -663,6 +664,6 @@ func (r *rpcCoinTypeFeeCalculator) GetFeeStats(coinType wire.CoinType) (*rpcserv
 }
 
 // EstimateFeeRate returns the current fee rate estimate for the given coin type.
-func (r *rpcCoinTypeFeeCalculator) EstimateFeeRate(coinType wire.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
+func (r *rpcCoinTypeFeeCalculator) EstimateFeeRate(coinType cointype.CoinType, targetConfirmations int) (dcrutil.Amount, error) {
 	return r.calc.EstimateFeeRate(coinType, targetConfirmations)
 }

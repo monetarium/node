@@ -1,6 +1,8 @@
 module github.com/decred/dcrd/gcs/v4
 
-go 1.17
+go 1.23
+
+toolchain go1.23.4
 
 require (
 	github.com/dchest/siphash v1.2.3
@@ -15,6 +17,7 @@ require (
 require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412 // indirect
 	github.com/decred/base58 v1.0.5 // indirect
+	github.com/decred/dcrd/cointype v1.0.0 // indirect
 	github.com/decred/dcrd/crypto/ripemd160 v1.0.2 // indirect
 	github.com/decred/dcrd/database/v3 v3.0.2 // indirect
 	github.com/decred/dcrd/dcrec v1.0.1 // indirect
@@ -27,3 +30,5 @@ require (
 )
 
 replace github.com/decred/dcrd/wire => ../wire
+
+replace github.com/decred/dcrd/cointype => ../cointype

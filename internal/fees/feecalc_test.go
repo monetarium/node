@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestNewCoinTypeFeeCalculator tests the creation of a new fee calculator
@@ -40,9 +40,9 @@ func TestNewCoinTypeFeeCalculator(t *testing.T) {
 
 	varFound, skaFound := false, false
 	for _, coinType := range supportedTypes {
-		if coinType == wire.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			varFound = true
-		} else if coinType == wire.CoinTypeSKA {
+		} else if coinType == cointype.CoinType(1) { // SKA-1
 			skaFound = true
 		}
 	}
@@ -65,37 +65,37 @@ func TestCalculateMinFee(t *testing.T) {
 	tests := []struct {
 		name           string
 		serializedSize int64
-		coinType       wire.CoinType
+		coinType       cointype.CoinType
 		expectedMin    int64
 	}{
 		{
 			name:           "VAR transaction 250 bytes",
 			serializedSize: 250,
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			expectedMin:    2500, // (250 * 10000) / 1000 = 2500 atoms
 		},
 		{
 			name:           "SKA transaction 250 bytes",
 			serializedSize: 250,
-			coinType:       wire.CoinTypeSKA,
-			expectedMin:    250, // SKA has 10x lower fee: (250 * 1000) / 1000 = 250 atoms
+			coinType:       cointype.CoinType(1), // SKA-1
+			expectedMin:    250,                  // SKA has 10x lower fee: (250 * 1000) / 1000 = 250 atoms
 		},
 		{
 			name:           "Large VAR transaction 1000 bytes",
 			serializedSize: 1000,
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			expectedMin:    10000, // (1000 * 10000) / 1000 = 10000 atoms
 		},
 		{
 			name:           "Large SKA transaction 1000 bytes",
 			serializedSize: 1000,
-			coinType:       wire.CoinTypeSKA,
-			expectedMin:    1000, // (1000 * 1000) / 1000 = 1000 atoms
+			coinType:       cointype.CoinType(1), // SKA-1
+			expectedMin:    1000,                 // (1000 * 1000) / 1000 = 1000 atoms
 		},
 		{
 			name:           "Unknown coin type defaults to VAR",
 			serializedSize: 500,
-			coinType:       wire.CoinType(99),
+			coinType:       cointype.CoinType(99),
 			expectedMin:    5000, // Should default to VAR: (500 * 10000) / 1000 = 5000 atoms
 		},
 	}
@@ -119,31 +119,31 @@ func TestEstimateFeeRate(t *testing.T) {
 
 	tests := []struct {
 		name                string
-		coinType            wire.CoinType
+		coinType            cointype.CoinType
 		targetConfirmations int
 		expectError         bool
 	}{
 		{
 			name:                "VAR next block",
-			coinType:            wire.CoinTypeVAR,
+			coinType:            cointype.CoinTypeVAR,
 			targetConfirmations: 1,
 			expectError:         false,
 		},
 		{
 			name:                "SKA fast confirmation",
-			coinType:            wire.CoinTypeSKA,
+			coinType:            cointype.CoinType(1), // SKA-1
 			targetConfirmations: 3,
 			expectError:         false,
 		},
 		{
 			name:                "VAR normal confirmation",
-			coinType:            wire.CoinTypeVAR,
+			coinType:            cointype.CoinTypeVAR,
 			targetConfirmations: 6,
 			expectError:         false,
 		},
 		{
 			name:                "Unknown coin type",
-			coinType:            wire.CoinType(99),
+			coinType:            cointype.CoinType(99),
 			targetConfirmations: 1,
 			expectError:         true,
 		},
@@ -188,17 +188,17 @@ func TestUpdateUtilization(t *testing.T) {
 	calc := NewCoinTypeFeeCalculator(params, defaultMinRelayFee)
 
 	// Get initial fee rate
-	initialStats, err := calc.GetFeeStats(wire.CoinTypeVAR)
+	initialStats, err := calc.GetFeeStats(cointype.CoinTypeVAR)
 	if err != nil {
 		t.Fatalf("Failed to get initial fee stats: %v", err)
 	}
 	initialMultiplier := initialStats.DynamicFeeMultiplier
 
 	// Update with high utilization
-	calc.UpdateUtilization(wire.CoinTypeVAR, 150, 50000, 0.95) // 95% block space used, 150 pending txs
+	calc.UpdateUtilization(cointype.CoinTypeVAR, 150, 50000, 0.95) // 95% block space used, 150 pending txs
 
 	// Get updated fee rate
-	updatedStats, err := calc.GetFeeStats(wire.CoinTypeVAR)
+	updatedStats, err := calc.GetFeeStats(cointype.CoinTypeVAR)
 	if err != nil {
 		t.Fatalf("Failed to get updated fee stats: %v", err)
 	}
@@ -228,12 +228,12 @@ func TestRecordTransactionFee(t *testing.T) {
 	calc := NewCoinTypeFeeCalculator(params, defaultMinRelayFee)
 
 	// Record some transaction fees
-	calc.RecordTransactionFee(wire.CoinTypeVAR, 5000, 250, true)  // 20000 atoms/KB
-	calc.RecordTransactionFee(wire.CoinTypeVAR, 7500, 250, true)  // 30000 atoms/KB
-	calc.RecordTransactionFee(wire.CoinTypeVAR, 10000, 250, true) // 40000 atoms/KB
+	calc.RecordTransactionFee(cointype.CoinTypeVAR, 5000, 250, true)  // 20000 atoms/KB
+	calc.RecordTransactionFee(cointype.CoinTypeVAR, 7500, 250, true)  // 30000 atoms/KB
+	calc.RecordTransactionFee(cointype.CoinTypeVAR, 10000, 250, true) // 40000 atoms/KB
 
 	// Get fee stats
-	stats, err := calc.GetFeeStats(wire.CoinTypeVAR)
+	stats, err := calc.GetFeeStats(cointype.CoinTypeVAR)
 	if err != nil {
 		t.Fatalf("Failed to get fee stats: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestValidateTransactionFees(t *testing.T) {
 		name           string
 		txFee          int64
 		serializedSize int64
-		coinType       wire.CoinType
+		coinType       cointype.CoinType
 		allowHighFees  bool
 		expectError    bool
 		errorContains  string
@@ -278,7 +278,7 @@ func TestValidateTransactionFees(t *testing.T) {
 			name:           "VAR sufficient fee",
 			txFee:          3000,
 			serializedSize: 250,
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			allowHighFees:  false,
 			expectError:    false,
 		},
@@ -286,7 +286,7 @@ func TestValidateTransactionFees(t *testing.T) {
 			name:           "VAR insufficient fee",
 			txFee:          1000,
 			serializedSize: 250,
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			allowHighFees:  false,
 			expectError:    true,
 			errorContains:  "insufficient fee",
@@ -295,7 +295,7 @@ func TestValidateTransactionFees(t *testing.T) {
 			name:           "SKA sufficient fee",
 			txFee:          300,
 			serializedSize: 250,
-			coinType:       wire.CoinTypeSKA,
+			coinType:       cointype.CoinType(1), // SKA-1
 			allowHighFees:  false,
 			expectError:    false,
 		},
@@ -303,7 +303,7 @@ func TestValidateTransactionFees(t *testing.T) {
 			name:           "SKA insufficient fee",
 			txFee:          100,
 			serializedSize: 250,
-			coinType:       wire.CoinTypeSKA,
+			coinType:       cointype.CoinType(1), // SKA-1
 			allowHighFees:  false,
 			expectError:    true,
 			errorContains:  "insufficient fee",
@@ -312,7 +312,7 @@ func TestValidateTransactionFees(t *testing.T) {
 			name:           "VAR excessive fee allowed",
 			txFee:          1000000, // Very high fee
 			serializedSize: 250,
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			allowHighFees:  true,
 			expectError:    false,
 		},
@@ -320,7 +320,7 @@ func TestValidateTransactionFees(t *testing.T) {
 			name:           "VAR excessive fee rejected",
 			txFee:          1000000, // Very high fee
 			serializedSize: 250,
-			coinType:       wire.CoinTypeVAR,
+			coinType:       cointype.CoinTypeVAR,
 			allowHighFees:  false,
 			expectError:    true,
 			errorContains:  "fee too high",
@@ -357,25 +357,25 @@ func TestDynamicFeeAdjustment(t *testing.T) {
 	calc := NewCoinTypeFeeCalculator(params, defaultMinRelayFee)
 
 	// Get baseline fee
-	baselineFee := calc.CalculateMinFee(250, wire.CoinTypeVAR)
+	baselineFee := calc.CalculateMinFee(250, cointype.CoinTypeVAR)
 
 	// Simulate high network utilization
-	calc.UpdateUtilization(wire.CoinTypeVAR, 200, 100000, 0.9) // High utilization
+	calc.UpdateUtilization(cointype.CoinTypeVAR, 200, 100000, 0.9) // High utilization
 
 	// Fee should increase
-	highUtilFee := calc.CalculateMinFee(250, wire.CoinTypeVAR)
+	highUtilFee := calc.CalculateMinFee(250, cointype.CoinTypeVAR)
 	if highUtilFee <= baselineFee {
 		t.Error("Expected fee to increase with high utilization")
 	}
 
 	// Simulate low network utilization
-	calc.UpdateUtilization(wire.CoinTypeVAR, 5, 1000, 0.1) // Low utilization
+	calc.UpdateUtilization(cointype.CoinTypeVAR, 5, 1000, 0.1) // Low utilization
 
 	// Allow time for smoothing
 	time.Sleep(time.Millisecond * 10)
-	calc.UpdateUtilization(wire.CoinTypeVAR, 5, 1000, 0.1) // Update again
+	calc.UpdateUtilization(cointype.CoinTypeVAR, 5, 1000, 0.1) // Update again
 
-	lowUtilFee := calc.CalculateMinFee(250, wire.CoinTypeVAR)
+	lowUtilFee := calc.CalculateMinFee(250, cointype.CoinTypeVAR)
 	if lowUtilFee >= highUtilFee {
 		t.Error("Expected fee to decrease with low utilization")
 	}
@@ -391,10 +391,10 @@ func TestFeeStatsConsistency(t *testing.T) {
 	// Record various fees
 	fees := []int64{1000, 2000, 3000, 4000, 5000}
 	for _, fee := range fees {
-		calc.RecordTransactionFee(wire.CoinTypeVAR, fee, 250, true)
+		calc.RecordTransactionFee(cointype.CoinTypeVAR, fee, 250, true)
 	}
 
-	stats, err := calc.GetFeeStats(wire.CoinTypeVAR)
+	stats, err := calc.GetFeeStats(cointype.CoinTypeVAR)
 	if err != nil {
 		t.Fatalf("Failed to get fee stats: %v", err)
 	}
@@ -426,15 +426,15 @@ func TestSKASpecificFeeBehavior(t *testing.T) {
 	calc := NewCoinTypeFeeCalculator(params, defaultMinRelayFee)
 
 	// SKA should use custom fee rate
-	skaFee := calc.CalculateMinFee(1000, wire.CoinTypeSKA) // 1KB transaction
-	expectedSKAFee := int64(500)                           // Should use params.SKAMinRelayTxFee
+	skaFee := calc.CalculateMinFee(1000, cointype.CoinType(1)) // 1KB transaction, SKA-1
+	expectedSKAFee := int64(500)                               // Should use params.SKAMinRelayTxFee
 
 	if skaFee != expectedSKAFee {
 		t.Errorf("Expected SKA fee %d, got %d", expectedSKAFee, skaFee)
 	}
 
 	// VAR should still use default
-	varFee := calc.CalculateMinFee(1000, wire.CoinTypeVAR)
+	varFee := calc.CalculateMinFee(1000, cointype.CoinTypeVAR)
 	expectedVARFee := int64(10000) // Should use defaultMinRelayFee
 
 	if varFee != expectedVARFee {
@@ -465,4 +465,82 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+// TestInitializeActiveSKACoinsFromConfig tests that initializeDefaultFeeRates correctly
+// reads active SKA coins from the chain configuration and initializes them
+func TestInitializeActiveSKACoinsFromConfig(t *testing.T) {
+	// Use SimNetParams which has predefined SKA coins
+	params := chaincfg.SimNetParams()
+	defaultMinRelayFee := dcrutil.Amount(1e4)
+
+	// Create a new fee calculator
+	calc := NewCoinTypeFeeCalculator(params, defaultMinRelayFee)
+
+	// Check that VAR is always initialized
+	calc.mu.RLock()
+	defer calc.mu.RUnlock()
+
+	if _, exists := calc.feeRates[cointype.CoinTypeVAR]; !exists {
+		t.Error("VAR coin type should always be initialized")
+	}
+
+	if _, exists := calc.utilizationStats[cointype.CoinTypeVAR]; !exists {
+		t.Error("VAR utilization stats should always be initialized")
+	}
+
+	// Check that active SKA coins from config are initialized
+	// Based on simnetparams.go: SKA-1 is active (Active: true), SKA-2 is inactive (Active: false)
+	expectedActiveSKACoins := []cointype.CoinType{}
+	for coinType, config := range params.SKACoins {
+		if config.Active {
+			expectedActiveSKACoins = append(expectedActiveSKACoins, coinType)
+		}
+	}
+
+	t.Logf("Expected active SKA coins: %v", expectedActiveSKACoins)
+
+	// Verify that each expected active SKA coin is initialized
+	for _, coinType := range expectedActiveSKACoins {
+		if _, exists := calc.feeRates[coinType]; !exists {
+			t.Errorf("Active SKA coin type %d should be initialized with fee rates", coinType)
+		}
+
+		if _, exists := calc.utilizationStats[coinType]; !exists {
+			t.Errorf("Active SKA coin type %d should be initialized with utilization stats", coinType)
+		}
+
+		// Verify the fee rate uses expected SKA defaults
+		feeRate := calc.feeRates[coinType]
+		expectedSKAMinFee := defaultMinRelayFee / 10 // SKA should be 10x lower than VAR
+		if params.SKAMinRelayTxFee > 0 {
+			expectedSKAMinFee = dcrutil.Amount(params.SKAMinRelayTxFee)
+		}
+
+		if feeRate.MinRelayFee != expectedSKAMinFee {
+			t.Errorf("SKA coin type %d expected min relay fee %d, got %d",
+				coinType, expectedSKAMinFee, feeRate.MinRelayFee)
+		}
+
+		if feeRate.DynamicFeeMultiplier != 1.0 {
+			t.Errorf("SKA coin type %d expected dynamic fee multiplier 1.0, got %f",
+				coinType, feeRate.DynamicFeeMultiplier)
+		}
+
+		if feeRate.MaxFeeRate != expectedSKAMinFee*100 {
+			t.Errorf("SKA coin type %d expected max fee rate %d, got %d",
+				coinType, expectedSKAMinFee*100, feeRate.MaxFeeRate)
+		}
+	}
+
+	// Check that inactive SKA coins are NOT initialized initially
+	for coinType, config := range params.SKACoins {
+		if !config.Active {
+			if _, exists := calc.feeRates[coinType]; exists {
+				t.Errorf("Inactive SKA coin type %d should not be initialized initially", coinType)
+			}
+		}
+	}
+
+	t.Logf("Successfully verified %d active SKA coins are initialized from config", len(expectedActiveSKACoins))
 }

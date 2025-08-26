@@ -7,6 +7,8 @@ package dcrutil
 import (
 	"math"
 	"testing"
+
+	"github.com/decred/dcrd/cointype"
 )
 
 // TestNewAmountForCoinType tests the NewAmountForCoinType function.
@@ -14,20 +16,20 @@ func TestNewAmountForCoinType(t *testing.T) {
 	tests := []struct {
 		name        string
 		amount      float64
-		coinType    CoinType
+		coinType    cointype.CoinType
 		expected    Amount
 		shouldError bool
 	}{
-		{"VAR 1.0", 1.0, CoinTypeVAR, Amount(AtomsPerVAR), false},
-		{"SKA 1.0", 1.0, CoinTypeSKA, Amount(AtomsPerSKA), false},
-		{"VAR 0.5", 0.5, CoinTypeVAR, Amount(AtomsPerVAR / 2), false},
-		{"SKA 0.5", 0.5, CoinTypeSKA, Amount(AtomsPerSKA / 2), false},
-		{"VAR 0", 0.0, CoinTypeVAR, 0, false},
-		{"SKA 0", 0.0, CoinTypeSKA, 0, false},
-		{"Valid SKA-99 coin type", 1.0, CoinType(99), Amount(AtomsPerSKA), false},
-		{"NaN", math.NaN(), CoinTypeVAR, 0, true},
-		{"Positive infinity", math.Inf(1), CoinTypeVAR, 0, true},
-		{"Negative infinity", math.Inf(-1), CoinTypeVAR, 0, true},
+		{"VAR 1.0", 1.0, cointype.CoinTypeVAR, Amount(cointype.AtomsPerVAR), false},
+		{"SKA 1.0", 1.0, cointype.CoinType(1), Amount(cointype.AtomsPerSKA), false},
+		{"VAR 0.5", 0.5, cointype.CoinTypeVAR, Amount(cointype.AtomsPerVAR / 2), false},
+		{"SKA 0.5", 0.5, cointype.CoinType(1), Amount(cointype.AtomsPerSKA / 2), false},
+		{"VAR 0", 0.0, cointype.CoinTypeVAR, 0, false},
+		{"SKA 0", 0.0, cointype.CoinType(1), 0, false},
+		{"Valid SKA-99 coin type", 1.0, cointype.CoinType(99), Amount(cointype.AtomsPerSKA), false},
+		{"NaN", math.NaN(), cointype.CoinTypeVAR, 0, true},
+		{"Positive infinity", math.Inf(1), cointype.CoinTypeVAR, 0, true},
+		{"Negative infinity", math.Inf(-1), cointype.CoinTypeVAR, 0, true},
 	}
 
 	for _, test := range tests {
@@ -54,16 +56,16 @@ func TestAmountToCoinType(t *testing.T) {
 	tests := []struct {
 		name     string
 		amount   Amount
-		coinType CoinType
+		coinType cointype.CoinType
 		expected float64
 	}{
-		{"VAR 1 coin", Amount(AtomsPerVAR), CoinTypeVAR, 1.0},
-		{"SKA 1 coin", Amount(AtomsPerSKA), CoinTypeSKA, 1.0},
-		{"VAR 0.5 coin", Amount(AtomsPerVAR / 2), CoinTypeVAR, 0.5},
-		{"SKA 0.5 coin", Amount(AtomsPerSKA / 2), CoinTypeSKA, 0.5},
-		{"VAR 0", 0, CoinTypeVAR, 0.0},
-		{"SKA 0", 0, CoinTypeSKA, 0.0},
-		{"Valid SKA-99 coin type", Amount(AtomsPerSKA), CoinType(99), 1.0},
+		{"VAR 1 coin", Amount(cointype.AtomsPerVAR), cointype.CoinTypeVAR, 1.0},
+		{"SKA 1 coin", Amount(cointype.AtomsPerSKA), cointype.CoinType(1), 1.0},
+		{"VAR 0.5 coin", Amount(cointype.AtomsPerVAR / 2), cointype.CoinTypeVAR, 0.5},
+		{"SKA 0.5 coin", Amount(cointype.AtomsPerSKA / 2), cointype.CoinType(1), 0.5},
+		{"VAR 0", 0, cointype.CoinTypeVAR, 0.0},
+		{"SKA 0", 0, cointype.CoinType(1), 0.0},
+		{"Valid SKA-99 coin type", Amount(cointype.AtomsPerSKA), cointype.CoinType(99), 1.0},
 	}
 
 	for _, test := range tests {
@@ -83,10 +85,10 @@ func TestAmountToVAR(t *testing.T) {
 		amount   Amount
 		expected float64
 	}{
-		{"1 VAR", Amount(AtomsPerVAR), 1.0},
-		{"0.5 VAR", Amount(AtomsPerVAR / 2), 0.5},
+		{"1 VAR", Amount(cointype.AtomsPerVAR), 1.0},
+		{"0.5 VAR", Amount(cointype.AtomsPerVAR / 2), 0.5},
 		{"0 VAR", 0, 0.0},
-		{"10 VAR", Amount(10 * AtomsPerVAR), 10.0},
+		{"10 VAR", Amount(10 * cointype.AtomsPerVAR), 10.0},
 	}
 
 	for _, test := range tests {
@@ -106,10 +108,10 @@ func TestAmountToSKA(t *testing.T) {
 		amount   Amount
 		expected float64
 	}{
-		{"1 SKA", Amount(AtomsPerSKA), 1.0},
-		{"0.5 SKA", Amount(AtomsPerSKA / 2), 0.5},
+		{"1 SKA", Amount(cointype.AtomsPerSKA), 1.0},
+		{"0.5 SKA", Amount(cointype.AtomsPerSKA / 2), 0.5},
 		{"0 SKA", 0, 0.0},
-		{"10 SKA", Amount(10 * AtomsPerSKA), 10.0},
+		{"10 SKA", Amount(10 * cointype.AtomsPerSKA), 10.0},
 	}
 
 	for _, test := range tests {
@@ -127,16 +129,16 @@ func TestAmountStringForCoinType(t *testing.T) {
 	tests := []struct {
 		name     string
 		amount   Amount
-		coinType CoinType
+		coinType cointype.CoinType
 		expected string
 	}{
-		{"VAR 1.0", Amount(AtomsPerVAR), CoinTypeVAR, "1.00000000 VAR"},
-		{"SKA 1.0", Amount(AtomsPerSKA), CoinTypeSKA, "1.00000000 SKA"},
-		{"VAR 0.5", Amount(AtomsPerVAR / 2), CoinTypeVAR, "0.50000000 VAR"},
-		{"SKA 0.5", Amount(AtomsPerSKA / 2), CoinTypeSKA, "0.50000000 SKA"},
-		{"VAR 0", 0, CoinTypeVAR, "0.00000000 VAR"},
-		{"SKA 0", 0, CoinTypeSKA, "0.00000000 SKA"},
-		{"Valid SKA-99 coin type", Amount(AtomsPerSKA), CoinType(99), "1.00000000 SKA-99"},
+		{"VAR 1.0", Amount(cointype.AtomsPerVAR), cointype.CoinTypeVAR, "1.00000000 VAR"},
+		{"SKA 1.0", Amount(cointype.AtomsPerSKA), cointype.CoinType(1), "1.00000000 SKA"},
+		{"VAR 0.5", Amount(cointype.AtomsPerVAR / 2), cointype.CoinTypeVAR, "0.50000000 VAR"},
+		{"SKA 0.5", Amount(cointype.AtomsPerSKA / 2), cointype.CoinType(1), "0.50000000 SKA"},
+		{"VAR 0", 0, cointype.CoinTypeVAR, "0.00000000 VAR"},
+		{"SKA 0", 0, cointype.CoinType(1), "0.00000000 SKA"},
+		{"Valid SKA-99 coin type", Amount(cointype.AtomsPerSKA), cointype.CoinType(99), "1.00000000 SKA-99"},
 	}
 
 	for _, test := range tests {
@@ -151,7 +153,7 @@ func TestAmountStringForCoinType(t *testing.T) {
 
 // TestAmountStringVAR tests the StringVAR method.
 func TestAmountStringVAR(t *testing.T) {
-	amount := Amount(AtomsPerVAR)
+	amount := Amount(cointype.AtomsPerVAR)
 	expected := "1.00000000 VAR"
 	result := amount.StringVAR()
 	if result != expected {
@@ -161,7 +163,7 @@ func TestAmountStringVAR(t *testing.T) {
 
 // TestAmountStringSKA tests the StringSKA method.
 func TestAmountStringSKA(t *testing.T) {
-	amount := Amount(AtomsPerSKA)
+	amount := Amount(cointype.AtomsPerSKA)
 	expected := "1.00000000 SKA"
 	result := amount.StringSKA()
 	if result != expected {
@@ -175,13 +177,13 @@ func TestNewAmountBackwardCompatibility(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	expected := Amount(AtomsPerVAR)
+	expected := Amount(cointype.AtomsPerVAR)
 	if amount != expected {
 		t.Errorf("Expected %d, got %d", expected, amount)
 	}
 
 	// Should be equivalent to VAR
-	varAmount, err := NewAmountForCoinType(1.0, CoinTypeVAR)
+	varAmount, err := NewAmountForCoinType(1.0, cointype.CoinTypeVAR)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}

@@ -7,7 +7,7 @@ package chaincfg
 import (
 	"testing"
 
-	dcrutil "github.com/decred/dcrd/dcrutil/v4"
+	"github.com/decred/dcrd/cointype"
 )
 
 // TestSKACoinConfig tests the SKACoinConfig structure and its methods.
@@ -78,7 +78,7 @@ func TestParamsIsSKACoinTypeActive(t *testing.T) {
 	params := MainNetParams()
 
 	tests := []struct {
-		coinType dcrutil.CoinType
+		coinType cointype.CoinType
 		expected bool
 		name     string
 	}{

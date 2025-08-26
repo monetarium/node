@@ -6,39 +6,8 @@ package blockchain
 
 import (
 	"github.com/decred/dcrd/blockchain/stake/v5"
+	"github.com/decred/dcrd/cointype"
 )
-
-// CoinType represents the type of native coin in UTXO entries.
-// This is defined in blockchain package to avoid import cycles.
-type CoinType uint8
-
-const (
-	// CoinTypeVAR represents Varta coins - the original mined cryptocurrency.
-	CoinTypeVAR CoinType = 0
-
-	// CoinTypeSKA represents Skarb coins - pre-emitted asset-backed tokens.
-	CoinTypeSKA CoinType = 1
-
-	// CoinTypeMax defines the maximum valid coin type value.
-	CoinTypeMax CoinType = 255
-)
-
-// String returns the string representation of the coin type.
-func (ct CoinType) String() string {
-	switch ct {
-	case CoinTypeVAR:
-		return "VAR"
-	case CoinTypeSKA:
-		return "SKA"
-	default:
-		return "Unknown"
-	}
-}
-
-// IsValid returns whether the coin type is valid.
-func (ct CoinType) IsValid() bool {
-	return ct <= CoinTypeMax
-}
 
 const (
 	// baseEntrySize is the base size of a utxo entry on a 64-bit platform,
@@ -158,7 +127,7 @@ type UtxoEntry struct {
 
 	// coinType represents the type of coin (VAR or SKA) for this UTXO.
 	// This field is essential for dual-coin support.
-	coinType CoinType
+	coinType cointype.CoinType
 
 	// state contains info for the in-memory state of the output as defined by
 	// utxoState.
@@ -261,12 +230,12 @@ func (entry *UtxoEntry) ScriptVersion() uint16 {
 }
 
 // CoinType returns the coin type (VAR or SKA) for the output.
-func (entry *UtxoEntry) CoinType() CoinType {
+func (entry *UtxoEntry) CoinType() cointype.CoinType {
 	return entry.coinType
 }
 
 // AmountWithCoinType returns both the amount and coin type for the output.
-func (entry *UtxoEntry) AmountWithCoinType() (int64, CoinType) {
+func (entry *UtxoEntry) AmountWithCoinType() (int64, cointype.CoinType) {
 	return entry.amount, entry.coinType
 }
 

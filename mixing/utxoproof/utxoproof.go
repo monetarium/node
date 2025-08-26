@@ -20,7 +20,7 @@ const (
 	tag = "mixpr-utxoproof"
 
 	// schemes
-	secp256k1P2PKH = "P2PKH(EC-Schnorr-VARv0)"
+	secp256k1P2PKH = "P2PKH(EC-Schnorr-DCRv0)"
 )
 
 var sep = []byte{','}

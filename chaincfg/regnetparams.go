@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -76,7 +77,7 @@ func RegNetParams() *Params {
 			}},
 			TxOut: []*wire.TxOut{{
 				Value:    0x00000000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0x0000,
 				PkScript: hexDecode("801679e98561ada96caec2949a5d41c4cab3851e" +
 					"b740d951c10ecbcf265c1fd9"),

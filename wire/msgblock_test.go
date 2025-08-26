@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/dcrd/cointype"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 )
@@ -626,7 +628,7 @@ var testBlock = MsgBlock{
 			TxOut: []*TxOut{
 				{
 					Value:    0x3333333333333333,
-					CoinType: CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					Version:  0x9898,
 					PkScript: []byte{
 						0x41, // OP_DATA_65
@@ -670,7 +672,7 @@ var testBlock = MsgBlock{
 			TxOut: []*TxOut{
 				{
 					Value:    0x3333333333333333,
-					CoinType: CoinTypeVAR,
+					CoinType: cointype.CoinTypeVAR,
 					Version:  0x1212,
 					PkScript: []byte{
 						0x41, // OP_DATA_65

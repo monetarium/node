@@ -9,7 +9,7 @@ import (
 	"container/heap"
 
 	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrd/cointype"
 )
 
 // txPrioItem houses a transaction along with extra information that allows the
@@ -22,7 +22,7 @@ type txPrioItem struct {
 	fee            int64
 	priority       float64
 	feePerKB       float64
-	coinType       wire.CoinType // Primary coin type for this transaction
+	coinType       cointype.CoinType // Primary coin type for this transaction
 }
 
 // txPriorityQueueLessFunc describes a function that can be used as a compare

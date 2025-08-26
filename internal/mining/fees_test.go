@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/txscript/v4/stdaddr"
 	"github.com/decred/dcrd/wire"
 )
@@ -42,7 +43,7 @@ func TestAddFeesToCoinbase(t *testing.T) {
 			name: "VAR fees only",
 			totalFees: func() wire.FeesByType {
 				fees := wire.NewFeesByType()
-				fees.Add(wire.CoinTypeVAR, 1000)
+				fees.Add(cointype.CoinTypeVAR, 1000)
 				return fees
 			}(),
 			powOutputIdx:    1,
@@ -53,7 +54,7 @@ func TestAddFeesToCoinbase(t *testing.T) {
 			name: "SKA fees only",
 			totalFees: func() wire.FeesByType {
 				fees := wire.NewFeesByType()
-				fees.Add(wire.CoinTypeSKA, 500)
+				fees.Add(cointype.CoinType(1), 500)
 				return fees
 			}(),
 			powOutputIdx:    1,
@@ -64,9 +65,9 @@ func TestAddFeesToCoinbase(t *testing.T) {
 			name: "mixed fees",
 			totalFees: func() wire.FeesByType {
 				fees := wire.NewFeesByType()
-				fees.Add(wire.CoinTypeVAR, 1000)
-				fees.Add(wire.CoinTypeSKA, 500)
-				fees.Add(wire.CoinType(2), 300)
+				fees.Add(cointype.CoinTypeVAR, 1000)
+				fees.Add(cointype.CoinType(1), 500)
+				fees.Add(cointype.CoinType(2), 300)
 				return fees
 			}(),
 			powOutputIdx:    1,
@@ -77,9 +78,9 @@ func TestAddFeesToCoinbase(t *testing.T) {
 			name: "zero fees ignored",
 			totalFees: func() wire.FeesByType {
 				fees := wire.NewFeesByType()
-				fees.Add(wire.CoinTypeVAR, 1000)
-				fees.Add(wire.CoinTypeSKA, 0) // Should be ignored
-				fees.Add(wire.CoinType(2), 300)
+				fees.Add(cointype.CoinTypeVAR, 1000)
+				fees.Add(cointype.CoinType(1), 0) // Should be ignored
+				fees.Add(cointype.CoinType(2), 300)
 				return fees
 			}(),
 			powOutputIdx:    1,
@@ -93,8 +94,8 @@ func TestAddFeesToCoinbase(t *testing.T) {
 			// Create a mock coinbase transaction with initial outputs
 			coinbaseTx := &wire.MsgTx{
 				TxOut: []*wire.TxOut{
-					{Value: 500, CoinType: wire.CoinTypeVAR},  // Treasury output
-					{Value: 1000, CoinType: wire.CoinTypeVAR}, // PoW output
+					{Value: 500, CoinType: cointype.CoinTypeVAR},  // Treasury output
+					{Value: 1000, CoinType: cointype.CoinTypeVAR}, // PoW output
 				},
 			}
 
@@ -135,7 +136,7 @@ func TestAddFeesToCoinbase(t *testing.T) {
 					}
 
 					// Should not be VAR coin type (VAR goes to PoW output)
-					if output.CoinType == wire.CoinTypeVAR {
+					if output.CoinType == cointype.CoinTypeVAR {
 						t.Errorf("Output %d should not be VAR coin type", i)
 					}
 				}
@@ -150,9 +151,9 @@ func TestFeesByTypeIntegration(t *testing.T) {
 	fees := wire.NewFeesByType()
 
 	// Add fees for different coin types
-	fees.Add(wire.CoinTypeVAR, 1000)
-	fees.Add(wire.CoinTypeSKA, 500)
-	fees.Add(wire.CoinType(2), 300)
+	fees.Add(cointype.CoinTypeVAR, 1000)
+	fees.Add(cointype.CoinType(1), 500)
+	fees.Add(cointype.CoinType(2), 300)
 
 	// Test total calculation
 	expectedTotal := int64(1800)
@@ -161,8 +162,8 @@ func TestFeesByTypeIntegration(t *testing.T) {
 	}
 
 	// Test coin type retrieval
-	if fees.Get(wire.CoinTypeVAR) != 1000 {
-		t.Errorf("Expected VAR fees 1000, got %d", fees.Get(wire.CoinTypeVAR))
+	if fees.Get(cointype.CoinTypeVAR) != 1000 {
+		t.Errorf("Expected VAR fees 1000, got %d", fees.Get(cointype.CoinTypeVAR))
 	}
 
 	// Test types enumeration

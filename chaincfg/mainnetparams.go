@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	dcrutil "github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -74,7 +74,7 @@ func MainNetParams() *Params {
 			}},
 			TxOut: []*wire.TxOut{{
 				Value:    0x00000000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0x0000,
 				PkScript: hexDecode("801679e98561ada96caec2949a5d41c4cab3851e" +
 					"b740d951c10ecbcf265c1fd9"),
@@ -591,7 +591,7 @@ func MainNetParams() *Params {
 		SKAMinRelayTxFee:    1e4,        // 0.0001 SKA minimum relay fee
 
 		// SKA coin type configurations for multiple coin support
-		SKACoins: map[dcrutil.CoinType]*SKACoinConfig{
+		SKACoins: map[cointype.CoinType]*SKACoinConfig{
 			1: {
 				CoinType:       1,
 				Name:           "Skarb-1",
@@ -633,11 +633,11 @@ func MainNetParams() *Params {
 		},
 
 		// Initial SKA types to activate at network genesis
-		InitialSKATypes: []dcrutil.CoinType{1}, // Only SKA-1 initially active
+		InitialSKATypes: []cointype.CoinType{1}, // Only SKA-1 initially active
 
 		// SKA emission authorization keys (PLACEHOLDER - MUST BE REPLACED WITH SECURE KEYS)
 		// These keys authorize SKA emission transactions for each coin type
-		SKAEmissionKeys: map[wire.CoinType]*secp256k1.PublicKey{
+		SKAEmissionKeys: map[cointype.CoinType]*secp256k1.PublicKey{
 			// SECURITY NOTE: These are placeholder keys for development ONLY
 			// Production deployment MUST generate secure keys with proper key ceremony
 			1: mustParseHexPubKey("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"),
@@ -645,7 +645,7 @@ func MainNetParams() *Params {
 		},
 
 		// SKA emission nonces for replay protection (starts at 0 for all types)
-		SKAEmissionNonces: map[wire.CoinType]uint64{
+		SKAEmissionNonces: map[cointype.CoinType]uint64{
 			1: 0, // SKA-1 nonce counter
 			2: 0, // SKA-2 nonce counter
 		},

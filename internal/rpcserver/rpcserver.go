@@ -38,6 +38,7 @@ import (
 	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/crypto/blake256"
 	"github.com/decred/dcrd/crypto/rand"
 	"github.com/decred/dcrd/database/v3"
@@ -729,7 +730,7 @@ func (s *Server) messageToHex(msg wire.Message) (string, error) {
 func newTxOut(amount int64, pkScriptVer uint16, pkScript []byte) *wire.TxOut {
 	return &wire.TxOut{
 		Value:    amount,
-		CoinType: wire.CoinTypeVAR, // Default to VAR for backward compatibility
+		CoinType: cointype.CoinTypeVAR, // Default to VAR for backward compatibility
 		Version:  pkScriptVer,
 		PkScript: pkScript,
 	}
@@ -1519,7 +1520,7 @@ func handleEstimateSmartFee(_ context.Context, s *Server, cmd interface{}) (inte
 
 	// Use coin-type-aware fee estimation if available
 	if s.cfg.CoinTypeFeeCalculator != nil {
-		feeRate, err := s.cfg.CoinTypeFeeCalculator.EstimateFeeRate(wire.CoinType(coinType), int(c.Confirmations))
+		feeRate, err := s.cfg.CoinTypeFeeCalculator.EstimateFeeRate(cointype.CoinType(coinType), int(c.Confirmations))
 		if err != nil {
 			// Fall back to standard fee estimator
 			fee, err := s.cfg.FeeEstimator.EstimateFee(int32(c.Confirmations))
@@ -1593,7 +1594,7 @@ func handleGetFeeEstimatesByCoinType(_ context.Context, s *Server, cmd interface
 	}
 
 	// Get comprehensive fee statistics for the coin type
-	coinType := wire.CoinType(c.CoinType)
+	coinType := cointype.CoinType(c.CoinType)
 	feeStats, err2 := s.cfg.CoinTypeFeeCalculator.GetFeeStats(coinType)
 	if err2 != nil {
 		// nolint: nilerr
@@ -2696,7 +2697,7 @@ func handleGetMempoolFeesInfo(_ context.Context, s *Server, cmd interface{}) (in
 	}
 
 	// Group transactions by coin type
-	coinTypeTxs := make(map[wire.CoinType][]*mempool.TxDesc)
+	coinTypeTxs := make(map[cointype.CoinType][]*mempool.TxDesc)
 	totalTxCount := 0
 	totalSize := int64(0)
 
@@ -2715,11 +2716,11 @@ func handleGetMempoolFeesInfo(_ context.Context, s *Server, cmd interface{}) (in
 	}
 
 	// If coin type filter is specified, filter results
-	var filteredCoinTypes []wire.CoinType
+	var filteredCoinTypes []cointype.CoinType
 	if c.CoinType != nil {
-		targetCoinType := wire.CoinType(*c.CoinType)
+		targetCoinType := cointype.CoinType(*c.CoinType)
 		if _, exists := coinTypeTxs[targetCoinType]; exists {
-			filteredCoinTypes = []wire.CoinType{targetCoinType}
+			filteredCoinTypes = []cointype.CoinType{targetCoinType}
 		} else {
 			// No transactions for the specified coin type
 			return &types.GetMempoolFeesInfoResult{
@@ -2880,9 +2881,9 @@ func calculatePercentile(values []float64, percentile float64) float64 {
 }
 
 // Helper function to generate coin type names
-func generateCoinTypeName(coinType wire.CoinType) string {
+func generateCoinTypeName(coinType cointype.CoinType) string {
 	switch coinType {
-	case wire.CoinTypeVAR:
+	case cointype.CoinTypeVAR:
 		return "VAR"
 	default:
 		if coinType >= 1 && coinType <= 255 {
@@ -3337,7 +3338,7 @@ func handleGetRawTransaction(_ context.Context, s *Server, cmd interface{}) (int
 		} else {
 			// Legacy transaction data - need to add CoinType field
 			for i := range msgTx.TxOut {
-				msgTx.TxOut[i].CoinType = wire.CoinTypeVAR
+				msgTx.TxOut[i].CoinType = cointype.CoinTypeVAR
 			}
 			isLegacyFormat = true
 		}
@@ -3470,7 +3471,7 @@ func handleGetEmissionStatus(_ context.Context, s *Server, icmd interface{}) (in
 	c := icmd.(*types.GetEmissionStatusCmd)
 
 	// Validate coin type range
-	coinType := dcrutil.CoinType(c.CoinType)
+	coinType := cointype.CoinType(c.CoinType)
 	if coinType < 1 || coinType > 255 {
 		return nil, dcrjson.NewRPCError(dcrjson.ErrRPCInvalidParameter,
 			"coin type must be between 1 and 255 (SKA types)")
@@ -3498,7 +3499,7 @@ func handleGetEmissionStatus(_ context.Context, s *Server, icmd interface{}) (in
 	// Get current nonce from chain parameters
 	currentNonce := uint64(0)
 	if chainParams.SKAEmissionNonces != nil {
-		wireCoinType := wire.CoinType(coinType)
+		wireCoinType := coinType
 		currentNonce = chainParams.SKAEmissionNonces[wireCoinType]
 	}
 

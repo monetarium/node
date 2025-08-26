@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
@@ -17,7 +18,7 @@ func mockChainParams() *chaincfg.Params {
 	params := &chaincfg.Params{}
 
 	// Configure 3 SKA types for testing
-	params.SKACoins = map[dcrutil.CoinType]*chaincfg.SKACoinConfig{
+	params.SKACoins = map[cointype.CoinType]*chaincfg.SKACoinConfig{
 		1: {
 			CoinType:       1,
 			Name:           "Skarb-1",
@@ -73,7 +74,7 @@ func TestBaseAllocations(t *testing.T) {
 	baseAllocations := allocator.calculateBaseAllocations()
 
 	// VAR should get 10% = 100KB
-	varAllocation := baseAllocations[dcrutil.CoinTypeVAR]
+	varAllocation := baseAllocations[cointype.CoinTypeVAR]
 	if varAllocation != 100000 {
 		t.Errorf("Expected VAR allocation 100000, got %d", varAllocation)
 	}
@@ -101,16 +102,16 @@ func TestHighDemandScenario(t *testing.T) {
 	params := mockChainParams()
 	allocator := NewBlockSpaceAllocator(1000000, params) // 1MB block
 
-	pendingTxBytes := map[dcrutil.CoinType]uint32{
-		dcrutil.CoinTypeVAR: 800000,  // 800KB pending
-		1:                   1000000, // 1000KB pending (SKA-1)
-		2:                   100000,  // 100KB pending (SKA-2)
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 800000,  // 800KB pending
+		1:                    1000000, // 1000KB pending (SKA-1)
+		2:                    100000,  // 100KB pending (SKA-2)
 	}
 
 	result := allocator.AllocateBlockSpace(pendingTxBytes)
 
 	// Verify VAR allocation: 100KB base + 35KB overflow = 135KB
-	varAlloc := result.GetAllocationForCoinType(dcrutil.CoinTypeVAR)
+	varAlloc := result.GetAllocationForCoinType(cointype.CoinTypeVAR)
 	if varAlloc.BaseAllocation != 100000 {
 		t.Errorf("Expected VAR base allocation 100000, got %d", varAlloc.BaseAllocation)
 	}
@@ -140,21 +141,21 @@ func TestHighDemandScenario(t *testing.T) {
 	}
 }
 
-// TestNoVARDemandScenario tests when VAR has no pending transactions.
-func TestNoVARDemandScenario(t *testing.T) {
+// TestNoVARemandScenario tests when VAR has no pending transactions.
+func TestNoVARemandScenario(t *testing.T) {
 	params := mockChainParams()
 	allocator := NewBlockSpaceAllocator(1000000, params) // 1MB block
 
-	pendingTxBytes := map[dcrutil.CoinType]uint32{
-		dcrutil.CoinTypeVAR: 0,      // No VAR demand
-		1:                   500000, // 500KB pending (SKA-1)
-		2:                   300000, // 300KB pending (SKA-2)
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 0,      // No VAR demand
+		1:                    500000, // 500KB pending (SKA-1)
+		2:                    300000, // 300KB pending (SKA-2)
 	}
 
 	result := allocator.AllocateBlockSpace(pendingTxBytes)
 
 	// VAR should use 0 bytes
-	varAlloc := result.GetAllocationForCoinType(dcrutil.CoinTypeVAR)
+	varAlloc := result.GetAllocationForCoinType(cointype.CoinTypeVAR)
 	if varAlloc.UsedBytes != 0 {
 		t.Errorf("Expected VAR used bytes 0, got %d", varAlloc.UsedBytes)
 	}
@@ -172,21 +173,21 @@ func TestNoVARDemandScenario(t *testing.T) {
 	}
 }
 
-// TestOnlyVARDemandScenario tests when only VAR has pending transactions.
-func TestOnlyVARDemandScenario(t *testing.T) {
+// TestOnlyVARemandScenario tests when only VAR has pending transactions.
+func TestOnlyVARemandScenario(t *testing.T) {
 	params := mockChainParams()
 	allocator := NewBlockSpaceAllocator(1000000, params) // 1MB block
 
-	pendingTxBytes := map[dcrutil.CoinType]uint32{
-		dcrutil.CoinTypeVAR: 800000, // 800KB pending
-		1:                   0,      // No SKA-1 demand
-		2:                   0,      // No SKA-2 demand
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 800000, // 800KB pending
+		1:                    0,      // No SKA-1 demand
+		2:                    0,      // No SKA-2 demand
 	}
 
 	result := allocator.AllocateBlockSpace(pendingTxBytes)
 
 	// VAR should get 100% of overflow since it's the only one with pending
-	varAlloc := result.GetAllocationForCoinType(dcrutil.CoinTypeVAR)
+	varAlloc := result.GetAllocationForCoinType(cointype.CoinTypeVAR)
 	// Base 100KB + all 900KB overflow = but VAR only needs 800KB total
 	expectedVARUsage := uint32(800000) // Uses what it needs
 	if varAlloc.UsedBytes != expectedVARUsage {
@@ -210,10 +211,10 @@ func TestMultipleSKAWithDemand(t *testing.T) {
 	params := mockChainParams()
 	allocator := NewBlockSpaceAllocator(1000000, params) // 1MB block
 
-	pendingTxBytes := map[dcrutil.CoinType]uint32{
-		dcrutil.CoinTypeVAR: 200000, // 200KB pending
-		1:                   800000, // 800KB pending (SKA-1)
-		2:                   700000, // 700KB pending (SKA-2)
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 200000, // 200KB pending
+		1:                    800000, // 800KB pending (SKA-1)
+		2:                    700000, // 700KB pending (SKA-2)
 	}
 
 	result := allocator.AllocateBlockSpace(pendingTxBytes)
@@ -228,7 +229,7 @@ func TestMultipleSKAWithDemand(t *testing.T) {
 	// After base: VAR uses 100KB (100KB still pending), SKA-1 uses 450KB (350KB pending), SKA-2 uses 450KB (250KB pending)
 	// No overflow since all base allocations are fully used
 
-	varAlloc := result.GetAllocationForCoinType(dcrutil.CoinTypeVAR)
+	varAlloc := result.GetAllocationForCoinType(cointype.CoinTypeVAR)
 	if varAlloc.UsedBytes != 100000 {
 		t.Errorf("Expected VAR used bytes 100000, got %d", varAlloc.UsedBytes)
 	}
@@ -255,9 +256,9 @@ func TestIdentifyActivePendingTypes(t *testing.T) {
 	allocator := NewBlockSpaceAllocator(1000000, params)
 
 	// Setup scenario where VAR and SKA-1 have pending after base allocation
-	allocations := map[dcrutil.CoinType]*CoinTypeAllocation{
-		dcrutil.CoinTypeVAR: {
-			CoinType:     dcrutil.CoinTypeVAR,
+	allocations := map[cointype.CoinType]*CoinTypeAllocation{
+		cointype.CoinTypeVAR: {
+			CoinType:     cointype.CoinTypeVAR,
 			PendingBytes: 800000,
 			UsedBytes:    100000, // 700KB still pending
 		},
@@ -273,10 +274,10 @@ func TestIdentifyActivePendingTypes(t *testing.T) {
 		},
 	}
 
-	pendingTxBytes := map[dcrutil.CoinType]uint32{
-		dcrutil.CoinTypeVAR: 800000,
-		1:                   1000000,
-		2:                   100000,
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 800000,
+		1:                    1000000,
+		2:                    100000,
 	}
 
 	activePending := allocator.identifyActivePendingTypes(pendingTxBytes, allocations)
@@ -290,7 +291,7 @@ func TestIdentifyActivePendingTypes(t *testing.T) {
 	hasVAR := false
 	hasSKA1 := false
 	for _, coinType := range activePending {
-		if coinType == dcrutil.CoinTypeVAR {
+		if coinType == cointype.CoinTypeVAR {
 			hasVAR = true
 		}
 		if coinType == 1 {
@@ -326,10 +327,10 @@ func TestEdgeCaseZeroPending(t *testing.T) {
 	params := mockChainParams()
 	allocator := NewBlockSpaceAllocator(1000000, params)
 
-	pendingTxBytes := map[dcrutil.CoinType]uint32{
-		dcrutil.CoinTypeVAR: 0, // No pending
-		1:                   0, // No pending
-		2:                   0, // No pending
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 0, // No pending
+		1:                    0, // No pending
+		2:                    0, // No pending
 	}
 
 	result := allocator.AllocateBlockSpace(pendingTxBytes)
@@ -367,7 +368,7 @@ func TestMinFunction(t *testing.T) {
 }
 
 // createMockTransaction creates a mock transaction with the specified coin type outputs.
-func createMockTransaction(coinTypes []wire.CoinType) *dcrutil.Tx {
+func createMockTransaction(coinTypes []cointype.CoinType) *dcrutil.Tx {
 	tx := &wire.MsgTx{
 		Version: 1,
 		TxIn: []*wire.TxIn{
@@ -395,33 +396,33 @@ func createMockTransaction(coinTypes []wire.CoinType) *dcrutil.Tx {
 func TestGetTransactionCoinType(t *testing.T) {
 	testCases := []struct {
 		name         string
-		coinTypes    []wire.CoinType
-		expectedType dcrutil.CoinType
+		coinTypes    []cointype.CoinType
+		expectedType cointype.CoinType
 	}{
 		{
 			name:         "VAR only transaction",
-			coinTypes:    []wire.CoinType{wire.CoinTypeVAR, wire.CoinTypeVAR},
-			expectedType: dcrutil.CoinTypeVAR,
+			coinTypes:    []cointype.CoinType{cointype.CoinTypeVAR, cointype.CoinTypeVAR},
+			expectedType: cointype.CoinTypeVAR,
 		},
 		{
 			name:         "SKA-1 only transaction",
-			coinTypes:    []wire.CoinType{wire.CoinType(1), wire.CoinType(1)},
-			expectedType: dcrutil.CoinType(1),
+			coinTypes:    []cointype.CoinType{cointype.CoinType(1), cointype.CoinType(1)},
+			expectedType: cointype.CoinType(1),
 		},
 		{
 			name:         "Mixed transaction - VAR majority",
-			coinTypes:    []wire.CoinType{wire.CoinTypeVAR, wire.CoinTypeVAR, wire.CoinType(1)},
-			expectedType: dcrutil.CoinTypeVAR,
+			coinTypes:    []cointype.CoinType{cointype.CoinTypeVAR, cointype.CoinTypeVAR, cointype.CoinType(1)},
+			expectedType: cointype.CoinTypeVAR,
 		},
 		{
 			name:         "Mixed transaction - SKA majority",
-			coinTypes:    []wire.CoinType{wire.CoinTypeVAR, wire.CoinType(1), wire.CoinType(1)},
-			expectedType: dcrutil.CoinType(1),
+			coinTypes:    []cointype.CoinType{cointype.CoinTypeVAR, cointype.CoinType(1), cointype.CoinType(1)},
+			expectedType: cointype.CoinType(1),
 		},
 		{
 			name:         "Single output transaction",
-			coinTypes:    []wire.CoinType{wire.CoinType(2)},
-			expectedType: dcrutil.CoinType(2),
+			coinTypes:    []cointype.CoinType{cointype.CoinType(2)},
+			expectedType: cointype.CoinType(2),
 		},
 	}
 
@@ -444,9 +445,9 @@ func TestTransactionSizeTracker(t *testing.T) {
 	tracker := NewTransactionSizeTracker(allocator)
 
 	// Create test transactions
-	varTx := createMockTransaction([]wire.CoinType{wire.CoinTypeVAR, wire.CoinTypeVAR})
-	ska1Tx := createMockTransaction([]wire.CoinType{wire.CoinType(1), wire.CoinType(1)})
-	ska2Tx := createMockTransaction([]wire.CoinType{wire.CoinType(2)})
+	varTx := createMockTransaction([]cointype.CoinType{cointype.CoinTypeVAR, cointype.CoinTypeVAR})
+	ska1Tx := createMockTransaction([]cointype.CoinType{cointype.CoinType(1), cointype.CoinType(1)})
+	ska2Tx := createMockTransaction([]cointype.CoinType{cointype.CoinType(2)})
 
 	// Add transactions to tracker
 	tracker.AddTransaction(varTx)
@@ -454,7 +455,7 @@ func TestTransactionSizeTracker(t *testing.T) {
 	tracker.AddTransaction(ska2Tx)
 
 	// Verify sizes are tracked correctly
-	varSize := tracker.GetSizeForCoinType(dcrutil.CoinTypeVAR)
+	varSize := tracker.GetSizeForCoinType(cointype.CoinTypeVAR)
 	if varSize == 0 {
 		t.Error("Expected VAR size to be tracked")
 	}
@@ -487,7 +488,7 @@ func TestCanAddTransaction(t *testing.T) {
 	tracker := NewTransactionSizeTracker(allocator)
 
 	// Create a transaction that would fill most of the VAR allocation
-	varTx := createMockTransaction([]wire.CoinType{wire.CoinTypeVAR})
+	varTx := createMockTransaction([]cointype.CoinType{cointype.CoinTypeVAR})
 
 	// First transaction should be addable
 	if !tracker.CanAddTransaction(varTx) {
@@ -498,9 +499,9 @@ func TestCanAddTransaction(t *testing.T) {
 	tracker.AddTransaction(varTx)
 
 	// Create a very large transaction that would exceed allocation
-	largeCoinTypes := make([]wire.CoinType, 100) // Large transaction
+	largeCoinTypes := make([]cointype.CoinType, 100) // Large transaction
 	for i := range largeCoinTypes {
-		largeCoinTypes[i] = wire.CoinTypeVAR
+		largeCoinTypes[i] = cointype.CoinTypeVAR
 	}
 	largeTx := createMockTransaction(largeCoinTypes)
 
@@ -517,11 +518,11 @@ func TestTrackerReset(t *testing.T) {
 	tracker := NewTransactionSizeTracker(allocator)
 
 	// Add a transaction
-	varTx := createMockTransaction([]wire.CoinType{wire.CoinTypeVAR})
+	varTx := createMockTransaction([]cointype.CoinType{cointype.CoinTypeVAR})
 	tracker.AddTransaction(varTx)
 
 	// Verify transaction is tracked
-	if tracker.GetSizeForCoinType(dcrutil.CoinTypeVAR) == 0 {
+	if tracker.GetSizeForCoinType(cointype.CoinTypeVAR) == 0 {
 		t.Error("Expected VAR size to be tracked before reset")
 	}
 
@@ -529,7 +530,7 @@ func TestTrackerReset(t *testing.T) {
 	tracker.Reset()
 
 	// Verify all sizes are cleared
-	if tracker.GetSizeForCoinType(dcrutil.CoinTypeVAR) != 0 {
+	if tracker.GetSizeForCoinType(cointype.CoinTypeVAR) != 0 {
 		t.Error("Expected VAR size to be 0 after reset")
 	}
 }

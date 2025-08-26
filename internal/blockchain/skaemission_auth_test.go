@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/decred/dcrd/wire"
 )
 
 // TestEmissionAuthorizationBasic tests the basic emission authorization functionality
@@ -31,10 +31,10 @@ func TestEmissionAuthorizationBasic(t *testing.T) {
 	pubKey := privKey.PubKey()
 
 	// Initialize emission keys and nonces
-	params.SKAEmissionKeys = map[wire.CoinType]*secp256k1.PublicKey{
+	params.SKAEmissionKeys = map[cointype.CoinType]*secp256k1.PublicKey{
 		1: pubKey,
 	}
-	params.SKAEmissionNonces = map[wire.CoinType]uint64{
+	params.SKAEmissionNonces = map[cointype.CoinType]uint64{
 		1: 0,
 	}
 
@@ -149,8 +149,8 @@ func TestUnauthorizedEmissionPrevention(t *testing.T) {
 		SKAEmissionHeight: 100,
 		SKAEmissionAmount: 1000000,
 		SKAMaxAmount:      10000000,
-		SKAEmissionKeys:   make(map[wire.CoinType]*secp256k1.PublicKey),
-		SKAEmissionNonces: make(map[wire.CoinType]uint64),
+		SKAEmissionKeys:   make(map[cointype.CoinType]*secp256k1.PublicKey),
+		SKAEmissionNonces: make(map[cointype.CoinType]uint64),
 	}
 
 	// Test 1: No emission key configured

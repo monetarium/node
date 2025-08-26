@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	dcrutil "github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -78,7 +78,7 @@ func SimNetParams() *Params {
 			}},
 			TxOut: []*wire.TxOut{{
 				Value:    0x00000000,
-				CoinType: wire.CoinTypeVAR,
+				CoinType: cointype.CoinTypeVAR,
 				Version:  0,
 				PkScript: hexDecode("4104678afdb0fe5548271967f1a67130b7105c" +
 					"d6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e5" +
@@ -620,7 +620,7 @@ func SimNetParams() *Params {
 		SKAMinRelayTxFee:    1e3,        // 0.00001 SKA minimum fee
 
 		// SKA coin type configurations for simnet testing
-		SKACoins: map[dcrutil.CoinType]*SKACoinConfig{
+		SKACoins: map[cointype.CoinType]*SKACoinConfig{
 			1: {
 				CoinType:       1,
 				Name:           "Skarb-1",
@@ -659,17 +659,17 @@ func SimNetParams() *Params {
 		},
 
 		// Initial SKA types to activate at simnet genesis
-		InitialSKATypes: []dcrutil.CoinType{1}, // Only SKA-1 initially active
+		InitialSKATypes: []cointype.CoinType{1}, // Only SKA-1 initially active
 
 		// SKA emission authorization keys for simnet (TEST KEYS ONLY)
-		SKAEmissionKeys: map[wire.CoinType]*secp256k1.PublicKey{
+		SKAEmissionKeys: map[cointype.CoinType]*secp256k1.PublicKey{
 			// SIMNET TEST KEYS - NOT FOR PRODUCTION USE
 			1: mustParseHexPubKeySimnet("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"),
 			2: mustParseHexPubKeySimnet("03389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26381749838fca9302ccaa9ddd"),
 		},
 
 		// SKA emission nonces for simnet replay protection
-		SKAEmissionNonces: map[wire.CoinType]uint64{
+		SKAEmissionNonces: map[cointype.CoinType]uint64{
 			1: 0, // SKA-1 nonce counter
 			2: 0, // SKA-2 nonce counter
 		},

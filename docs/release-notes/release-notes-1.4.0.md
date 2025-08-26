@@ -117,7 +117,7 @@ for API details.
 #### Built-in Support for Enabling External TLS RPC Connections
 
 A new command line parameter (`--altdnsnames`) and environment variable
-(`VARD_ALT_DNSNAMES`) can now be used before the first launch of drcd to specify
+(`MONETARIUM_ALT_DNSNAMES`) can now be used before the first launch of drcd to specify
 additional external IP addresses and DNS names to add during the certificate
 creation that are permitted to connect to the RPC server via TLS.  Previously,
 a separate tool was required to accomplish this configuration.

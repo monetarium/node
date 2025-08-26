@@ -15,11 +15,10 @@ import (
 )
 
 func main() {
-	// Find all hex test data files in rpcserver legacy testdata
-	testDataPath := "../internal/rpcserver/testdata"
-	legacyDataPath := filepath.Join(testDataPath, "legacy_v11")
+	// Find all hex test data files in txsort testdata
+	testDataPath := "dcrutil/txsort/testdata"
 
-	files, err := filepath.Glob(filepath.Join(legacyDataPath, "*.hex"))
+	files, err := filepath.Glob(filepath.Join(testDataPath, "*.hex"))
 	if err != nil {
 		panic(err)
 	}
@@ -42,18 +41,25 @@ func main() {
 			continue
 		}
 
-		// Deserialize with old protocol version (11) for legacy test data
+		// Deserialize with legacy protocol version for old transaction data
 		var tx wire.MsgTx
 		reader := bytes.NewReader(txBytes)
+		
+		// Try with protocol version 11 first (legacy), then fallback to auto-detection
 		err = tx.BtcDecode(reader, 11)
 		if err != nil {
-			fmt.Printf("Error deserializing transaction from %s: %v\n", file, err)
-			continue
-		}
-
-		// Ensure all TxOut entries have CoinType set to VAR
-		for i := range tx.TxOut {
-			tx.TxOut[i].CoinType = cointype.CoinTypeVAR
+			// Try with current protocol version
+			reader = bytes.NewReader(txBytes)
+			err = tx.BtcDecode(reader, wire.ProtocolVersion)
+			if err != nil {
+				fmt.Printf("Error deserializing transaction from %s: %v\n", file, err)
+				continue
+			}
+		} else {
+			// Legacy transaction data - need to add CoinType field for compatibility
+			for i := range tx.TxOut {
+				tx.TxOut[i].CoinType = cointype.CoinTypeVAR
+			}
 		}
 
 		// Serialize with current protocol version
@@ -66,16 +72,17 @@ func main() {
 		// Encode as hex
 		newHexStr := hex.EncodeToString(newTxBytes)
 
-		// Write updated file to main testdata directory
-		outputFile := filepath.Join(testDataPath, filepath.Base(file))
-		err = os.WriteFile(outputFile, []byte(newHexStr), 0644)
+		// Write updated file
+		err = os.WriteFile(file, []byte(newHexStr), 0644)
 		if err != nil {
 			fmt.Printf("Error writing updated %s: %v\n", file, err)
 			continue
 		}
 
-		fmt.Printf("Updated %s -> %s successfully\n", file, outputFile)
+		fmt.Printf("Updated %s successfully (old: %d bytes, new: %d bytes)\n", 
+			file, len(txBytes), len(newTxBytes))
+		fmt.Printf("Old hash: %x\n", tx.TxHash())
 	}
 
-	fmt.Println("Done updating hex test data files")
+	fmt.Println("Done updating txsort test data files")
 }

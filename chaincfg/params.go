@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	dcrutil "github.com/decred/dcrd/dcrutil/v4"
 	"github.com/decred/dcrd/wire"
 )
 
@@ -220,7 +220,7 @@ type TokenPayout struct {
 // with individual configurations for each.
 type SKACoinConfig struct {
 	// CoinType is the numeric identifier for this SKA coin type (1-255).
-	CoinType dcrutil.CoinType
+	CoinType cointype.CoinType
 
 	// Name is the human-readable name for this SKA coin type.
 	Name string
@@ -288,7 +288,7 @@ type SKAEmissionAuth struct {
 	Nonce uint64
 
 	// CoinType specifies which SKA coin type this authorization covers (1-255)
-	CoinType wire.CoinType
+	CoinType cointype.CoinType
 
 	// Amount is the total amount authorized for emission
 	Amount int64
@@ -708,11 +708,12 @@ type Params struct {
 
 	// SKAEmissionKeys maps coin types to their authorized emission public keys.
 	// Only transactions signed by the corresponding private key are valid emissions.
-	SKAEmissionKeys map[wire.CoinType]*secp256k1.PublicKey
+	SKAEmissionKeys map[cointype.CoinType]*secp256k1.PublicKey
 
 	// SKAEmissionNonces tracks the last used nonce for each coin type to prevent
 	// replay attacks. Each emission must use nonce = last_nonce + 1.
-	SKAEmissionNonces map[wire.CoinType]uint64
+	// Currently only emission with nonce 1 is allowed.
+	SKAEmissionNonces map[cointype.CoinType]uint64
 
 	// SKAMinRelayTxFee is the minimum fee rate for SKA transactions to be
 	// relayed by the network. This is separate from VAR transaction fees.
@@ -721,12 +722,12 @@ type Params struct {
 	// SKACoins is a map of coin type to configuration for all supported
 	// SKA coin types in this network. This allows dynamic management of
 	// multiple SKA coin types.
-	SKACoins map[dcrutil.CoinType]*SKACoinConfig
+	SKACoins map[cointype.CoinType]*SKACoinConfig
 
 	// InitialSKATypes defines which SKA coin types should be active at
 	// network genesis. Additional types can be activated later through
 	// governance or admin commands.
-	InitialSKATypes []dcrutil.CoinType
+	InitialSKATypes []cointype.CoinType
 }
 
 // HDPrivKeyVersion returns the hierarchical deterministic extended private key
@@ -872,12 +873,17 @@ func (p *Params) TicketExpiryBlocks() uint32 {
 func newHashFromStr(hexStr string) *chainhash.Hash {
 	hash, err := chainhash.NewHashFromStr(hexStr)
 	if err != nil {
-		// Log critical error instead of panicking to prevent crashes
-		// This should never happen with hardcoded values, but graceful handling
-		// is safer for production environments
+		// Log critical error instead of just panicking
 		fmt.Printf("CRITICAL: Invalid hardcoded hash in chaincfg: %s, error: %v\n", hexStr, err)
-		// Return zero hash as fallback - will be caught by validation
-		return &chainhash.Hash{}
+
+		// Ordinarily I don't like panics in library code since it
+		// can take applications down without them having a chance to
+		// recover which is extremely annoying, however an exception is
+		// being made in this case because the only way this can panic
+		// is if there is an error in the hard-coded hashes.  Thus it
+		// will only ever potentially panic on init and therefore is
+		// 100% predictable.
+		panic(err)
 	}
 	return hash
 }
@@ -889,10 +895,8 @@ func newHashFromStr(hexStr string) *chainhash.Hash {
 func hexDecode(hexStr string) []byte {
 	b, err := hex.DecodeString(hexStr)
 	if err != nil {
-		// Log critical error instead of panicking
 		fmt.Printf("CRITICAL: Invalid hardcoded hex string in chaincfg: %s, error: %v\n", hexStr, err)
-		// Return empty slice as fallback
-		return []byte{}
+		panic(err)
 	}
 	return b
 }
@@ -910,10 +914,8 @@ func mustParseHex(hexStr string) []byte {
 func hexToBigInt(hexStr string) *big.Int {
 	val, ok := new(big.Int).SetString(hexStr, 16)
 	if !ok {
-		// Log critical error instead of panicking
 		fmt.Printf("CRITICAL: Failed to parse hardcoded big integer from hex in chaincfg: %s\n", hexStr)
-		// Return zero big.Int as fallback
-		return big.NewInt(0)
+		panic("failed to parse big integer from hex: " + hexStr)
 	}
 	return val
 }
@@ -967,20 +969,20 @@ func (p *Params) Seeders() []string {
 
 // GetSKACoinConfig returns the configuration for the specified SKA coin type.
 // Returns nil if the coin type is not configured.
-func (p *Params) GetSKACoinConfig(coinType dcrutil.CoinType) *SKACoinConfig {
+func (p *Params) GetSKACoinConfig(coinType cointype.CoinType) *SKACoinConfig {
 	return p.SKACoins[coinType]
 }
 
 // IsSKACoinTypeActive returns true if the specified SKA coin type is
 // configured and active in this network.
-func (p *Params) IsSKACoinTypeActive(coinType dcrutil.CoinType) bool {
+func (p *Params) IsSKACoinTypeActive(coinType cointype.CoinType) bool {
 	config := p.SKACoins[coinType]
 	return config != nil && config.Active
 }
 
 // GetActiveSKATypes returns a slice of all currently active SKA coin types.
-func (p *Params) GetActiveSKATypes() []dcrutil.CoinType {
-	var active []dcrutil.CoinType
+func (p *Params) GetActiveSKATypes() []cointype.CoinType {
+	var active []cointype.CoinType
 	for coinType, config := range p.SKACoins {
 		if config.Active {
 			active = append(active, coinType)
@@ -991,8 +993,8 @@ func (p *Params) GetActiveSKATypes() []dcrutil.CoinType {
 
 // GetAllSKATypes returns a slice of all configured SKA coin types,
 // both active and inactive.
-func (p *Params) GetAllSKATypes() []dcrutil.CoinType {
-	var all []dcrutil.CoinType
+func (p *Params) GetAllSKATypes() []cointype.CoinType {
+	var all []cointype.CoinType
 	for coinType := range p.SKACoins {
 		all = append(all, coinType)
 	}
@@ -1001,7 +1003,7 @@ func (p *Params) GetAllSKATypes() []dcrutil.CoinType {
 
 // GetSKAEmissionKey returns the authorized emission public key for the specified
 // coin type. Returns nil if no key is configured for this coin type.
-func (p *Params) GetSKAEmissionKey(coinType wire.CoinType) *secp256k1.PublicKey {
+func (p *Params) GetSKAEmissionKey(coinType cointype.CoinType) *secp256k1.PublicKey {
 	if p.SKAEmissionKeys == nil {
 		return nil
 	}
@@ -1010,7 +1012,7 @@ func (p *Params) GetSKAEmissionKey(coinType wire.CoinType) *secp256k1.PublicKey 
 
 // GetSKAEmissionNonce returns the last used nonce for the specified coin type.
 // Returns 0 if no nonce has been used yet.
-func (p *Params) GetSKAEmissionNonce(coinType wire.CoinType) uint64 {
+func (p *Params) GetSKAEmissionNonce(coinType cointype.CoinType) uint64 {
 	if p.SKAEmissionNonces == nil {
 		return 0
 	}
@@ -1018,16 +1020,16 @@ func (p *Params) GetSKAEmissionNonce(coinType wire.CoinType) uint64 {
 }
 
 // SetSKAEmissionNonce updates the last used nonce for the specified coin type.
-// This should be called after a successful emission to prevent replay attacks.
-func (p *Params) SetSKAEmissionNonce(coinType wire.CoinType, nonce uint64) {
+// This should be called after a successful emission to block emission spam.
+func (p *Params) SetSKAEmissionNonce(coinType cointype.CoinType, nonce uint64) {
 	if p.SKAEmissionNonces == nil {
-		p.SKAEmissionNonces = make(map[wire.CoinType]uint64)
+		p.SKAEmissionNonces = make(map[cointype.CoinType]uint64)
 	}
 	p.SKAEmissionNonces[coinType] = nonce
 }
 
 // IsSKAEmissionAuthorized returns true if the provided coin type has an
 // authorized emission key configured.
-func (p *Params) IsSKAEmissionAuthorized(coinType wire.CoinType) bool {
+func (p *Params) IsSKAEmissionAuthorized(coinType cointype.CoinType) bool {
 	return p.GetSKAEmissionKey(coinType) != nil
 }
