@@ -64,12 +64,6 @@ func cloneParams(params *chaincfg.Params) *chaincfg.Params {
 			result.SKAEmissionKeys[k] = v
 		}
 	}
-	if params.SKAEmissionNonces != nil {
-		result.SKAEmissionNonces = make(map[cointype.CoinType]uint64)
-		for k, v := range params.SKAEmissionNonces {
-			result.SKAEmissionNonces[k] = v
-		}
-	}
 
 	// Deep copy other maps as needed
 	if params.SKACoins != nil {

@@ -40,9 +40,6 @@ func TestEmissionAuthorizationBasic(t *testing.T) {
 	params.SKAEmissionKeys = map[cointype.CoinType]*secp256k1.PublicKey{
 		1: pubKey,
 	}
-	params.SKAEmissionNonces = map[cointype.CoinType]uint64{
-		1: 0,
-	}
 
 	// Create test authorization
 	auth := &chaincfg.SKAEmissionAuth{
@@ -219,7 +216,6 @@ func TestUnauthorizedEmissionPrevention(t *testing.T) {
 		SKAEmissionAmount: 1000000,
 		SKAMaxAmount:      10000000,
 		SKAEmissionKeys:   make(map[cointype.CoinType]*secp256k1.PublicKey),
-		SKAEmissionNonces: make(map[cointype.CoinType]uint64),
 	}
 
 	// Test 1: No emission key configured

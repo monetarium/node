@@ -3496,18 +3496,11 @@ func handleGetEmissionStatus(_ context.Context, s *Server, icmd interface{}) (in
 	// Determine if emission window is currently active
 	windowActive := currentHeight >= windowStart && currentHeight <= windowEnd
 
-	// Get current nonce from chain parameters
-	currentNonce := uint64(0)
-	if chainParams.SKAEmissionNonces != nil {
-		wireCoinType := coinType
-		currentNonce = chainParams.SKAEmissionNonces[wireCoinType]
-	}
+	// Get current nonce from blockchain state (not chain parameters)
+	currentNonce := s.cfg.Chain.GetSKAEmissionNonce(coinType)
 
-	// TODO: Check if already emitted by examining blockchain state
-	// For now, this is a placeholder - actual implementation would need to:
-	// 1. Search blockchain for existing emission transactions for this coin type
-	// 2. Check UTXO set for emission-created outputs
-	alreadyEmitted := false
+	// Check if already emitted by examining blockchain state
+	alreadyEmitted := s.cfg.Chain.HasSKAEmissionOccurred(coinType)
 
 	return types.GetEmissionStatusResult{
 		CoinType:       c.CoinType,

@@ -204,6 +204,8 @@ type testRPCChain struct {
 	blake3PowActiveErr            error
 	subsidySplitR2Active          bool
 	subsidySplitR2ActiveErr       error
+	skaEmissionNonce              uint64
+	skaEmissionOccurred           bool
 }
 
 // BestSnapshot returns a mocked blockchain.BestState.
@@ -453,6 +455,16 @@ func (c *testRPCChain) IsBlake3PowAgendaActive(*chainhash.Hash) (bool, error) {
 // not the modified subsidy split round 2 agenda is active.
 func (c *testRPCChain) IsSubsidySplitR2AgendaActive(*chainhash.Hash) (bool, error) {
 	return c.subsidySplitR2Active, c.subsidySplitR2ActiveErr
+}
+
+// GetSKAEmissionNonce returns a mocked nonce for the specified coin type.
+func (c *testRPCChain) GetSKAEmissionNonce(cointype.CoinType) uint64 {
+	return c.skaEmissionNonce
+}
+
+// HasSKAEmissionOccurred returns a mocked status of whether emission occurred.
+func (c *testRPCChain) HasSKAEmissionOccurred(cointype.CoinType) bool {
+	return c.skaEmissionOccurred
 }
 
 // testPeer provides a mock peer by implementing the Peer interface.
@@ -1408,12 +1420,6 @@ func cloneParams(params *chaincfg.Params) *chaincfg.Params {
 		result.SKAEmissionKeys = make(map[cointype.CoinType]*secp256k1.PublicKey)
 		for k, v := range params.SKAEmissionKeys {
 			result.SKAEmissionKeys[k] = v
-		}
-	}
-	if params.SKAEmissionNonces != nil {
-		result.SKAEmissionNonces = make(map[cointype.CoinType]uint64)
-		for k, v := range params.SKAEmissionNonces {
-			result.SKAEmissionNonces[k] = v
 		}
 	}
 

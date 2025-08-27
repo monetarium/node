@@ -34,9 +34,6 @@ func TestShipCriticalSecurityFixes(t *testing.T) {
 	params.SKAEmissionKeys = map[cointype.CoinType]*secp256k1.PublicKey{
 		1: pubKey,
 	}
-	params.SKAEmissionNonces = map[cointype.CoinType]uint64{
-		1: 0,
-	}
 	params.SKACoins = map[cointype.CoinType]*chaincfg.SKACoinConfig{
 		1: {
 			CoinType:          1,

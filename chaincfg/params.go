@@ -710,11 +710,6 @@ type Params struct {
 	// Only transactions signed by the corresponding private key are valid emissions.
 	SKAEmissionKeys map[cointype.CoinType]*secp256k1.PublicKey
 
-	// SKAEmissionNonces tracks the last used nonce for each coin type to prevent
-	// replay attacks. Each emission must use nonce = last_nonce + 1.
-	// Currently only emission with nonce 1 is allowed.
-	SKAEmissionNonces map[cointype.CoinType]uint64
-
 	// SKAMinRelayTxFee is the minimum fee rate for SKA transactions to be
 	// relayed by the network. This is separate from VAR transaction fees.
 	SKAMinRelayTxFee int64
@@ -1008,24 +1003,6 @@ func (p *Params) GetSKAEmissionKey(coinType cointype.CoinType) *secp256k1.Public
 		return nil
 	}
 	return p.SKAEmissionKeys[coinType]
-}
-
-// GetSKAEmissionNonce returns the last used nonce for the specified coin type.
-// Returns 0 if no nonce has been used yet.
-func (p *Params) GetSKAEmissionNonce(coinType cointype.CoinType) uint64 {
-	if p.SKAEmissionNonces == nil {
-		return 0
-	}
-	return p.SKAEmissionNonces[coinType]
-}
-
-// SetSKAEmissionNonce updates the last used nonce for the specified coin type.
-// This should be called after a successful emission to block emission spam.
-func (p *Params) SetSKAEmissionNonce(coinType cointype.CoinType, nonce uint64) {
-	if p.SKAEmissionNonces == nil {
-		p.SKAEmissionNonces = make(map[cointype.CoinType]uint64)
-	}
-	p.SKAEmissionNonces[coinType] = nonce
 }
 
 // IsSKAEmissionAuthorized returns true if the provided coin type has an

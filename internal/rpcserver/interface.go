@@ -463,6 +463,14 @@ type Chain interface {
 	// proof of work hash function to blake3, as defined in DCP0011, has passed
 	// and is now active for the block AFTER the given block.
 	IsBlake3PowAgendaActive(*chainhash.Hash) (bool, error)
+
+	// GetSKAEmissionNonce returns the last used nonce for the specified coin type
+	// from the blockchain state. Returns 0 if no emissions have occurred yet.
+	GetSKAEmissionNonce(cointype.CoinType) uint64
+
+	// HasSKAEmissionOccurred returns whether the specified coin type has been
+	// emitted in the blockchain.
+	HasSKAEmissionOccurred(cointype.CoinType) bool
 }
 
 // Clock represents a clock for use with the RPC server. The purpose of this

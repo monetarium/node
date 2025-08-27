@@ -269,9 +269,6 @@ func TestValidateSKAEmissionTransaction(t *testing.T) {
 	params.SKAEmissionKeys = map[cointype.CoinType]*secp256k1.PublicKey{
 		1: pubKey,
 	}
-	params.SKAEmissionNonces = map[cointype.CoinType]uint64{
-		1: 0,
-	}
 
 	// Create authorization for a valid emission
 	auth := &chaincfg.SKAEmissionAuth{

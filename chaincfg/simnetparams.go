@@ -667,12 +667,6 @@ func SimNetParams() *Params {
 			1: mustParseHexPubKeySimnet("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"),
 			2: mustParseHexPubKeySimnet("03389ffce9cd9ae88dcc0631e88a821ffdbe9bfe26381749838fca9302ccaa9ddd"),
 		},
-
-		// SKA emission nonces for simnet replay protection
-		SKAEmissionNonces: map[cointype.CoinType]uint64{
-			1: 0, // SKA-1 nonce counter
-			2: 0, // SKA-2 nonce counter
-		},
 	}
 }
 
