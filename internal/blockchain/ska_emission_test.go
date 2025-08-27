@@ -52,10 +52,32 @@ func TestSKAActivation(t *testing.T) {
 	}
 }
 
-// TestCreateSKAEmissionTransactionValidation tests the validation logic
-// for SKA emission transaction creation without requiring valid addresses.
-func TestCreateSKAEmissionTransactionValidation(t *testing.T) {
+// TestCreateAuthorizedSKAEmissionTransactionValidation tests the validation logic
+// for authorized SKA emission transaction creation.
+func TestCreateAuthorizedSKAEmissionTransactionValidation(t *testing.T) {
 	params := chaincfg.SimNetParams()
+
+	// Get emission key for SKA-1 from chain params
+	emissionKey := params.GetSKAEmissionKey(cointype.CoinType(1))
+	if emissionKey == nil {
+		t.Fatal("No emission key configured for SKA-1 in test params")
+	}
+
+	// Helper function to create authorization
+	createAuth := func(addresses []string, amounts []int64) *chaincfg.SKAEmissionAuth {
+		totalAmount := int64(0)
+		for _, amount := range amounts {
+			totalAmount += amount
+		}
+		return &chaincfg.SKAEmissionAuth{
+			EmissionKey: emissionKey,
+			Signature:   make([]byte, 64), // Dummy signature for validation tests
+			Nonce:       1,
+			CoinType:    cointype.CoinType(1),
+			Amount:      totalAmount,
+			Height:      10, // Valid height for SKA-1 in simnet
+		}
+	}
 
 	tests := []struct {
 		name        string
@@ -88,15 +110,20 @@ func TestCreateSKAEmissionTransactionValidation(t *testing.T) {
 		{
 			name:        "Wrong total amount",
 			addresses:   []string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"},
-			amounts:     []int64{50000000000}, // Wrong amount (should be 1e6 * 1e8)
+			amounts:     []int64{50000000000}, // Wrong amount (authorization will have different amount)
 			expectError: true,
-			errorMsg:    "does not match chain parameter",
+			errorMsg:    "does not match authorization",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, err := CreateSKAEmissionTransaction(test.addresses, test.amounts, params)
+			auth := createAuth(test.addresses, test.amounts)
+			// Special case: create authorization mismatch for "Wrong total amount" test
+			if test.name == "Wrong total amount" {
+				auth.Amount = 99999999999 // Different from the amounts provided
+			}
+			_, err := CreateAuthorizedSKAEmissionTransaction(auth, test.addresses, test.amounts, params)
 
 			if test.expectError {
 				if err == nil {

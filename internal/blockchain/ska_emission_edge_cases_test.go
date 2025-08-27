@@ -47,9 +47,22 @@ func TestSKAEmissionBasicValidation(t *testing.T) {
 			expectedEmissionAmount += amount
 		}
 
-		// Create emission with wrong amount by using CreateSKAEmissionTransaction
-		// which now validates the amount
-		_, err := CreateSKAEmissionTransaction(
+		// Create emission with wrong amount by using CreateAuthorizedSKAEmissionTransaction
+		// which validates the amount against authorization
+		emissionKey := params.GetSKAEmissionKey(cointype.CoinType(1))
+		if emissionKey == nil {
+			t.Fatal("No emission key configured for SKA-1")
+		}
+		auth := &chaincfg.SKAEmissionAuth{
+			EmissionKey: emissionKey,
+			Signature:   make([]byte, 64), // Dummy signature
+			Nonce:       1,
+			CoinType:    cointype.CoinType(1),
+			Amount:      expectedEmissionAmount, // Auth for correct amount
+			Height:      10,
+		}
+		_, err := CreateAuthorizedSKAEmissionTransaction(
+			auth,
 			[]string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"},
 			[]int64{expectedEmissionAmount + 1},
 			params,
@@ -177,14 +190,37 @@ func TestSKAEmissionConcurrency(t *testing.T) {
 		}
 
 		// Test that creating emission transactions with partial amounts fails
-		// This tests the amount validation in CreateSKAEmissionTransaction
-		_, err1 := CreateSKAEmissionTransaction(
+		// This tests the amount validation in CreateAuthorizedSKAEmissionTransaction
+		emissionKey := params.GetSKAEmissionKey(cointype.CoinType(1))
+		if emissionKey == nil {
+			t.Fatal("No emission key configured for SKA-1")
+		}
+
+		auth1 := &chaincfg.SKAEmissionAuth{
+			EmissionKey: emissionKey,
+			Signature:   make([]byte, 64), // Dummy signature
+			Nonce:       1,
+			CoinType:    cointype.CoinType(1),
+			Amount:      expectedEmissionAmount, // Auth for full amount, but tx has partial
+			Height:      10,
+		}
+		_, err1 := CreateAuthorizedSKAEmissionTransaction(
+			auth1,
 			[]string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"},
 			[]int64{expectedEmissionAmount / 2},
 			params,
 		)
 
-		_, err2 := CreateSKAEmissionTransaction(
+		auth2 := &chaincfg.SKAEmissionAuth{
+			EmissionKey: emissionKey,
+			Signature:   make([]byte, 64), // Dummy signature
+			Nonce:       2,
+			CoinType:    cointype.CoinType(1),
+			Amount:      expectedEmissionAmount, // Auth for full amount, but tx has partial
+			Height:      10,
+		}
+		_, err2 := CreateAuthorizedSKAEmissionTransaction(
+			auth2,
 			[]string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"},
 			[]int64{expectedEmissionAmount / 2},
 			params,
