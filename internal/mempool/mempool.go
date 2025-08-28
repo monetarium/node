@@ -287,6 +287,23 @@ type TxPool struct {
 	feeCalculator *fees.CoinTypeFeeCalculator
 }
 
+// mempoolChainAdapter adapts the mempool's function-based blockchain access
+// to the interface expected by ValidateAuthorizedSKAEmissionTransaction.
+type mempoolChainAdapter struct {
+	hasEmissionOccurred func(cointype.CoinType) bool
+	getEmissionNonce    func(cointype.CoinType) uint64
+}
+
+// HasSKAEmissionOccurred checks if SKA emission has occurred for the given coin type.
+func (m *mempoolChainAdapter) HasSKAEmissionOccurred(coinType cointype.CoinType) bool {
+	return m.hasEmissionOccurred(coinType)
+}
+
+// GetSKAEmissionNonce returns the current nonce for the given coin type.
+func (m *mempoolChainAdapter) GetSKAEmissionNonce(coinType cointype.CoinType) uint64 {
+	return m.getEmissionNonce(coinType)
+}
+
 // insertVote inserts a vote into the map of block votes.
 //
 // This function MUST be called with the vote mutex locked (for writes).
@@ -1305,12 +1322,16 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 			}
 		}
 
-		// Perform full cryptographic validation including governance authorization
-		// Note: Signature verification will be done during block validation
-		// since mempool doesn't have direct access to blockchain state.
-		// For now, we do basic structural validation.
-		if err := blockchain.ValidateSKAEmissionTransaction(msgTx, nextBlockHeight, mp.cfg.ChainParams); err != nil {
-			str := fmt.Sprintf("transaction %v is an invalid SKA emission transaction: %v", txHash, err)
+		// Create a chain adapter to provide blockchain state access for secure validation
+		chainAdapter := &mempoolChainAdapter{
+			hasEmissionOccurred: mp.cfg.HasSKAEmissionOccurred,
+			getEmissionNonce:    mp.cfg.GetSKAEmissionNonce,
+		}
+
+		// Perform full cryptographic validation including signature verification
+		// This ensures invalid emission transactions cannot enter the mempool
+		if err := blockchain.ValidateAuthorizedSKAEmissionTransaction(msgTx, nextBlockHeight, chainAdapter, mp.cfg.ChainParams); err != nil {
+			str := fmt.Sprintf("transaction %v is an invalid authorized SKA emission transaction: %v", txHash, err)
 			return nil, txRuleError(ErrInvalid, str)
 		}
 	} else if standalone.IsCoinBaseTx(msgTx, isTreasuryEnabled) {

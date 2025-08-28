@@ -7,10 +7,9 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/wire"
+	"github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 // TestSKAEmissionBasicValidation tests basic SKA emission validation.
@@ -23,6 +22,15 @@ func TestSKAEmissionBasicValidation(t *testing.T) {
 		t.Fatal("SKA coin type 1 not found in simnet params")
 	}
 
+	// Create mock chain for testing
+	chain := &BlockChain{
+		chainParams: params,
+		skaEmissionState: &SKAEmissionState{
+			nonces:  make(map[cointype.CoinType]uint64),
+			emitted: make(map[cointype.CoinType]bool),
+		},
+	}
+
 	t.Run("ValidEmission", func(t *testing.T) {
 		// Calculate expected total emission amount from config
 		var expectedEmissionAmount int64
@@ -30,11 +38,30 @@ func TestSKAEmissionBasicValidation(t *testing.T) {
 			expectedEmissionAmount += amount
 		}
 
-		// Create a valid emission transaction with the correct amount
-		tx := createValidEmissionTx(expectedEmissionAmount)
+		// Generate test key and configure params
+		privKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			t.Fatalf("Failed to generate private key: %v", err)
+		}
+		pubKey := privKey.PubKey()
+		config.EmissionKey = pubKey
 
-		// Test at the correct emission height
-		err := ValidateSKAEmissionTransaction(tx, int64(config.EmissionHeight), params)
+		// Create a valid emission transaction with proper authorization
+		addresses := []string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"}
+		amounts := []int64{expectedEmissionAmount}
+		tx := createTestEmissionTx(t, addresses, amounts, cointype.CoinType(1), params)
+
+		auth := &chaincfg.SKAEmissionAuth{
+			EmissionKey: pubKey,
+			CoinType:    cointype.CoinType(1),
+			Nonce:       1,
+			Amount:      expectedEmissionAmount,
+			Height:      int64(config.EmissionHeight),
+		}
+		signEmissionTx(t, tx, auth, privKey, params)
+
+		// Test at the correct emission height using secure validation
+		err = ValidateAuthorizedSKAEmissionTransaction(tx, int64(config.EmissionHeight), chain, params)
 		if err != nil {
 			t.Errorf("Valid emission transaction should pass: %v", err)
 		}
@@ -79,10 +106,29 @@ func TestSKAEmissionBasicValidation(t *testing.T) {
 			expectedEmissionAmount += amount
 		}
 
-		// Create valid emission at wrong height
-		tx := createValidEmissionTx(expectedEmissionAmount)
+		// Generate test key and configure params
+		privKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			t.Fatalf("Failed to generate private key: %v", err)
+		}
+		pubKey := privKey.PubKey()
+		config.EmissionKey = pubKey
 
-		err := ValidateSKAEmissionTransaction(tx, int64(config.EmissionHeight)+1000, params)
+		// Create valid emission at wrong height
+		addresses := []string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"}
+		amounts := []int64{expectedEmissionAmount}
+		tx := createTestEmissionTx(t, addresses, amounts, cointype.CoinType(1), params)
+
+		auth := &chaincfg.SKAEmissionAuth{
+			EmissionKey: pubKey,
+			CoinType:    cointype.CoinType(1),
+			Nonce:       1,
+			Amount:      expectedEmissionAmount,
+			Height:      int64(config.EmissionHeight),
+		}
+		signEmissionTx(t, tx, auth, privKey, params)
+
+		err = ValidateAuthorizedSKAEmissionTransaction(tx, int64(config.EmissionHeight)+1000, chain, params)
 		if err == nil {
 			t.Error("Emission at wrong height should fail")
 		}
@@ -95,11 +141,32 @@ func TestSKAEmissionBasicValidation(t *testing.T) {
 			expectedEmissionAmount += amount
 		}
 
-		// Create emission with VAR output (should fail)
-		tx := createValidEmissionTx(expectedEmissionAmount)
+		// Generate test key and configure params
+		privKey, err := secp256k1.GeneratePrivateKey()
+		if err != nil {
+			t.Fatalf("Failed to generate private key: %v", err)
+		}
+		pubKey := privKey.PubKey()
+		config.EmissionKey = pubKey
+
+		// Create emission with proper authorization
+		addresses := []string{"SsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"}
+		amounts := []int64{expectedEmissionAmount}
+		tx := createTestEmissionTx(t, addresses, amounts, cointype.CoinType(1), params)
+
+		auth := &chaincfg.SKAEmissionAuth{
+			EmissionKey: pubKey,
+			CoinType:    cointype.CoinType(1),
+			Nonce:       1,
+			Amount:      expectedEmissionAmount,
+			Height:      int64(config.EmissionHeight),
+		}
+		signEmissionTx(t, tx, auth, privKey, params)
+
+		// Modify to use VAR output (should fail validation)
 		tx.TxOut[0].CoinType = cointype.CoinTypeVAR
 
-		err := ValidateSKAEmissionTransaction(tx, int64(config.EmissionHeight), params)
+		err = ValidateAuthorizedSKAEmissionTransaction(tx, int64(config.EmissionHeight), chain, params)
 		if err == nil {
 			t.Error("Emission with VAR output should fail")
 		}
@@ -234,27 +301,4 @@ func TestSKAEmissionConcurrency(t *testing.T) {
 			t.Error("Expected partial emission tx2 to fail")
 		}
 	})
-}
-
-// Helper function to create a valid emission transaction.
-func createValidEmissionTx(amount int64) *wire.MsgTx {
-	return &wire.MsgTx{
-		Version: 1,
-		TxIn: []*wire.TxIn{{
-			PreviousOutPoint: wire.OutPoint{
-				Hash:  chainhash.Hash{}, // Null hash
-				Index: 0xffffffff,       // Null index
-			},
-			SignatureScript: []byte{0x01, 0x53, 0x4b, 0x41}, // Contains "SKA"
-			Sequence:        wire.MaxTxInSequenceNum,
-		}},
-		TxOut: []*wire.TxOut{{
-			Value:    amount,
-			CoinType: cointype.CoinType(1),
-			Version:  0,
-			PkScript: []byte{0x76, 0xa9, 0x14, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x88, 0xac},
-		}},
-		LockTime: 0,
-		Expiry:   0,
-	}
 }

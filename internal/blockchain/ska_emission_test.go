@@ -275,8 +275,9 @@ func TestIsSKAEmissionTransaction(t *testing.T) {
 	}
 }
 
-// TestValidateSKAEmissionTransaction tests the validation of SKA emission transactions.
-func TestValidateSKAEmissionTransaction(t *testing.T) {
+// TestValidateAuthorizedSKAEmissionTransactionBasic tests the basic validation logic
+// of authorized SKA emission transactions (adapted from legacy test).
+func TestValidateAuthorizedSKAEmissionTransactionBasic(t *testing.T) {
 	params := chaincfg.SimNetParams()
 	emissionHeight := params.SKACoins[1].EmissionHeight // Use per-coin emission height
 

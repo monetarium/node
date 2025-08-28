@@ -4040,7 +4040,7 @@ func newServer(ctx context.Context, profiler *profileServer,
 			tipHash := &s.chain.BestSnapshot().Hash
 			return s.chain.IsSubsidySplitR2AgendaActive(tipHash)
 		},
-		// SECURITY FIX: Add SKA emission state checks for mempool protection
+		// Add SKA emission state checks for mempool protection
 		HasSKAEmissionOccurred: s.chain.HasSKAEmissionOccurred,
 		GetSKAEmissionNonce:    s.chain.GetSKAEmissionNonce,
 		TSpendMinedOnAncestor: func(tspend chainhash.Hash) error {
