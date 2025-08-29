@@ -5,6 +5,8 @@
 package mining
 
 import (
+	"sort"
+
 	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
@@ -82,10 +84,10 @@ func (bsa *BlockSpaceAllocator) AllocateBlockSpace(pendingTxBytes map[cointype.C
 	// Phase 1: Calculate base allocations
 	baseAllocations := bsa.calculateBaseAllocations()
 
-	// Phase 2: Fill base allocations and calculate usage
+	// Phase 2: Initialize allocations for ALL pending coin types
 	allocations := make(map[cointype.CoinType]*CoinTypeAllocation)
-	totalOverflow := uint32(0)
 
+	// First, create entries for coin types with base allocations
 	for coinType, baseSpace := range baseAllocations {
 		pending := pendingTxBytes[coinType]
 		used := min(pending, baseSpace)
@@ -99,15 +101,38 @@ func (bsa *BlockSpaceAllocator) AllocateBlockSpace(pendingTxBytes map[cointype.C
 		}
 
 		allocations[coinType] = allocation
+	}
 
-		// Track unused space for overflow redistribution
-		if used < baseSpace {
-			totalOverflow += baseSpace - used
+	// Ensure every coin type with pending transactions has an allocation entry
+	for coinType, pending := range pendingTxBytes {
+		if _, ok := allocations[coinType]; !ok && pending > 0 {
+			allocations[coinType] = &CoinTypeAllocation{
+				CoinType:        coinType,
+				BaseAllocation:  0,
+				FinalAllocation: 0,
+				PendingBytes:    pending,
+				UsedBytes:       0,
+			}
+		}
+	}
+
+	// Calculate total overflow including unallocated space and unused base allocations
+	sumBase := uint32(0)
+	for _, baseSpace := range baseAllocations {
+		sumBase += baseSpace
+	}
+	roundingRemainder := bsa.maxBlockSize - sumBase
+	totalOverflow := roundingRemainder
+
+	// Add unused base allocations to overflow
+	for _, allocation := range allocations {
+		if allocation.UsedBytes < allocation.BaseAllocation {
+			totalOverflow += allocation.BaseAllocation - allocation.UsedBytes
 		}
 	}
 
 	// Phase 3: Identify coin types with remaining demand
-	activePendingTypes := bsa.identifyActivePendingTypes(pendingTxBytes, allocations)
+	activePendingTypes := bsa.identifyActivePendingTypes(allocations)
 
 	// Phase 4: Distribute overflow space proportionally
 	if totalOverflow > 0 && len(activePendingTypes) > 0 {
@@ -137,20 +162,38 @@ func (bsa *BlockSpaceAllocator) AllocateBlockSpace(pendingTxBytes map[cointype.C
 func (bsa *BlockSpaceAllocator) calculateBaseAllocations() map[cointype.CoinType]uint32 {
 	allocations := make(map[cointype.CoinType]uint32)
 
-	// VAR gets fixed 10% allocation
-	varSpace := uint32(float64(bsa.maxBlockSize) * bsa.varAllocation)
+	// Use integer math to avoid rounding losses
+	// VAR gets exactly 10% using integer division
+	varSpace := bsa.maxBlockSize / 10 // Exactly 10%
 	allocations[cointype.CoinTypeVAR] = varSpace
 
-	// SKA types share 90% equally among active types
+	// SKA types share the remaining 90%
+	skaSpace := bsa.maxBlockSize - varSpace // Exactly the rest
+
 	activeSKATypes := bsa.chainParams.GetActiveSKATypes()
 	if len(activeSKATypes) > 0 {
-		totalSKASpace := uint32(float64(bsa.maxBlockSize) * bsa.skaAllocation)
-		skaSpacePerType := totalSKASpace / uint32(len(activeSKATypes))
+		// Distribute SKA space equally with remainder handling
+		skaSpacePerType := skaSpace / uint32(len(activeSKATypes))
+		remainder := skaSpace % uint32(len(activeSKATypes))
 
-		for _, skaType := range activeSKATypes {
-			allocations[skaType] = skaSpacePerType
+		// Sort SKA types for deterministic remainder distribution
+		sortedSKATypes := make([]cointype.CoinType, len(activeSKATypes))
+		copy(sortedSKATypes, activeSKATypes)
+		sort.Slice(sortedSKATypes, func(i, j int) bool {
+			return sortedSKATypes[i] < sortedSKATypes[j]
+		})
+
+		for i, skaType := range sortedSKATypes {
+			allocation := skaSpacePerType
+			// Distribute remainder bytes to first few types
+			if uint32(i) < remainder {
+				allocation++
+			}
+			allocations[skaType] = allocation
 		}
 	}
+	// Note: If no SKA types are active, the 90% space will be added to overflow
+	// in AllocateBlockSpace and can be claimed by any pending coin type
 
 	return allocations
 }
@@ -158,7 +201,6 @@ func (bsa *BlockSpaceAllocator) calculateBaseAllocations() map[cointype.CoinType
 // identifyActivePendingTypes finds coin types that have pending transactions
 // after their base allocation is filled.
 func (bsa *BlockSpaceAllocator) identifyActivePendingTypes(
-	pendingTxBytes map[cointype.CoinType]uint32,
 	allocations map[cointype.CoinType]*CoinTypeAllocation) []cointype.CoinType {
 
 	var activePending []cointype.CoinType
@@ -174,60 +216,112 @@ func (bsa *BlockSpaceAllocator) identifyActivePendingTypes(
 }
 
 // distributeOverflow distributes unused block space among coin types with pending
-// transactions using the same 10%/90% proportional strategy.
+// transactions using iterative proportional distribution within 10%/90% buckets.
 func (bsa *BlockSpaceAllocator) distributeOverflow(
 	allocations map[cointype.CoinType]*CoinTypeAllocation,
 	totalOverflow uint32,
 	activePendingTypes []cointype.CoinType) {
 
-	// Count active pending types by category
-	hasVARPending := false
-	activeSKACount := 0
+	remaining := totalOverflow
+	maxIterations := 10 // Prevent infinite loops
 
-	for _, coinType := range activePendingTypes {
-		if coinType == cointype.CoinTypeVAR {
-			hasVARPending = true
-		} else {
-			activeSKACount++
-		}
-	}
+	for iteration := 0; iteration < maxIterations && remaining > 0; iteration++ {
+		// Partition active pending types and calculate demands
+		var varTypes, skaTypes []cointype.CoinType
+		var varDemand, skaDemand uint64
 
-	// Calculate overflow distribution based on 10%/90% rule
-	var varOverflow, skaOverflowPerType uint32
+		for _, coinType := range activePendingTypes {
+			allocation := allocations[coinType]
+			demand := uint64(allocation.PendingBytes - allocation.UsedBytes)
+			if demand == 0 {
+				continue
+			}
 
-	if hasVARPending && activeSKACount > 0 {
-		// Both VAR and SKA have pending - use 10%/90% split
-		varOverflow = uint32(float64(totalOverflow) * bsa.varAllocation)
-		skaOverflowTotal := uint32(float64(totalOverflow) * bsa.skaAllocation)
-		if activeSKACount > 0 {
-			skaOverflowPerType = skaOverflowTotal / uint32(activeSKACount)
-		}
-	} else if hasVARPending {
-		// Only VAR has pending - gets 100%
-		varOverflow = totalOverflow
-		skaOverflowPerType = 0
-	} else if activeSKACount > 0 {
-		// Only SKA types have pending - split 100% among them
-		varOverflow = 0
-		skaOverflowPerType = totalOverflow / uint32(activeSKACount)
-	}
-
-	// Apply overflow to allocations
-	for _, coinType := range activePendingTypes {
-		allocation := allocations[coinType]
-		remainingDemand := allocation.PendingBytes - allocation.UsedBytes
-
-		var availableOverflow uint32
-		if coinType == cointype.CoinTypeVAR {
-			availableOverflow = varOverflow
-		} else {
-			availableOverflow = skaOverflowPerType
+			if coinType == cointype.CoinTypeVAR {
+				varTypes = append(varTypes, coinType)
+				varDemand += demand
+			} else {
+				skaTypes = append(skaTypes, coinType)
+				skaDemand += demand
+			}
 		}
 
-		// Use as much overflow as needed (up to available overflow)
-		additionalUsage := min(remainingDemand, availableOverflow)
-		allocation.UsedBytes += additionalUsage
-		allocation.FinalAllocation += additionalUsage
+		// If no demand remains, stop
+		if varDemand+skaDemand == 0 {
+			break
+		}
+
+		// Calculate bucket shares based on 10%/90% rule
+		var varShare, skaShare uint64
+		if len(varTypes) > 0 && len(skaTypes) > 0 {
+			// Both have demand - use 10%/90% split
+			varShare = uint64(remaining) / 10       // 10% for VAR
+			skaShare = uint64(remaining) - varShare // 90% for SKA
+		} else if len(varTypes) > 0 {
+			// Only VAR has demand - gets everything
+			varShare = uint64(remaining)
+			skaShare = 0
+		} else if len(skaTypes) > 0 {
+			// Only SKA has demand - gets everything
+			varShare = 0
+			skaShare = uint64(remaining)
+		}
+
+		// Cap shares by actual demand
+		if varShare > varDemand {
+			varShare = varDemand
+		}
+		if skaShare > skaDemand {
+			skaShare = skaDemand
+		}
+
+		// Distribute proportionally within each bucket
+		consumed := uint32(0)
+
+		// Helper function to distribute within a bucket proportionally
+		distributeToBucket := func(types []cointype.CoinType, bucketShare, bucketDemand uint64) {
+			if bucketShare == 0 || bucketDemand == 0 || len(types) == 0 {
+				return
+			}
+
+			leftover := bucketShare
+			for i, coinType := range types {
+				allocation := allocations[coinType]
+				demand := uint64(allocation.PendingBytes - allocation.UsedBytes)
+
+				var give uint64
+				if i == len(types)-1 {
+					// Last type gets all remaining to avoid rounding loss
+					give = leftover
+				} else {
+					// Proportional distribution
+					give = (bucketShare * demand) / bucketDemand
+				}
+
+				// Cap by actual demand
+				if give > demand {
+					give = demand
+				}
+
+				if give > 0 {
+					add := uint32(give)
+					allocation.UsedBytes += add
+					allocation.FinalAllocation += add
+					consumed += add
+					leftover -= give
+				}
+			}
+		}
+
+		distributeToBucket(varTypes, varShare, varDemand)
+		distributeToBucket(skaTypes, skaShare, skaDemand)
+
+		// If nothing was consumed, we can't make progress
+		if consumed == 0 {
+			break
+		}
+
+		remaining -= consumed
 	}
 }
 
@@ -253,26 +347,26 @@ func min(a, b uint32) uint32 {
 }
 
 // GetTransactionCoinType determines the primary coin type of a transaction
-// based on the majority of its outputs.
+// based on the total value of outputs for each coin type.
 func GetTransactionCoinType(tx *dcrutil.Tx) cointype.CoinType {
 	msgTx := tx.MsgTx()
 	if len(msgTx.TxOut) == 0 {
 		return cointype.CoinTypeVAR // Default to VAR for transactions with no outputs
 	}
 
-	// Count outputs by coin type
-	coinTypeCounts := make(map[cointype.CoinType]int)
+	// Sum output values by coin type
+	coinTypeValues := make(map[cointype.CoinType]uint64)
 	for _, txOut := range msgTx.TxOut {
-		coinTypeCounts[txOut.CoinType]++
+		coinTypeValues[txOut.CoinType] += uint64(txOut.Value)
 	}
 
-	// Find the coin type with the most outputs
+	// Find the coin type with the highest total value
 	var primaryCoinType cointype.CoinType = cointype.CoinTypeVAR
-	maxCount := 0
+	var maxValue uint64 = 0
 
-	for coinType, count := range coinTypeCounts {
-		if count > maxCount {
-			maxCount = count
+	for coinType, value := range coinTypeValues {
+		if value > maxValue {
+			maxValue = value
 			primaryCoinType = coinType
 		}
 	}
@@ -323,14 +417,8 @@ func (tst *TransactionSizeTracker) CanAddTransaction(tx *dcrutil.Tx) bool {
 
 	// Check if this coin type would exceed its final allocation
 	coinAllocation := allocation.GetAllocationForCoinType(coinType)
-
-	// DEBUG: Log allocation check details
 	if coinAllocation == nil {
-		log.Debugf("DEBUG: Transaction rejected - no allocation for coinType %d", coinType)
 		return false
-	} else {
-		log.Debugf("DEBUG: Transaction coinType %d - allocation exists, finalAllocation=%d, testSize=%d",
-			coinType, coinAllocation.FinalAllocation, testSizes[coinType])
 	}
 
 	return testSizes[coinType] <= coinAllocation.FinalAllocation

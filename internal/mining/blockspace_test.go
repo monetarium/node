@@ -5,6 +5,7 @@
 package mining
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/decred/dcrd/chaincfg/v3"
@@ -274,13 +275,7 @@ func TestIdentifyActivePendingTypes(t *testing.T) {
 		},
 	}
 
-	pendingTxBytes := map[cointype.CoinType]uint32{
-		cointype.CoinTypeVAR: 800000,
-		1:                    1000000,
-		2:                    100000,
-	}
-
-	activePending := allocator.identifyActivePendingTypes(pendingTxBytes, allocations)
+	activePending := allocator.identifyActivePendingTypes(allocations)
 
 	// Should identify VAR and SKA-1 as having pending
 	if len(activePending) != 2 {
@@ -348,6 +343,147 @@ func TestEdgeCaseZeroPending(t *testing.T) {
 	}
 }
 
+// TestNoSKATypesScenario tests the critical case where no SKA types are active.
+// This verifies that VAR can claim all block space when it's the only pending type.
+func TestNoSKATypesScenario(t *testing.T) {
+	// Create params with no active SKA types
+	params := &chaincfg.Params{
+		SKACoins: map[cointype.CoinType]*chaincfg.SKACoinConfig{},
+	}
+
+	allocator := NewBlockSpaceAllocator(1000000, params) // 1MB block
+
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 950000, // 950KB pending (more than 10% base)
+	}
+
+	result := allocator.AllocateBlockSpace(pendingTxBytes)
+
+	// VAR should be able to use up to the full block size
+	varAlloc := result.GetAllocationForCoinType(cointype.CoinTypeVAR)
+	if varAlloc == nil {
+		t.Fatal("Expected VAR allocation to exist")
+	}
+
+	// VAR base should be 10% = 100KB
+	if varAlloc.BaseAllocation != 100000 {
+		t.Errorf("Expected VAR base allocation 100000, got %d", varAlloc.BaseAllocation)
+	}
+
+	// VAR should use all its pending (950KB)
+	if varAlloc.UsedBytes != 950000 {
+		t.Errorf("Expected VAR to use 950000 bytes, got %d", varAlloc.UsedBytes)
+	}
+
+	// Final allocation should accommodate all usage
+	if varAlloc.FinalAllocation < 950000 {
+		t.Errorf("Expected VAR final allocation >= 950000, got %d", varAlloc.FinalAllocation)
+	}
+}
+
+// TestIntegerMathPrecision verifies that integer math preserves all bytes.
+func TestIntegerMathPrecision(t *testing.T) {
+	testCases := []uint32{
+		1000000, // 1MB - divides evenly
+		999999,  // 1MB - 1 byte
+		1000001, // 1MB + 1 byte
+		123456,  // Arbitrary size
+	}
+
+	for _, blockSize := range testCases {
+		t.Run(fmt.Sprintf("BlockSize=%d", blockSize), func(t *testing.T) {
+			params := mockChainParams()
+			allocator := NewBlockSpaceAllocator(blockSize, params)
+
+			baseAllocations := allocator.calculateBaseAllocations()
+
+			// Sum all base allocations
+			totalAllocated := uint32(0)
+			for _, allocation := range baseAllocations {
+				totalAllocated += allocation
+			}
+
+			// Total should equal block size exactly
+			if totalAllocated != blockSize {
+				t.Errorf("Total base allocations %d != block size %d, lost %d bytes",
+					totalAllocated, blockSize, blockSize-totalAllocated)
+			}
+		})
+	}
+}
+
+// TestIterativeOverflowDistribution tests that overflow is fully distributed.
+func TestIterativeOverflowDistribution(t *testing.T) {
+	params := mockChainParams()
+	allocator := NewBlockSpaceAllocator(1000000, params) // 1MB
+
+	// Scenario: VAR needs 200KB (100KB base + 100KB overflow)
+	//          SKA-1 needs 300KB (can't fit in 450KB base)
+	//          SKA-2 needs 600KB (150KB over base)
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 200000, // 200KB
+		1:                    300000, // 300KB - fits in base
+		2:                    600000, // 600KB - needs overflow
+	}
+
+	result := allocator.AllocateBlockSpace(pendingTxBytes)
+
+	// Verify all pending demand is satisfied up to block limit
+	totalDemand := uint32(200000 + 300000 + 600000) // 1100KB
+	expectedUsage := min(totalDemand, 1000000)      // Capped at 1MB
+
+	if result.TotalUsed != expectedUsage {
+		t.Errorf("Expected total usage %d, got %d", expectedUsage, result.TotalUsed)
+	}
+
+	// Verify proportional distribution within limits
+	varAlloc := result.GetAllocationForCoinType(cointype.CoinTypeVAR)
+	ska1Alloc := result.GetAllocationForCoinType(1)
+	ska2Alloc := result.GetAllocationForCoinType(2)
+
+	// All allocations should exist
+	if varAlloc == nil || ska1Alloc == nil || ska2Alloc == nil {
+		t.Fatal("Missing allocations")
+	}
+
+	// SKA-1 should get its full 300KB (fits in base)
+	if ska1Alloc.UsedBytes != 300000 {
+		t.Errorf("Expected SKA-1 to use 300000, got %d", ska1Alloc.UsedBytes)
+	}
+}
+
+// TestMixedPendingWithNewCoinType tests handling of coin types not in base allocation.
+func TestMixedPendingWithNewCoinType(t *testing.T) {
+	params := mockChainParams()
+	allocator := NewBlockSpaceAllocator(1000000, params)
+
+	// Add pending for a coin type that doesn't have base allocation
+	pendingTxBytes := map[cointype.CoinType]uint32{
+		cointype.CoinTypeVAR: 50000,  // 50KB
+		1:                    100000, // 100KB
+		2:                    100000, // 100KB
+		99:                   200000, // 200KB - new coin type not in base!
+	}
+
+	result := allocator.AllocateBlockSpace(pendingTxBytes)
+
+	// Coin type 99 should get an allocation entry even though it had no base
+	newTypeAlloc := result.GetAllocationForCoinType(99)
+	if newTypeAlloc == nil {
+		t.Fatal("Expected allocation for new coin type 99")
+	}
+
+	// It should have zero base but can claim overflow
+	if newTypeAlloc.BaseAllocation != 0 {
+		t.Errorf("Expected zero base for type 99, got %d", newTypeAlloc.BaseAllocation)
+	}
+
+	// Since other types don't use all their base, type 99 should get some space
+	if newTypeAlloc.UsedBytes == 0 {
+		t.Error("Expected new coin type to get some overflow space")
+	}
+}
+
 // TestMinFunction verifies the min utility function.
 func TestMinFunction(t *testing.T) {
 	testCases := []struct {
@@ -392,6 +528,34 @@ func createMockTransaction(coinTypes []cointype.CoinType) *dcrutil.Tx {
 	return dcrutil.NewTx(tx)
 }
 
+// createMockTransactionWithValues creates a transaction with specific values per output.
+func createMockTransactionWithValues(outputs []struct {
+	coinType cointype.CoinType
+	value    int64
+}) *dcrutil.Tx {
+	tx := &wire.MsgTx{
+		Version: 1,
+		TxIn: []*wire.TxIn{
+			{
+				PreviousOutPoint: wire.OutPoint{},
+				SignatureScript:  []byte{},
+				Sequence:         wire.MaxTxInSequenceNum,
+			},
+		},
+		TxOut: make([]*wire.TxOut, len(outputs)),
+	}
+
+	for i, out := range outputs {
+		tx.TxOut[i] = &wire.TxOut{
+			Value:    out.value,
+			CoinType: out.coinType,
+			PkScript: []byte{0x51}, // OP_TRUE
+		}
+	}
+
+	return dcrutil.NewTx(tx)
+}
+
 // TestGetTransactionCoinType verifies transaction coin type determination.
 func TestGetTransactionCoinType(t *testing.T) {
 	testCases := []struct {
@@ -429,6 +593,67 @@ func TestGetTransactionCoinType(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			tx := createMockTransaction(tc.coinTypes)
+			coinType := GetTransactionCoinType(tx)
+
+			if coinType != tc.expectedType {
+				t.Errorf("Expected coin type %d, got %d", tc.expectedType, coinType)
+			}
+		})
+	}
+}
+
+// TestGetTransactionCoinTypeValueWeighted tests value-weighted coin type determination.
+func TestGetTransactionCoinTypeValueWeighted(t *testing.T) {
+	testCases := []struct {
+		name    string
+		outputs []struct {
+			coinType cointype.CoinType
+			value    int64
+		}
+		expectedType cointype.CoinType
+	}{
+		{
+			name: "Many dust outputs vs one large output",
+			outputs: []struct {
+				coinType cointype.CoinType
+				value    int64
+			}{
+				{cointype.CoinTypeVAR, 1},       // dust
+				{cointype.CoinTypeVAR, 1},       // dust
+				{cointype.CoinTypeVAR, 1},       // dust
+				{cointype.CoinType(1), 1000000}, // 1 coin
+			},
+			expectedType: cointype.CoinType(1), // SKA-1 wins by value
+		},
+		{
+			name: "Equal count but different values",
+			outputs: []struct {
+				coinType cointype.CoinType
+				value    int64
+			}{
+				{cointype.CoinTypeVAR, 100000}, // 0.1 coin
+				{cointype.CoinTypeVAR, 200000}, // 0.2 coin
+				{cointype.CoinType(2), 500000}, // 0.5 coin
+				{cointype.CoinType(2), 600000}, // 0.6 coin
+			},
+			expectedType: cointype.CoinType(2), // SKA-2 wins: 1.1 vs 0.3
+		},
+		{
+			name: "Zero value outputs should still count",
+			outputs: []struct {
+				coinType cointype.CoinType
+				value    int64
+			}{
+				{cointype.CoinTypeVAR, 0},
+				{cointype.CoinType(1), 1},
+			},
+			expectedType: cointype.CoinType(1),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tx := createMockTransactionWithValues(tc.outputs)
 			coinType := GetTransactionCoinType(tx)
 
 			if coinType != tc.expectedType {
