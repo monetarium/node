@@ -2731,6 +2731,46 @@ func (mp *TxPool) GetFeeCalculator() *fees.CoinTypeFeeCalculator {
 	return mp.feeCalculator
 }
 
+// ProcessConfirmedTransactions records confirmed transactions in the dual-coin fee calculator
+// This should be called during block processing before removing transactions from the mempool
+func (mp *TxPool) ProcessConfirmedTransactions(block *dcrutil.Block, isTreasuryEnabled bool) {
+	if mp.feeCalculator == nil {
+		return
+	}
+
+	processConfirmedTxs := func(txns []*dcrutil.Tx) {
+		for _, tx := range txns {
+			mp.mtx.RLock()
+			if poolTxDesc, exists := mp.pool[*tx.Hash()]; exists {
+				// Use the accurate coin type and fee data from mempool
+				primaryCoinType, err := mp.primaryCoinTypeFromInputs(nil, tx.MsgTx(), poolTxDesc.Type)
+				if err != nil {
+					// Fallback to output-based detection for edge cases
+					primaryCoinType = mp.determinePrimaryCoinType(tx.MsgTx())
+				}
+				txSize := int64(tx.MsgTx().SerializeSize())
+				mp.feeCalculator.RecordTransactionFee(primaryCoinType, poolTxDesc.Fee, txSize, true) // true = confirmed
+			}
+			mp.mtx.RUnlock()
+		}
+	}
+
+	// Process regular transactions (skip coinbase at index 0)
+	if len(block.Transactions()) > 1 {
+		processConfirmedTxs(block.Transactions()[1:])
+	}
+
+	// Process stake transactions
+	if isTreasuryEnabled {
+		// Skip treasurybase at index 0 if treasury is enabled
+		if len(block.STransactions()) > 1 {
+			processConfirmedTxs(block.STransactions()[1:])
+		}
+	} else {
+		processConfirmedTxs(block.STransactions())
+	}
+}
+
 // validateCoinTypeConsistency ensures that transactions don't mix coin types
 // (VAR inputs can only produce VAR outputs, SKA inputs can only produce SKA outputs)
 func (mp *TxPool) validateCoinTypeConsistency(tx *dcrutil.Tx, utxoView *blockchain.UtxoViewpoint) error {
@@ -2865,18 +2905,4 @@ func (mp *TxPool) validateCoinTypeConsistency(tx *dcrutil.Tx, utxoView *blockcha
 	}
 
 	return nil
-}
-
-// RecordConfirmedTransaction records a transaction fee as confirmed for fee estimation
-// Note: This uses output-based coin type detection as it doesn't have access to UTXOs.
-// For more accurate coin type detection, the blockchain should track fees per coin type.
-func (mp *TxPool) RecordConfirmedTransaction(tx *dcrutil.Tx, fee int64) {
-	if mp.feeCalculator != nil {
-		msgTx := tx.MsgTx()
-		// For confirmed transactions, we don't have the UTXO view,
-		// so we use output-based detection. This works for single-coin transactions.
-		primaryCoinType := mp.determinePrimaryCoinType(msgTx)
-		txSize := int64(msgTx.SerializeSize())
-		mp.feeCalculator.RecordTransactionFee(primaryCoinType, fee, txSize, true) // true = confirmed
-	}
 }

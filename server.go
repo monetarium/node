@@ -2894,6 +2894,11 @@ func (s *server) handleBlockchainNotification(notification *blockchain.Notificat
 		// estimator of the txs that are leaving
 		s.feeEstimator.ProcessBlock(block)
 
+		// Record confirmed transactions in the dual-coin fee calculator
+		// This must be done before removing transactions from the mempool
+		// so we can access the original coin type and fee information
+		s.txMemPool.ProcessConfirmedTransactions(block, isTreasuryEnabled)
+
 		// TODO: In the case the new tip disapproves the previous block, any
 		// transactions the previous block contains in its regular tree which
 		// double spend the same inputs as transactions in either tree of the
