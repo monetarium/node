@@ -247,6 +247,14 @@ func createEmissionAuthScript(auth *chaincfg.SKAEmissionAuth) ([]byte, error) {
 // ValidateAuthorizedSKAEmissionTransaction validates that a transaction is a valid
 // cryptographically authorized SKA emission transaction with full security controls
 // including signature verification and replay protection.
+//
+// This performs comprehensive validation beyond the fast detection in
+// wire.IsSKAEmissionTransaction, including:
+// - Cryptographic signature verification
+// - Nonce-based replay protection
+// - Emission window validation
+// - Authorization amount matching
+// - Governance parameter enforcement
 func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 	chain ChainStateProvider, chainParams *chaincfg.Params) error {
 

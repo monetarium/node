@@ -16,9 +16,6 @@ import (
 	"github.com/decred/dcrd/cointype"
 )
 
-// Note: CoinType alias removed - use cointype.CoinType directly
-// Note: CoinTypeVAR constant removed - use cointype.CoinTypeVAR directly
-
 // FeesByType represents transaction fees collected by coin type.
 // This map-based approach scales to handle all coin types (0-255) without
 // requiring separate variables for each coin type.
@@ -494,7 +491,8 @@ func (msg *MsgTx) mustSerialize(serType TxSerializeType) []byte {
 		}
 		fmt.Printf("  Expected SerializeSize: %d\n", msg.SerializeSize())
 		// Return empty byte slice as fallback
-		return []byte{}
+		panic(fmt.Sprintf("MsgTx failed serializing for type %v",
+			serType))
 	}
 	// Log successful serialization details for debugging
 	if len(serialized) == 0 {
@@ -1442,8 +1440,14 @@ func writeTxOut(w io.Writer, pver uint32, version uint16, to *TxOut) error {
 // IsSKAEmissionTransaction returns whether the given transaction is an SKA
 // emission transaction based on its structure. SKA emission transactions have
 // null inputs with authorized signature scripts and only produce SKA outputs.
-// This function is optimized for performance as it may be called frequently
-// to validate multiple SKA coin types (1-255).
+//
+// This function performs fast detection for categorization purposes and is
+// optimized for performance as it may be called frequently. For full validation
+// including cryptographic signature verification, use
+// ValidateAuthorizedSKAEmissionTransaction in the blockchain package.
+//
+// The signature script must contain: [SKA_marker:4][auth_version:1][nonce:8]
+// [coin_type:1][amount:8][height:8][pubkey:33][sig_len:1][signature:var]
 func IsSKAEmissionTransaction(tx *MsgTx) bool {
 	// Fast path: basic structure validation (most common rejection)
 	if len(tx.TxIn) != 1 || len(tx.TxOut) == 0 {
@@ -1456,21 +1460,23 @@ func IsSKAEmissionTransaction(tx *MsgTx) bool {
 		return false
 	}
 
-	// Optimized signature script checking (single format only)
+	// Check signature script has minimum length for valid authorization
+	// Minimum: 4(marker) + 1(version) + 8(nonce) + 1(cointype) + 8(amount) +
+	// 8(height) + 33(pubkey) + 1(siglen) = 64 bytes (plus variable signature)
 	sigScript := tx.TxIn[0].SignatureScript
-	if len(sigScript) < 4 {
+	if len(sigScript) < 64 {
 		return false
 	}
 
-	// Only check authorized format: [0x01][S][K][A]...
+	// Check authorized format: [0x01][S][K][A]...
 	if !(sigScript[0] == 0x01 && sigScript[1] == 0x53 &&
 		sigScript[2] == 0x4b && sigScript[3] == 0x41) {
 		return false
 	}
 
-	// Check all outputs are SKA coin types (1-255)
+	// Check all outputs are SKA coin types using standard method
 	for _, txOut := range tx.TxOut {
-		if txOut.CoinType == cointype.CoinTypeVAR || txOut.CoinType > 255 {
+		if !txOut.CoinType.IsSKA() {
 			return false
 		}
 	}
