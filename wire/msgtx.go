@@ -1460,11 +1460,11 @@ func IsSKAEmissionTransaction(tx *MsgTx) bool {
 		return false
 	}
 
-	// Check signature script has minimum length for valid authorization
-	// Minimum: 4(marker) + 1(version) + 8(nonce) + 1(cointype) + 8(amount) +
-	// 8(height) + 33(pubkey) + 1(siglen) = 64 bytes (plus variable signature)
+	// Check signature script has minimum length for SKA marker
+	// Minimum for basic detection: 4 bytes for [0x01][S][K][A] marker
+	// Full authorization requires 64+ bytes but that's validated elsewhere
 	sigScript := tx.TxIn[0].SignatureScript
-	if len(sigScript) < 64 {
+	if len(sigScript) < 4 {
 		return false
 	}
 
