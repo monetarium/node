@@ -120,10 +120,10 @@ func SimNetParams() *Params {
 		WorkDiffV2HalfLifeSecs:    6, // 6 * TimePerBlock
 
 		// Subsidy parameters.
-		BaseSubsidy:              50000000000,
-		MulSubsidy:               100,
-		DivSubsidy:               101,
-		SubsidyReductionInterval: 128,
+		BaseSubsidy:              6400000000, // 64 VAR per block (same as mainnet)
+		MulSubsidy:               1,          // Numerator for halving (1/2)
+		DivSubsidy:               2,          // Denominator for halving (1/2)
+		SubsidyReductionInterval: 128,        // Fast halving for testing
 		WorkRewardProportion:     6,
 		WorkRewardProportionV2:   5,
 		StakeRewardProportion:    3,

@@ -733,6 +733,144 @@ func createTreasuryBaseTx(subsidyCache *standalone.SubsidyCache, nextBlockHeight
 	return retTx, nil
 }
 
+// createSSFeeTx creates a stake fee distribution transaction for non-VAR coins.
+// These transactions distribute fees collected from non-VAR transactions to the
+// stakers who voted in the block.
+//
+// The transaction has:
+// - Version 3+ (same as modern votes)
+// - Single null input (like coinbase)
+// - Outputs to each voter proportional to their contribution
+// - All outputs have the same non-VAR coin type
+func createSSFeeTx(coinType cointype.CoinType, totalFee int64, voters []*dcrutil.Tx,
+	nextBlockHeight int64) (*dcrutil.Tx, error) {
+
+	// SSFee cannot be used for VAR fees (those go through SSGen)
+	if coinType == cointype.CoinTypeVAR {
+		return nil, fmt.Errorf("SSFee cannot distribute VAR fees")
+	}
+
+	// Need at least one voter to distribute to
+	if len(voters) == 0 {
+		return nil, fmt.Errorf("no voters to distribute fees to")
+	}
+
+	// Create OP_RETURN output for unique hash
+	heightBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(heightBytes, uint32(nextBlockHeight))
+	opReturnData := make([]byte, 0, 6)
+	opReturnData = append(opReturnData, []byte("SF")...) // Stake Fee marker
+	opReturnData = append(opReturnData, heightBytes...)
+	opReturnScript := make([]byte, 0, len(opReturnData)+2)
+	opReturnScript = append(opReturnScript, txscript.OP_RETURN)
+	opReturnScript = append(opReturnScript, txscript.OP_DATA_6)
+	opReturnScript = append(opReturnScript, opReturnData...)
+
+	// Create the SSFee transaction
+	tx := wire.NewMsgTx()
+	tx.Version = 3 // Same version as modern votes
+
+	// Add null input (like coinbase/treasurybase)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
+			wire.MaxPrevOutIndex, wire.TxTreeRegular),
+		Sequence:    wire.MaxTxInSequenceNum,
+		BlockHeight: wire.NullBlockHeight,
+		BlockIndex:  wire.NullBlockIndex,
+		ValueIn:     totalFee,
+	})
+
+	// Validate totalFee to prevent overflow
+	if totalFee < 0 {
+		return nil, fmt.Errorf("negative total fee: %d", totalFee)
+	}
+	if totalFee > math.MaxInt64/int64(len(voters)) {
+		return nil, fmt.Errorf("total fee too large for distribution: %d", totalFee)
+	}
+
+	// Find valid voters and track highest stake for remainder distribution
+	var highestStakeIdx int
+	var highestStakeValue int64
+	validVoters := make([]int, 0, len(voters))
+
+	for i, voter := range voters {
+		// Enhanced validation of voter transaction structure
+		msgTx := voter.MsgTx()
+		if msgTx == nil {
+			continue // Skip invalid transaction
+		}
+		if len(msgTx.TxOut) < 3 {
+			continue // Skip malformed vote
+		}
+
+		// The first reward output is at index 2
+		rewardOut := msgTx.TxOut[2]
+		if rewardOut == nil {
+			continue // Skip invalid reward output
+		}
+
+		// Validate reward output value for overflow protection
+		if rewardOut.Value < 0 {
+			continue // Skip negative values
+		}
+
+		validVoters = append(validVoters, i)
+
+		// Track highest stake voter for remainder distribution
+		if rewardOut.Value > highestStakeValue {
+			highestStakeValue = rewardOut.Value
+			highestStakeIdx = i
+		}
+	}
+
+	// Ensure we have valid voters after validation
+	if len(validVoters) == 0 {
+		return nil, fmt.Errorf("no valid voters found after validation")
+	}
+
+	// Calculate fee per valid voter (equal distribution)
+	validVotersCount := int64(len(validVoters))
+	feePerVoter := totalFee / validVotersCount
+	remainder := totalFee - (feePerVoter * validVotersCount)
+
+	// Create outputs for each valid voter
+	for _, voterIdx := range validVoters {
+		voter := voters[voterIdx]
+		rewardOut := voter.MsgTx().TxOut[2]
+
+		// Calculate this voter's fee amount
+		voterFee := feePerVoter
+		if voterIdx == highestStakeIdx && remainder > 0 {
+			// Highest stake voter gets any remainder from division
+			voterFee += remainder
+		}
+
+		// Validate final fee amount to prevent overflow
+		if voterFee < 0 || voterFee > totalFee {
+			return nil, fmt.Errorf("invalid voter fee calculated: %d", voterFee)
+		}
+
+		// Create output to voter
+		tx.AddTxOut(&wire.TxOut{
+			Value:    voterFee,
+			CoinType: coinType,
+			Version:  rewardOut.Version,
+			PkScript: rewardOut.PkScript,
+		})
+	}
+
+	// Add OP_RETURN output for unique hash (at the end)
+	tx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		CoinType: coinType,
+		PkScript: opReturnScript,
+	})
+
+	retTx := dcrutil.NewTx(tx)
+	retTx.SetTree(wire.TxTreeStake)
+	return retTx, nil
+}
+
 // spendTransaction updates the passed view by marking the inputs to the passed
 // transaction as spent.  It also adds all outputs in the passed transaction
 // which are not provably unspendable as available unspent transaction outputs.
@@ -2165,11 +2303,12 @@ nextPriorityQueueItem:
 	}
 
 	// Stake tx ordering in stake tree:
-	// 1. Stakebase
-	// 2. SSGen (votes).
-	// 3. SStx (fresh stake tickets).
-	// 4. SSRtx (revocations for missed tickets).
-	// 5. Stuff treasury payout in stake tree.
+	// 1. Stakebase/TreasuryBase (if treasury enabled)
+	// 2. SSGen (votes)
+	// 3. SSFee (non-VAR fee distributions to stakers)
+	// 4. SStx (fresh stake tickets)
+	// 5. SSRtx (revocations for missed tickets)
+	// 6. TAdd/TSpend (treasury operations if enabled)
 
 	// We have to figure out how many voters we have before adding the
 	// stakebase transaction.
@@ -2222,6 +2361,15 @@ nextPriorityQueueItem:
 	// Add the votes to blockTxnsStake since treasuryBase needs to come
 	// first.
 	blockTxnsStake = append(blockTxnsStake, votes...)
+
+	// Create SSFee transactions for non-VAR fees if we have voters
+	// This must happen after votes are added but before fresh stake tickets
+	var ssFeeTxns []*dcrutil.Tx
+	if nextBlockHeight >= stakeValidationHeight && voters > 0 {
+		// We'll calculate the fee split after all regular transactions are processed
+		// For now, just track that we need to create SSFee transactions
+		// The actual creation will happen after totalFees is calculated
+	}
 
 	// Set votebits, which determines whether the TxTreeRegular of the previous
 	// block is valid or not.
@@ -2419,6 +2567,51 @@ nextPriorityQueueItem:
 		for coinType := range totalFees {
 			scaledFee := totalFees[coinType] * int64(voters) / int64(g.cfg.ChainParams.TicketsPerBlock)
 			totalFees[coinType] = scaledFee
+		}
+
+		// Create SSFee transactions for non-VAR fees
+		if voters > 0 {
+			// Get subsidy proportions
+			work, stake, _, _ := standalone.GetSubsidyProportions(subsidySplitVariant)
+
+			// Calculate fee split between miners and stakers
+			minerFees, stakerFees := wire.CalcFeeSplitByCoinType(totalFees, work, stake)
+
+			// Create SSFee transactions for each non-VAR coin type with staker fees
+			for coinType, stakerFee := range stakerFees {
+				if coinType == cointype.CoinTypeVAR {
+					// VAR fees are distributed through votes (SSGen)
+					continue
+				}
+				if stakerFee <= 0 {
+					continue
+				}
+
+				// Create SSFee transaction for this coin type
+				ssFeeTx, err := createSSFeeTx(coinType, stakerFee, votes, nextBlockHeight)
+				if err != nil {
+					log.Warnf("Failed to create SSFee tx for coin type %d: %v", coinType, err)
+					continue
+				}
+
+				// Add to stake tree transactions
+				ssFeeTxns = append(ssFeeTxns, ssFeeTx)
+				blockTxnsStake = append(blockTxnsStake, ssFeeTx)
+
+				// Update block size
+				blockSize += uint32(ssFeeTx.MsgTx().SerializeSize())
+
+				// Track for fee accounting (SSFee has no input fees)
+				txFeesMap[*ssFeeTx.Hash()] = 0
+				txSigOpCountsMap[*ssFeeTx.Hash()] = 0
+
+				log.Debugf("Created SSFee tx for coin type %d, distributing %d to %d voters",
+					coinType, stakerFee, voters)
+			}
+
+			// Now update totalFees to only include miner portions
+			// (staker portions have been distributed via SSFee)
+			totalFees = minerFees
 		}
 	}
 
@@ -2634,10 +2827,10 @@ nextPriorityQueueItem:
 	}
 
 	log.Debugf("Created new block template (%d transactions, %d stake "+
-		"transactions, %d treasury transactions, %d in fees, %d signature "+
+		"transactions (%d SSFee), %d treasury transactions, %d in fees, %d signature "+
 		"operations, %d bytes, target difficulty %064x, stake difficulty %v)",
 		len(msgBlock.Transactions), len(msgBlock.STransactions),
-		totalTreasuryOps, totalFees.Total(), blockSigOps, blockSize,
+		len(ssFeeTxns), totalTreasuryOps, totalFees.Total(), blockSigOps, blockSize,
 		standalone.CompactToBig(msgBlock.Header.Bits),
 		dcrutil.Amount(msgBlock.Header.SBits).ToCoin())
 

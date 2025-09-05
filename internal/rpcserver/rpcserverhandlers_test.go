@@ -4305,9 +4305,9 @@ func TestHandleGetBlockSubsidy(t *testing.T) {
 		},
 		result: types.GetBlockSubsidyResult{
 			Developer: int64(0),
-			PoS:       int64(493028700),
-			PoW:       int64(986057401),
-			Total:     int64(1479086101),
+			PoS:       int64(1066666665),
+			PoW:       int64(2133333333),
+			Total:     int64(3199999998),
 		},
 	}, {
 		name:    "handleGetBlockSubsidy: modified subsidy split ok",
@@ -4323,9 +4323,9 @@ func TestHandleGetBlockSubsidy(t *testing.T) {
 		}(),
 		result: types.GetBlockSubsidyResult{
 			Developer: int64(0),
-			PoS:       int64(886673230),
-			PoW:       int64(110834154),
-			Total:     int64(997507384),
+			PoS:       int64(2560000000),
+			PoW:       int64(320000000),
+			Total:     int64(2880000000),
 		},
 	}, {
 		name:    "handleGetBlockSubsidy: modified subsidy split status failure",
@@ -4355,9 +4355,9 @@ func TestHandleGetBlockSubsidy(t *testing.T) {
 		}(),
 		result: types.GetBlockSubsidyResult{
 			Developer: int64(0),
-			PoS:       int64(784642840),
-			PoW:       int64(8816211),
-			Total:     int64(793459051),
+			PoS:       int64(2848000000),
+			PoW:       int64(32000000),
+			Total:     int64(2880000000),
 		},
 	}, {
 		name:    "handleGetBlockSubsidy: modified subsidy split r2 status failure",

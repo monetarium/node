@@ -2206,8 +2206,10 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 	stakeValidationHeight := uint32(b.chainParams.StakeValidationHeight)
 	var totalTickets, totalVotes, totalRevocations int64
 	var totalTreasuryAdd, totalTreasurySpend, totalTreasurybase int64
+	var totalSSFee int64
 	var totalYesVotes int64
 	var treasurySpendTxns []*wire.MsgTx
+	var ssFeeTxns []*wire.MsgTx
 	for txIdx, stx := range msgBlock.STransactions {
 		// A block must not have regular transactions in the stake transaction
 		// tree.
@@ -2248,6 +2250,18 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 
 		case stake.TxTypeSSRtx:
 			totalRevocations++
+
+		case stake.TxTypeSSFee:
+			// SSFee transactions distribute non-VAR fees to stakers
+			// They are allowed after stake validation height when fees are split
+			if header.Height < stakeValidationHeight {
+				str := fmt.Sprintf("block contains SSFee transaction at index %d "+
+					"before stake validation height %d", txIdx, stakeValidationHeight)
+				return ruleError(ErrStakeFees, str)
+			}
+			totalSSFee++
+			ssFeeTxns = append(ssFeeTxns, stx)
+			// SSFee transactions will be validated during fee distribution checks
 		}
 
 		// Count treasury-related stake transactions when the agenda is active.
@@ -2284,7 +2298,7 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 	// is performed here.
 	numStakeTx := int64(len(msgBlock.STransactions))
 	expectedNumStakeTx := totalTickets + totalVotes + totalRevocations +
-		totalTreasuryAdd + totalTreasurySpend + totalTreasurybase
+		totalTreasuryAdd + totalTreasurySpend + totalTreasurybase + totalSSFee
 	if numStakeTx != expectedNumStakeTx {
 		str := fmt.Sprintf("block contains an unexpected number of stake "+
 			"transactions (contains %d, expected %d)", numStakeTx,
@@ -2500,6 +2514,94 @@ func (b *BlockChain) checkBlockContext(block *dcrutil.Block, prevNode *blockNode
 	err = CheckSKAEmissionInBlock(block, blockHeight, b, b.chainParams)
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// validateSSFeeTxns validates that SSFee transactions properly distribute
+// non-VAR fees to the stakers who voted in the block.
+//
+// This function ensures:
+// - Each SSFee tx distributes fees for exactly one non-VAR coin type
+// - The total distributed matches the staker's share of fees for that coin type
+// - Distribution is proportional to vote contributions
+func (b *BlockChain) validateSSFeeTxns(block *dcrutil.Block, node *blockNode,
+	ssFeeTxns []*wire.MsgTx, totalFees wire.FeesByType, subsidySplitVariant standalone.SubsidySplitVariant) error {
+
+	// No validation needed if there are no SSFee transactions
+	if len(ssFeeTxns) == 0 {
+		return nil
+	}
+
+	// Calculate staker's share of fees by coin type
+	work, stake, _, _ := standalone.GetSubsidyProportions(subsidySplitVariant)
+	_, stakerFeesByType := wire.CalcFeeSplitByCoinType(totalFees, work, stake)
+
+	// Track which coin types have been distributed
+	distributedCoinTypes := make(map[cointype.CoinType]int64)
+
+	// Validate each SSFee transaction
+	for _, ssFeeTx := range ssFeeTxns {
+		// SSFee tx must have at least one output
+		if len(ssFeeTx.TxOut) == 0 {
+			return ruleError(ErrStakeFees,
+				"SSFee transaction has no outputs")
+		}
+
+		// Get the coin type from the first output (all must be the same)
+		coinType := ssFeeTx.TxOut[0].CoinType
+
+		// Verify this is not VAR (VAR fees are distributed via SSGen)
+		if coinType == cointype.CoinTypeVAR {
+			return ruleError(ErrStakeFees,
+				"SSFee transaction cannot distribute VAR fees")
+		}
+
+		// Check if we've already seen a distribution for this coin type
+		if _, exists := distributedCoinTypes[coinType]; exists {
+			return ruleError(ErrStakeFees,
+				fmt.Sprintf("duplicate SSFee transaction for coin type %d", coinType))
+		}
+
+		// Sum the total distributed in this SSFee tx
+		var totalDistributed int64
+		for _, out := range ssFeeTx.TxOut {
+			// Check for overflow before adding
+			if out.Value < 0 {
+				return ruleError(ErrStakeFees,
+					fmt.Sprintf("SSFee transaction has negative output value: %d", out.Value))
+			}
+			if totalDistributed > math.MaxInt64-out.Value {
+				return ruleError(ErrStakeFees,
+					"SSFee transaction total would overflow")
+			}
+			totalDistributed += out.Value
+		}
+
+		// Verify the total matches the staker's share for this coin type
+		expectedAmount := stakerFeesByType.Get(coinType)
+		if totalDistributed != expectedAmount {
+			return ruleError(ErrStakeFees,
+				fmt.Sprintf("SSFee for coin type %d distributes %d, expected %d",
+					coinType, totalDistributed, expectedAmount))
+		}
+
+		distributedCoinTypes[coinType] = totalDistributed
+	}
+
+	// Verify all non-VAR coin types with fees have been distributed
+	for coinType, amount := range stakerFeesByType {
+		if coinType == cointype.CoinTypeVAR {
+			continue // VAR fees are handled in SSGen
+		}
+		if amount > 0 {
+			if _, distributed := distributedCoinTypes[coinType]; !distributed {
+				return ruleError(ErrStakeFees,
+					fmt.Sprintf("missing SSFee transaction for coin type %d with %d fees",
+						coinType, amount))
+			}
+		}
 	}
 
 	return nil
@@ -4663,6 +4765,50 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block, parent *dcrutil.B
 		log.Tracef("checkTransactionsAndConnect failed for regular tree: %v",
 			err)
 		return err
+	}
+
+	// Validate SSFee transactions if present
+	// We need to compute the total fees from regular transactions to validate SSFee distributions
+	if node.height >= b.chainParams.StakeValidationHeight {
+		// Calculate total fees from regular tree
+		totalFees := wire.NewFeesByType()
+		for idx, tx := range block.Transactions()[1:] { // Skip coinbase
+			// Calculate transaction fee
+			var totalIn int64
+			for _, txIn := range tx.MsgTx().TxIn {
+				entry := view.LookupEntry(txIn.PreviousOutPoint)
+				if entry == nil {
+					continue // Already validated, skip error
+				}
+				totalIn += entry.Amount()
+			}
+			var totalOut int64
+			for _, txOut := range tx.MsgTx().TxOut {
+				totalOut += txOut.Value
+			}
+			txFee := totalIn - totalOut
+			if txFee > 0 {
+				coinType := wire.GetPrimaryCoinType(tx.MsgTx())
+				totalFees.Add(coinType, txFee)
+			}
+			_ = idx // Avoid unused variable warning
+		}
+
+		// Get SSFee transactions from the stake tree
+		var ssFeeTxns []*wire.MsgTx
+		for _, stx := range block.STransactions() {
+			if stake.DetermineTxType(stx.MsgTx()) == stake.TxTypeSSFee {
+				ssFeeTxns = append(ssFeeTxns, stx.MsgTx())
+			}
+		}
+
+		// Validate SSFee transactions if any exist
+		if len(ssFeeTxns) > 0 {
+			err = b.validateSSFeeTxns(block, node, ssFeeTxns, totalFees, subsidySplitVariant)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	// Enforce all relative lock times via sequence numbers for the regular

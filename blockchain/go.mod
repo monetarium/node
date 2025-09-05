@@ -5,6 +5,7 @@ go 1.23
 toolchain go1.23.4
 
 require (
+	github.com/decred/dcrd/blockchain/standalone/v2 v2.2.1
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.4
 	github.com/decred/dcrd/chaincfg/v3 v3.2.1
 	github.com/decred/dcrd/cointype v1.0.0
@@ -31,6 +32,10 @@ require (
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
 
+replace github.com/decred/dcrd/blockchain/standalone/v2 => ./standalone
+
 replace github.com/decred/dcrd/cointype => ../cointype
 
 replace github.com/decred/dcrd/database/v3 => ../database
+
+replace github.com/decred/dcrd/wire => ../wire

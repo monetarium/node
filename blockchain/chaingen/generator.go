@@ -14,6 +14,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/decred/dcrd/blockchain/standalone/v2"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/chaincfg/v3"
 	"github.com/decred/dcrd/crypto/rand"
@@ -2704,37 +2705,29 @@ func (g *Generator) NextBlock(blockName string, spend *SpendableOut, ticketSpend
 		coinbaseTx := g.CreateCoinbaseTx(nextHeight, numVotes)
 		regularTxns = []*wire.MsgTx{coinbaseTx}
 
-		// Increase the PoW subsidy to account for any fees in the stake tree.
-		// Fee distribution depends on whether we're before or after stake validation.
-		var minerShareOfFees dcrutil.Amount
+		// Use stake tree fees as total fees
+		// Note: stakeTreeFees already includes staker portions of regular transaction fees via SSFee transactions
+		// When users pay regular transaction fees, the staker portion creates SSFee transactions included in stakeTreeFees
+		var totalFees dcrutil.Amount = stakeTreeFees
+
+		// Distribute total fees based on stake validation height
+		var minerShareOfTotalFees dcrutil.Amount
 		if int64(nextHeight) < g.params.StakeValidationHeight {
 			// Before stake validation, miners get 100% of fees since there are no active stakers
-			minerShareOfFees = stakeTreeFees
+			minerShareOfTotalFees = totalFees
 		} else {
-			// After stake validation, fees are split 50/50 between miners and stakers
-			// This matches the validator's use of CalcFeeSplit with SSVMonetarium
-			const powProportion = 5
-			const totalProportions = 10 // 5 for pow, 5 for pos with 50/50 split
-			minerShareOfFees = (stakeTreeFees * powProportion) / totalProportions
+			// After stake validation, use the exact CalcFeeSplit function from standalone package
+			// This ensures perfect alignment with validator expectations using SSVMonetarium
+			minerFeesTotal, _ := standalone.CalcFeeSplit(int64(totalFees), standalone.SSVMonetarium)
+			minerShareOfTotalFees = dcrutil.Amount(minerFeesTotal)
 		}
-		coinbaseTx.TxOut[2].Value += int64(minerShareOfFees)
+		coinbaseTx.TxOut[2].Value += int64(minerShareOfTotalFees)
 
 		// Create a transaction to spend the provided utxo if needed.
 		if spend != nil {
-			// Create the transaction with a fee of 1 atom.
-			// Fee distribution follows the same rules as stake tree fees.
-			fee := dcrutil.Amount(1)
-			var minerShareOfRegularFee dcrutil.Amount
-			if int64(nextHeight) < g.params.StakeValidationHeight {
-				// Before stake validation, miners get 100% of fees
-				minerShareOfRegularFee = fee
-			} else {
-				// After stake validation, fees are split 50/50
-				const powProportion = 5
-				const totalProportions = 10
-				minerShareOfRegularFee = (fee * powProportion) / totalProportions
-			}
-			coinbaseTx.TxOut[2].Value += int64(minerShareOfRegularFee)
+			// Create the transaction with a fee of 2 atoms.
+			// Fee distribution is already handled above in totalFees calculation.
+			fee := dcrutil.Amount(2)
 
 			// Create a transaction that spends from the provided
 			// spendable output and includes an additional unique

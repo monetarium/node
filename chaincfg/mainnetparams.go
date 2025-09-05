@@ -119,10 +119,10 @@ func MainNetParams() *Params {
 		WorkDiffV2HalfLifeSecs:    43200, // 144 * TimePerBlock (12 hours)
 
 		// Subsidy parameters.
-		BaseSubsidy:              3119582664, // 21m
-		MulSubsidy:               100,
-		DivSubsidy:               101,
-		SubsidyReductionInterval: 6144,
+		BaseSubsidy:              6400000000, // 64 VAR per block
+		MulSubsidy:               1,          // Numerator for halving (1/2)
+		DivSubsidy:               2,          // Denominator for halving (1/2)
+		SubsidyReductionInterval: 420480,     // ~4 years (420,480 blocks)
 		WorkRewardProportion:     6,
 		WorkRewardProportionV2:   5,
 		StakeRewardProportion:    3,

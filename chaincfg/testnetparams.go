@@ -116,10 +116,10 @@ func TestNet3Params() *Params {
 		WorkDiffV2HalfLifeSecs:    720, // 6 * TimePerBlock (12 minutes)
 
 		// Subsidy parameters.
-		BaseSubsidy:              2500000000, // 25 Coin
-		MulSubsidy:               100,
-		DivSubsidy:               101,
-		SubsidyReductionInterval: 2048,
+		BaseSubsidy:              6400000000, // 64 VAR per block (same as mainnet)
+		MulSubsidy:               1,          // Numerator for halving (1/2)
+		DivSubsidy:               2,          // Denominator for halving (1/2)
+		SubsidyReductionInterval: 52560,      // ~6 months for testnet (faster than mainnet)
 		WorkRewardProportion:     6,
 		WorkRewardProportionV2:   5,
 		StakeRewardProportion:    3,

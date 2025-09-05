@@ -31,3 +31,5 @@ require (
 )
 
 replace github.com/decred/dcrd/cointype => ../../cointype
+
+replace github.com/decred/dcrd/wire => ../../wire

@@ -36,6 +36,7 @@ const (
 	TxTypeTAdd
 	TxTypeTSpend
 	TxTypeTreasuryBase
+	TxTypeSSFee // Stake fee distribution for non-VAR coin types
 )
 
 const (
@@ -78,6 +79,15 @@ const (
 	// are all outputs to the addresses specified in the OP_RETURNs of the
 	// original SStx referenced.
 	MaxOutputsPerSSRtx = MaxInputsPerSStx
+
+	// NumInputsPerSSFee is the exact number of inputs for an SSFee
+	// (stake fee distribution) tx. It has a single null input like coinbase.
+	NumInputsPerSSFee = 1
+
+	// MaxOutputsPerSSFee is the maximum number of outputs in an SSFee tx,
+	// which distributes fees to stakers who voted in the block.
+	// Maximum of 5 votes per block means max 5 outputs for fee distributions.
+	MaxOutputsPerSSFee = 5
 
 	// SStxPKHMinOutSize is the minimum size of an OP_RETURN commitment output
 	// for an SStx tx.
@@ -1268,6 +1278,66 @@ func IsSSRtx(tx *wire.MsgTx) bool {
 	return CheckSSRtx(tx) == nil
 }
 
+// CheckSSFee returns an error if a transaction is not a stake fee distribution
+// transaction. These transactions distribute non-VAR fees to stakers.
+//
+// SSFee transactions are specified as below:
+// Inputs: Single null input (like coinbase/treasurybase)
+// Outputs: Fee distributions to stakers (max 5, one per voter)
+//
+// The transaction must have:
+// - Version >= 3 (same as votes after DCP0001)
+// - Exactly 1 input (null input)
+// - Between 1 and MaxOutputsPerSSFee outputs
+// - All outputs must have the same non-VAR coin type
+func CheckSSFee(tx *wire.MsgTx) error {
+	// Check version (must be at least version 3 like modern votes)
+	const minSSFeeVersion = 3
+	if tx.Version < minSSFeeVersion {
+		return fmt.Errorf("SSFee tx version %d less than required %d",
+			tx.Version, minSSFeeVersion)
+	}
+
+	// Check number of inputs (must be exactly 1 null input)
+	if len(tx.TxIn) != NumInputsPerSSFee {
+		return fmt.Errorf("SSFee tx has %d inputs, expected %d",
+			len(tx.TxIn), NumInputsPerSSFee)
+	}
+
+	// Verify null input
+	if tx.TxIn[0].PreviousOutPoint.Index != wire.MaxPrevOutIndex {
+		return fmt.Errorf("SSFee tx input is not null")
+	}
+
+	// Check number of outputs
+	if len(tx.TxOut) < 1 || len(tx.TxOut) > MaxOutputsPerSSFee {
+		return fmt.Errorf("SSFee tx has %d outputs, expected 1-%d",
+			len(tx.TxOut), MaxOutputsPerSSFee)
+	}
+
+	// All outputs must have the same coin type (and it must not be VAR)
+	if len(tx.TxOut) > 0 {
+		firstCoinType := tx.TxOut[0].CoinType
+		if firstCoinType == cointype.CoinTypeVAR {
+			return fmt.Errorf("SSFee tx cannot distribute VAR fees (use SSGen)")
+		}
+		for i, out := range tx.TxOut {
+			if out.CoinType != firstCoinType {
+				return fmt.Errorf("SSFee tx output %d has coin type %d, expected %d",
+					i, out.CoinType, firstCoinType)
+			}
+		}
+	}
+
+	return nil
+}
+
+// IsSSFee returns whether or not a transaction is a stake fee distribution
+// transaction.
+func IsSSFee(tx *wire.MsgTx) bool {
+	return CheckSSFee(tx) == nil
+}
+
 // DetermineTxType determines the type of stake transaction a transaction is; if
 // none, it returns that it is an assumed regular tx.
 func DetermineTxType(tx *wire.MsgTx) TxType {
@@ -1279,6 +1349,11 @@ func DetermineTxType(tx *wire.MsgTx) TxType {
 	}
 	if IsSSRtx(tx) {
 		return TxTypeSSRtx
+	}
+	// Check for SSFee before treasury transactions
+	// SSFee uses version 3+ but doesn't require treasury version
+	if IsSSFee(tx) {
+		return TxTypeSSFee
 	}
 	if tx.Version >= wire.TxVersionTreasury {
 		if IsTAdd(tx) {
