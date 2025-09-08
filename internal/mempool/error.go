@@ -78,8 +78,10 @@ const (
 	// allowed by the active policy.
 	ErrFeeTooHigh = ErrorKind("ErrFeeTooHigh")
 
-	// ErrMixedCoinTypes indicates a transaction attempts to mix different
-	// coin types (VAR and SKA) which is not allowed.
+	// ErrMixedCoinTypes indicates a transaction contains inputs or outputs
+	// of different coin types. Each transaction must use a single coin type
+	// for all inputs and outputs to maintain clear separation between VAR
+	// and SKA economies.
 	ErrMixedCoinTypes = ErrorKind("ErrMixedCoinTypes")
 
 	// ErrOrphan indicates a transaction is an orphan.

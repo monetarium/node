@@ -522,11 +522,11 @@ func standardTreasurybaseOpReturn(height uint32) ([]byte, error) {
 // Once the agenda is active, it returns the combined merkle root for the
 // regular and stake transaction trees in accordance with DCP0005.
 func calcBlockMerkleRoot(regularTxns, stakeTxns []*wire.MsgTx, hdrCmtActive bool) chainhash.Hash {
-	// Debug logging for dual-coin transactions in block template
+	// Debug logging for non-VAR coin type transactions in block template
 	for i, tx := range regularTxns {
 		if len(tx.TxOut) > 0 && tx.TxOut[0].CoinType != 0 {
 			txHash := tx.TxHashFull()
-			log.Debugf("DEBUG: Block template - tx[%d] hash=%x (dual-coin)", i, txHash[:8])
+			log.Debugf("DEBUG: Block template - tx[%d] hash=%x (coin type %d)", i, txHash[:8], tx.TxOut[0].CoinType)
 		}
 	}
 
@@ -2132,7 +2132,17 @@ nextPriorityQueueItem:
 				miningView.reject(bundledTx.Tx.Hash())
 				continue nextPriorityQueueItem
 			}
-			// Skip script validation for SKA emission transactions
+			// Skip standard script validation for SKA emission transactions.
+			// SKA emissions use a special authorization format in the signature script
+			// that doesn't follow standard script patterns. Instead, they are validated
+			// through ValidateAuthorizedSKAEmissionTransaction which performs:
+			// - Cryptographic signature verification binding to the transaction
+			// - Admin key authorization checks
+			// - Nonce-based replay protection
+			// - Network ID verification
+			// - Emission window and amount validation
+			// This comprehensive validation happens during block validation, ensuring
+			// SKA emissions are secure despite bypassing standard script checks.
 			if !wire.IsSKAEmissionTransaction(bundledTx.Tx.MsgTx()) {
 				err = g.cfg.ValidateTransactionScripts(bundledTx.Tx, blockUtxos,
 					scriptFlags, isAutoRevocationsEnabled)
@@ -2579,8 +2589,17 @@ nextPriorityQueueItem:
 	// Scale the fees according to the number of voters once stake validation
 	// height is reached.
 	if nextBlockHeight >= stakeValidationHeight {
-		// Scale all coin type fees proportionally
+		// Scale all coin type fees proportionally with overflow protection
 		for coinType := range totalFees {
+			// Check for potential overflow before multiplication
+			// MaxInt64 / voters gives us the max safe value for totalFees[coinType]
+			if voters > 0 && totalFees[coinType] > math.MaxInt64/int64(voters) {
+				// Fee would overflow, cap it at maximum safe value
+				log.Warnf("Fee overflow protection triggered for coin type %d: capping fee at maximum safe value", coinType)
+				totalFees[coinType] = math.MaxInt64 / int64(voters)
+			}
+			
+			// Now safe to scale
 			scaledFee := totalFees[coinType] * int64(voters) / int64(g.cfg.ChainParams.TicketsPerBlock)
 			totalFees[coinType] = scaledFee
 		}
@@ -2606,8 +2625,10 @@ nextPriorityQueueItem:
 				// Create SSFee transaction for this coin type
 				ssFeeTx, err := createSSFeeTx(coinType, stakerFee, votes, nextBlockHeight)
 				if err != nil {
-					log.Warnf("Failed to create SSFee tx for coin type %d: %v", coinType, err)
-					continue
+					// Critical error: staker fees cannot be distributed
+					// This is a serious issue as fees would be lost if we continue
+					return nil, fmt.Errorf("failed to create staker SSFee tx for coin type %d (amount: %d): %w",
+						coinType, stakerFee, err)
 				}
 
 				// Add to stake tree transactions
@@ -2641,8 +2662,10 @@ nextPriorityQueueItem:
 			// Create miner SSFee transaction for this coin type
 			minerSSFeeTx, err := createMinerSSFeeTx(coinType, minerFee, payToAddress, nextBlockHeight)
 			if err != nil {
-				log.Warnf("Failed to create miner SSFee tx for coin type %d: %v", coinType, err)
-				continue
+				// Critical error: miner fees cannot be distributed
+				// This is a serious issue as fees would be lost if we continue
+				return nil, fmt.Errorf("failed to create miner SSFee tx for coin type %d (amount: %d): %w",
+					coinType, minerFee, err)
 			}
 
 			// Add to stake tree transactions

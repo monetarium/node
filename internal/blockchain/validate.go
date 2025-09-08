@@ -1877,11 +1877,11 @@ func (b *BlockChain) checkMerkleRoots(block *wire.MsgBlock, prevNode *blockNode)
 		// leaves to another merkle tree and ensure the final calculated merkle
 		// root matches the entry in the block header.
 
-		// Debug logging for dual-coin transactions
+		// Debug logging for non-VAR coin type transactions
 		for i, tx := range block.Transactions {
 			if len(tx.TxOut) > 0 && tx.TxOut[0].CoinType != 0 {
 				txHash := tx.TxHashFull()
-				log.Debugf("DEBUG: Block validation - tx[%d] hash=%x (dual-coin)", i, txHash[:8])
+				log.Debugf("DEBUG: Block validation - tx[%d] hash=%x (coin type %d)", i, txHash[:8], tx.TxOut[0].CoinType)
 			}
 		}
 
@@ -3590,8 +3590,8 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 		return txFeeInAtom, nil
 	}
 
-	// For dual-coin transactions, implement proper dual-coin input/output validation
-	// Separate input tracking by coin type using UTXO coin type information
+	// For single-coin-type transactions, validate that all inputs and outputs
+	// use the same coin type. Track input values by coin type from UTXOs.
 	var totalVARIn int64
 	skaIn := make(map[cointype.CoinType]int64)
 
