@@ -2523,6 +2523,15 @@ func New(ctx context.Context, config *Config) (*BlockChain, error) {
 	}
 	b.pruner = newChainPruner(&b)
 
+	// Validate SKA emission parameters
+	// Ensure all SKA emissions happen after stake validation is active
+	for coinType, skaConfig := range params.SKACoins {
+		if skaConfig.EmissionHeight > 0 && int64(skaConfig.EmissionHeight) < params.StakeValidationHeight {
+			return nil, fmt.Errorf("SKA coin type %d emission height %d is before stake validation height %d",
+				coinType, skaConfig.EmissionHeight, params.StakeValidationHeight)
+		}
+	}
+
 	// Initialize the SKA emission state for tracking nonces and emissions.
 	// This must be done before chain state initialization as it may be
 	// referenced during block validation.

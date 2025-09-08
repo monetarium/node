@@ -35,7 +35,7 @@ func TestChainParamsSKAConfiguration(t *testing.T) {
 				minRelayFee        int64
 			}{
 				ska1EmissionAmount: 1e6 * 1e8, // 1 million SKA-1
-				ska1EmissionHeight: 10,        // Early emission for testing
+				ska1EmissionHeight: 150,       // After stake validation to preserve SKA fees
 				ska1Active:         true,      // Active in simnet
 				minRelayFee:        1e3,       // 0.00001 SKA
 			},

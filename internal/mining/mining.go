@@ -871,6 +871,83 @@ func createSSFeeTx(coinType cointype.CoinType, totalFee int64, voters []*dcrutil
 	return retTx, nil
 }
 
+// createMinerSSFeeTx creates a miner fee distribution transaction for non-VAR coins.
+// These transactions distribute fees collected from non-VAR transactions to the miner.
+//
+// The transaction has:
+// - Version 3+ (same as SSFee for stakers)
+// - Single null input (like coinbase)
+// - Single output to the miner address
+// - The output has the specified non-VAR coin type
+func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
+	minerAddress stdaddr.Address, nextBlockHeight int64) (*dcrutil.Tx, error) {
+
+	// SSFee cannot be used for VAR fees (those go through coinbase)
+	if coinType == cointype.CoinTypeVAR {
+		return nil, fmt.Errorf("miner SSFee cannot distribute VAR fees")
+	}
+
+	// Validate fee amount
+	if totalFee <= 0 {
+		return nil, fmt.Errorf("invalid fee amount: %d", totalFee)
+	}
+
+	// Create OP_RETURN output for unique hash
+	heightBytes := make([]byte, 4)
+	binary.LittleEndian.PutUint32(heightBytes, uint32(nextBlockHeight))
+	opReturnData := make([]byte, 0, 6)
+	opReturnData = append(opReturnData, []byte("MF")...) // Miner Fee marker
+	opReturnData = append(opReturnData, heightBytes...)
+	opReturnScript := make([]byte, 0, len(opReturnData)+2)
+	opReturnScript = append(opReturnScript, txscript.OP_RETURN)
+	opReturnScript = append(opReturnScript, txscript.OP_DATA_6)
+	opReturnScript = append(opReturnScript, opReturnData...)
+
+	// Create the miner SSFee transaction
+	tx := wire.NewMsgTx()
+	tx.Version = 3 // Same version as staker SSFee
+
+	// Add null input (like coinbase/treasurybase)
+	tx.AddTxIn(&wire.TxIn{
+		PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
+			wire.MaxPrevOutIndex, wire.TxTreeRegular),
+		Sequence:    wire.MaxTxInSequenceNum,
+		BlockHeight: wire.NullBlockHeight,
+		BlockIndex:  wire.NullBlockIndex,
+		ValueIn:     totalFee,
+	})
+
+	// Create payment script for the miner address or anyone-can-spend if nil
+	var scriptVersion uint16
+	var payScript []byte
+	if minerAddress != nil {
+		scriptVersion, payScript = minerAddress.PaymentScript()
+	} else {
+		// Fallback to anyone-can-spend (matches coinbase fallback behavior)
+		scriptVersion = 0
+		payScript = opTrueScript
+	}
+
+	// Create single output to miner
+	tx.AddTxOut(&wire.TxOut{
+		Value:    totalFee,
+		CoinType: coinType,
+		Version:  scriptVersion,
+		PkScript: payScript,
+	})
+
+	// Add OP_RETURN output for unique hash (at the end)
+	tx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		CoinType: coinType,
+		PkScript: opReturnScript,
+	})
+
+	retTx := dcrutil.NewTx(tx)
+	retTx.SetTree(wire.TxTreeStake)
+	return retTx, nil
+}
+
 // spendTransaction updates the passed view by marking the inputs to the passed
 // transaction as spent.  It also adds all outputs in the passed transaction
 // which are not provably unspendable as available unspent transaction outputs.
@@ -1370,67 +1447,6 @@ func calcCoinTypeAwareFeePerKb(txDesc *TxDesc, ancestorStats *TxAncestorStats,
 //	|                                   |   |
 //	 -----------------------------------  --
 //
-// addFeesToCoinbase adds fees from different coin types to the coinbase transaction.
-// VAR fees are added to the existing PoW output, while other coin types get new outputs.
-func addFeesToCoinbase(coinbaseTx *wire.MsgTx, totalFees wire.FeesByType, powOutputIdx int, payToAddress stdaddr.Address) error {
-	log.Debugf("DEBUG: addFeesToCoinbase - powOutputIdx=%d, totalFees=%v", powOutputIdx, totalFees)
-
-	// Log initial coinbase outputs
-	log.Debugf("DEBUG: addFeesToCoinbase - Initial coinbase has %d outputs:", len(coinbaseTx.TxOut))
-	for i, out := range coinbaseTx.TxOut {
-		log.Debugf("DEBUG: addFeesToCoinbase - Initial Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
-	}
-
-	// Add VAR fees to existing PoW output
-	varFees := totalFees.Get(cointype.CoinTypeVAR)
-	if varFees > 0 {
-		log.Debugf("DEBUG: addFeesToCoinbase - Adding VAR fees %d to output[%d]", varFees, powOutputIdx)
-		coinbaseTx.TxOut[powOutputIdx].Value += varFees
-	}
-
-	// Create new outputs for other coin types
-	for _, coinType := range totalFees.Types() {
-		if coinType == cointype.CoinTypeVAR {
-			continue // Already handled above
-		}
-
-		feeAmount := totalFees.Get(coinType)
-		if feeAmount <= 0 {
-			continue // Skip zero/negative fees
-		}
-
-		// Create payment script for the miner address or anyone-can-spend if nil
-		var scriptVersion uint16
-		var payScript []byte
-		if payToAddress != nil {
-			scriptVersion, payScript = payToAddress.PaymentScript()
-		} else {
-			// Fallback to anyone-can-spend (matches coinbase fallback behavior)
-			scriptVersion = 0
-			payScript = opTrueScript
-		}
-
-		// Create new output for this coin type's fees
-		feeOutput := &wire.TxOut{
-			Value:    feeAmount,
-			CoinType: coinType,
-			Version:  scriptVersion,
-			PkScript: payScript,
-		}
-
-		coinbaseTx.TxOut = append(coinbaseTx.TxOut, feeOutput)
-		log.Debugf("DEBUG: addFeesToCoinbase - Added fee output for coinType %d with value %d", coinType, feeAmount)
-	}
-
-	// Log final coinbase outputs
-	log.Debugf("DEBUG: addFeesToCoinbase - Final coinbase has %d outputs:", len(coinbaseTx.TxOut))
-	for i, out := range coinbaseTx.TxOut {
-		log.Debugf("DEBUG: addFeesToCoinbase - Final Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
-	}
-
-	return nil
-}
-
 // This function returns nil when there are not enough voters on any of the
 // current top blocks to create a new block template.
 func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress stdaddr.Address) (*BlockTemplate, error) {
@@ -2569,14 +2585,14 @@ nextPriorityQueueItem:
 			totalFees[coinType] = scaledFee
 		}
 
-		// Create SSFee transactions for non-VAR fees
+		// Get subsidy proportions for fee splitting
+		work, stake, _, _ := standalone.GetSubsidyProportions(subsidySplitVariant)
+
+		// Calculate fee split between miners and stakers
+		minerFees, stakerFees := wire.CalcFeeSplitByCoinType(totalFees, work, stake)
+
+		// Create SSFee transactions for staker fees if there are voters
 		if voters > 0 {
-			// Get subsidy proportions
-			work, stake, _, _ := standalone.GetSubsidyProportions(subsidySplitVariant)
-
-			// Calculate fee split between miners and stakers
-			minerFees, stakerFees := wire.CalcFeeSplitByCoinType(totalFees, work, stake)
-
 			// Create SSFee transactions for each non-VAR coin type with staker fees
 			for coinType, stakerFee := range stakerFees {
 				if coinType == cointype.CoinTypeVAR {
@@ -2608,11 +2624,47 @@ nextPriorityQueueItem:
 				log.Debugf("Created SSFee tx for coin type %d, distributing %d to %d voters",
 					coinType, stakerFee, voters)
 			}
-
-			// Now update totalFees to only include miner portions
-			// (staker portions have been distributed via SSFee)
-			totalFees = minerFees
 		}
+
+		// Create miner SSFee transactions for non-VAR miner fees
+		// This distributes non-VAR fees to miners through SSFee transactions
+		// instead of adding them to the coinbase, maintaining coin type separation
+		for coinType, minerFee := range minerFees {
+			if coinType == cointype.CoinTypeVAR {
+				// VAR fees go to coinbase, not SSFee
+				continue
+			}
+			if minerFee <= 0 {
+				continue
+			}
+
+			// Create miner SSFee transaction for this coin type
+			minerSSFeeTx, err := createMinerSSFeeTx(coinType, minerFee, payToAddress, nextBlockHeight)
+			if err != nil {
+				log.Warnf("Failed to create miner SSFee tx for coin type %d: %v", coinType, err)
+				continue
+			}
+
+			// Add to stake tree transactions
+			ssFeeTxns = append(ssFeeTxns, minerSSFeeTx)
+			blockTxnsStake = append(blockTxnsStake, minerSSFeeTx)
+
+			// Update block size
+			blockSize += uint32(minerSSFeeTx.MsgTx().SerializeSize())
+
+			// Track for fee accounting (SSFee has no input fees)
+			txFeesMap[*minerSSFeeTx.Hash()] = 0
+			txSigOpCountsMap[*minerSSFeeTx.Hash()] = 0
+
+			log.Debugf("Created miner SSFee tx for coin type %d, distributing %d to miner",
+				coinType, minerFee)
+		}
+
+		// Now update totalFees to only include VAR miner fees for the coinbase
+		// All non-VAR fees have been distributed via SSFee transactions
+		varFeesOnly := wire.NewFeesByType()
+		varFeesOnly.Add(cointype.CoinTypeVAR, minerFees.Get(cointype.CoinTypeVAR))
+		totalFees = varFeesOnly
 	}
 
 	txSigOpCounts = append(txSigOpCounts, numCoinbaseSigOps)
@@ -2628,11 +2680,11 @@ nextPriorityQueueItem:
 		if isTreasuryEnabled {
 			powOutputIdx = 1
 		}
-		// Add fees to coinbase - VAR fees go to existing PoW output,
-		// other coin types get new outputs
-		err := addFeesToCoinbase(coinbaseTx.MsgTx(), totalFees, powOutputIdx, payToAddress)
-		if err != nil {
-			return nil, err
+		// Add VAR fees to coinbase - only VAR fees go to the PoW output
+		// Non-VAR fees have already been distributed via miner SSFee transactions
+		varFees := totalFees.Get(cointype.CoinTypeVAR)
+		if varFees > 0 {
+			coinbaseTx.MsgTx().TxOut[powOutputIdx].Value += varFees
 		}
 		txFees[0] = -totalFees.Total()
 	}

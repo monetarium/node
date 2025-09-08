@@ -996,153 +996,6 @@ func CheckBlockSanity(block *dcrutil.Block, timeSource MedianTimeSource, chainPa
 	return checkBlockSanity(block, timeSource, BFNone, chainParams)
 }
 
-// validateCoinbaseMultiOutput performs detailed validation of multi-output
-// coinbase transactions to ensure proper fee distribution by coin type.
-// This validation ensures that:
-// 1. The coinbase output structure is valid (no duplicate coin types)
-// 2. Fee outputs match exactly the collected fees by coin type
-// 3. The subsidy output is correctly formed (VAR coin type)
-// 4. All outputs have valid coin types and consistent addresses
-func validateCoinbaseMultiOutput(coinbaseTx *wire.MsgTx, expectedFees wire.FeesByType, subsidyAmount int64) error {
-	outputs := coinbaseTx.TxOut
-	if len(outputs) == 0 {
-		return ruleError(ErrBadCoinbaseOutputStructure, "coinbase has no outputs")
-	}
-
-	// Track coin types we've seen to detect duplicates
-	seenCoinTypes := make(map[cointype.CoinType]int)
-
-	// Track fee amounts we've found in outputs
-	foundFees := wire.NewFeesByType()
-
-	// Track subsidy output
-	var subsidyOutput *wire.TxOut
-	var subsidyOutputIdx int = -1
-
-	// Analyze each output
-	for i, output := range outputs {
-		coinType := output.CoinType
-
-		// Note: CoinType is uint8, so 0-255 range is enforced by type system
-		// No additional validation needed for coin type range
-
-		// Track coin type occurrences
-		seenCoinTypes[coinType]++
-
-		// For non-VAR coin types, only one output per coin type is allowed
-		// VAR can have multiple outputs (subsidy + fees)
-		if coinType != cointype.CoinTypeVAR && seenCoinTypes[coinType] > 1 {
-			return ruleError(ErrBadCoinbaseOutputStructure,
-				fmt.Sprintf("coinbase has duplicate outputs for coin type %d", coinType))
-		}
-
-		// Identify subsidy output (should be VAR output with highest value)
-		if coinType == cointype.CoinTypeVAR {
-			if subsidyOutputIdx == -1 || output.Value > subsidyOutput.Value {
-				// First VAR output or a VAR output with higher value
-				if subsidyOutputIdx != -1 {
-					// Previous candidate becomes a fee output
-					log.Debugf("DEBUG: validateCoinbaseMultiOutput - Previous subsidy candidate[%d] with value %d becomes fee output", subsidyOutputIdx, subsidyOutput.Value)
-					foundFees.Add(coinType, subsidyOutput.Value)
-				}
-				log.Debugf("DEBUG: validateCoinbaseMultiOutput - Found new subsidy output[%d]: Value=%d, CoinType=%d", i, output.Value, output.CoinType)
-				subsidyOutput = output
-				subsidyOutputIdx = i
-			} else {
-				// This is a fee output for VAR
-				log.Debugf("DEBUG: validateCoinbaseMultiOutput - Found VAR fee output[%d]: Value=%d", i, output.Value)
-				foundFees.Add(coinType, output.Value)
-			}
-		} else {
-			// This is a fee output for a non-VAR coin type
-			foundFees.Add(coinType, output.Value)
-		}
-	}
-
-	// Validate that we have a subsidy output
-	if subsidyOutput == nil {
-		return ruleError(ErrBadCoinbaseOutputStructure, "coinbase missing VAR subsidy output")
-	}
-
-	// Validate subsidy output amount (should be subsidy + VAR fees)
-	expectedSubsidyAmount := subsidyAmount + expectedFees.Get(cointype.CoinTypeVAR)
-
-	// DEBUG: Log validation details
-	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyOutput.Value=%d, expectedSubsidyAmount=%d", subsidyOutput.Value, expectedSubsidyAmount)
-	log.Debugf("DEBUG: validateCoinbaseMultiOutput - subsidyAmount=%d, VAR fees=%d", subsidyAmount, expectedFees.Get(cointype.CoinTypeVAR))
-	log.Debugf("DEBUG: validateCoinbaseMultiOutput - coinbase has %d outputs:", len(coinbaseTx.TxOut))
-	for i, out := range coinbaseTx.TxOut {
-		log.Debugf("DEBUG: validateCoinbaseMultiOutput - Output[%d]: Value=%d, CoinType=%d", i, out.Value, out.CoinType)
-	}
-
-	if subsidyOutput.Value != expectedSubsidyAmount {
-		return ruleError(ErrBadCoinbaseFeeDistribution,
-			fmt.Sprintf("subsidy output amount mismatch: got %d, expected %d (subsidy %d + VAR fees %d)",
-				subsidyOutput.Value, expectedSubsidyAmount, subsidyAmount, expectedFees.Get(cointype.CoinTypeVAR)))
-	}
-
-	// Validate fee outputs match expected fees exactly
-	for _, coinType := range expectedFees.Types() {
-		if coinType == cointype.CoinTypeVAR {
-			continue // Already validated above in subsidy output
-		}
-
-		expectedAmount := expectedFees.Get(coinType)
-		foundAmount := foundFees.Get(coinType)
-
-		if foundAmount != expectedAmount {
-			return ruleError(ErrBadCoinbaseFeeDistribution,
-				fmt.Sprintf("fee output mismatch for coin type %d: got %d, expected %d",
-					coinType, foundAmount, expectedAmount))
-		}
-	}
-
-	// Validate that we don't have unexpected fee outputs
-	for _, coinType := range foundFees.Types() {
-		if expectedFees.Get(coinType) == 0 {
-			return ruleError(ErrBadCoinbaseFeeDistribution,
-				fmt.Sprintf("unexpected fee output for coin type %d with amount %d",
-					coinType, foundFees.Get(coinType)))
-		}
-	}
-
-	// Validate script consistency (all payment outputs should pay to the same address)
-	// Find first non-zero-value output as reference for payment script
-	var referenceScript []byte
-	var referenceVersion uint16
-	var referenceFound bool
-
-	for _, output := range outputs {
-		if output.Value > 0 {
-			referenceScript = output.PkScript
-			referenceVersion = output.Version
-			referenceFound = true
-			break
-		}
-	}
-
-	// If we have payment outputs, ensure they all use the same script
-	if referenceFound {
-		for i, output := range outputs {
-			// Skip zero-value outputs (like OP_RETURN)
-			if output.Value == 0 {
-				continue
-			}
-
-			if !bytes.Equal(output.PkScript, referenceScript) {
-				return ruleError(ErrBadCoinbaseMultiOutput,
-					fmt.Sprintf("coinbase output %d has different payment script than reference payment output", i))
-			}
-			if output.Version != referenceVersion {
-				return ruleError(ErrBadCoinbaseMultiOutput,
-					fmt.Sprintf("coinbase output %d has different script version than reference payment output", i))
-			}
-		}
-	}
-
-	return nil
-}
-
 // isDCP0005Violation returns whether or not the block is known to violate
 // DCP0005.  Due to a bug that has since been fixed, some blocks were accepted
 // that violated DCP0005 by still being submitted on an old block version
@@ -4346,35 +4199,15 @@ func (b *BlockChain) checkTransactionsAndConnect(inputFees dcrutil.Amount,
 			return ruleError(ErrBadCoinbaseValue, str)
 		}
 
-		// Perform detailed validation of multi-output coinbase structure
-		// to ensure proper fee distribution by coin type.
-		// Only apply this validation for new-style coinbase transactions that:
-		// 1. Have fees from multiple coin types, OR
-		// 2. Have a non-VAR coin type output (indicating new format)
+		// Validate that coinbase only contains VAR outputs
+		// Non-VAR fees are now distributed through SSFee transactions in the stake tree
 		coinbaseTx := txs[0].MsgTx()
-		hasMultiCoinFees := len(totalFees.Types()) > 1
-		hasNonVAROutputs := false
-		for _, output := range coinbaseTx.TxOut {
+		for i, output := range coinbaseTx.TxOut {
 			if output.CoinType != cointype.CoinTypeVAR {
-				hasNonVAROutputs = true
-				break
-			}
-		}
-
-		if hasMultiCoinFees || hasNonVAROutputs {
-			// Calculate miner's share of fees by coin type
-			var minerFeesByType wire.FeesByType
-			if node.height < b.chainParams.StakeValidationHeight {
-				// Before stake validation, miners get 100% of all coin type fees
-				minerFeesByType = totalFees
-			} else {
-				// After stake validation, split fees based on subsidy proportions
-				work, stake, _, _ := standalone.GetSubsidyProportions(subsidySplitVariant)
-				minerFeesByType, _ = wire.CalcFeeSplitByCoinType(totalFees, work, stake)
-			}
-
-			if err := validateCoinbaseMultiOutput(coinbaseTx, minerFeesByType, subsidyWithoutFees); err != nil {
-				return err
+				str := fmt.Sprintf("coinbase output %d has non-VAR coin type %d; "+
+					"non-VAR fees must be distributed via SSFee transactions",
+					i, output.CoinType)
+				return ruleError(ErrBadCoinbaseOutputStructure, str)
 			}
 		}
 	} else { // TxTreeStake

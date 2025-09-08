@@ -29,6 +29,8 @@ type ChainStateProvider interface {
 
 // isSKAEmissionWindow returns whether the provided block height is within
 // the emission window for the specified SKA coin type.
+// Note: This function only checks the emission window bounds, not stake validation.
+// Stake validation is checked separately in ValidateAuthorizedSKAEmissionTransaction.
 func isSKAEmissionWindow(blockHeight int64, coinType cointype.CoinType, chainParams *chaincfg.Params) bool {
 	config, exists := chainParams.SKACoins[coinType]
 	if !exists {
@@ -266,6 +268,15 @@ func ValidateAuthorizedSKAEmissionTransaction(tx *wire.MsgTx, blockHeight int64,
 
 	// Get the coin type from the first output
 	coinType := tx.TxOut[0].CoinType
+
+	// Ensure SKA emissions only happen after stake validation is active
+	// This ensures the SSFee mechanism is available for distributing non-VAR fees
+	stakeValidationHeight := chainParams.StakeValidationHeight
+	if blockHeight < stakeValidationHeight {
+		return fmt.Errorf("SKA emission not allowed before stake validation height %d (attempted at %d)",
+			stakeValidationHeight, blockHeight)
+	}
+
 	if !isSKAEmissionWindow(blockHeight, coinType, chainParams) {
 		return fmt.Errorf("SKA emission transaction at invalid height %d for coin type %d",
 			blockHeight, coinType)
