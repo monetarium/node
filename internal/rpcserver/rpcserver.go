@@ -2486,24 +2486,11 @@ func handleGetBlockSubsidy(_ context.Context, s *Server, cmd interface{}) (inter
 	if err != nil {
 		return nil, err
 	}
-	isSubsidyEnabled, err := s.isSubsidySplitAgendaActive(&prevBlkHash)
-	if err != nil {
-		return nil, err
-	}
-	isSubsidyR2Enabled, err := s.isSubsidySplitR2AgendaActive(&prevBlkHash)
-	if err != nil {
-		return nil, err
-	}
 
-	// Determine which subsidy split variant to use depending on the active
-	// agendas.
-	subsidySplitVariant := standalone.SSVOriginal
-	switch {
-	case isSubsidyR2Enabled:
-		subsidySplitVariant = standalone.SSVDCP0012
-	case isSubsidyEnabled:
-		subsidySplitVariant = standalone.SSVDCP0010
-	}
+	// Use Monetarium subsidy split (50% miners, 50% stakers, 0% treasury)
+	// Note: We're not checking DCP agenda activation since we always want
+	// to use the Monetarium split for production
+	subsidySplitVariant := standalone.SSVMonetarium
 
 	subsidyCache := s.cfg.SubsidyCache
 	dev := subsidyCache.CalcTreasurySubsidy(height, voters, isTreasuryEnabled)

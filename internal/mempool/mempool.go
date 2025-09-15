@@ -1291,18 +1291,11 @@ func (mp *TxPool) maybeAcceptTransaction(tx *dcrutil.Tx, isNew, allowHighFees,
 	// Determine active agendas based on flags.
 	isTreasuryEnabled := checkTxFlags.IsTreasuryEnabled()
 	isAutoRevocationsEnabled := checkTxFlags.IsAutoRevocationsEnabled()
-	isSubsidyEnabled := checkTxFlags.IsSubsidySplitEnabled()
-	isSubsidyR2Enabled := checkTxFlags.IsSubsidySplitR2Enabled()
 
-	// Determine which subsidy split variant to use depending on the active
-	// agendas.
-	subsidySplitVariant := standalone.SSVOriginal
-	switch {
-	case isSubsidyR2Enabled:
-		subsidySplitVariant = standalone.SSVDCP0012
-	case isSubsidyEnabled:
-		subsidySplitVariant = standalone.SSVDCP0010
-	}
+	// Use Monetarium subsidy split (50% miners, 50% stakers, 0% treasury)
+	// Note: We're not checking DCP agenda activation since we always want
+	// to use the Monetarium split for production
+	subsidySplitVariant := standalone.SSVMonetarium
 
 	// Determine the type of transaction (regular or stake) and be sure to set
 	// the transaction tree correctly as it's possible a user submitted it to
