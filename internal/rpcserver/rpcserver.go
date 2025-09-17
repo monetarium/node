@@ -5677,19 +5677,6 @@ func (s *Server) isAutoRevocationsAgendaActive(prevBlkHash *chainhash.Hash) (boo
 	return isAutoRevocationsEnabled, nil
 }
 
-// isSubsidySplitAgendaActive returns if the modified subsidy split agenda is
-// active or not for the block AFTER the provided block hash.
-func (s *Server) isSubsidySplitAgendaActive(prevBlkHash *chainhash.Hash) (bool, error) {
-	chain := s.cfg.Chain
-	isSubsidySplitEnabled, err := chain.IsSubsidySplitAgendaActive(prevBlkHash)
-	if err != nil {
-		context := fmt.Sprintf("Could not obtain modified subsidy split "+
-			"agenda status for block %s", prevBlkHash)
-		return false, rpcInternalErr(err, context)
-	}
-	return isSubsidySplitEnabled, nil
-}
-
 // isBlake3PowAgendaActive returns whether or not the agenda to change the proof
 // of work hash function to blake3 is active or not for the block AFTER the
 // provided block hash.
@@ -5699,19 +5686,6 @@ func (s *Server) isBlake3PowAgendaActive(prevBlkHash *chainhash.Hash) (bool, err
 	if err != nil {
 		context := fmt.Sprintf("Could not obtain blake3 proof of work "+
 			"agenda status for block %s", prevBlkHash)
-		return false, rpcInternalErr(err, context)
-	}
-	return isActive, nil
-}
-
-// isSubsidySplitR2AgendaActive returns if the modified subsidy split round 2
-// agenda is active or not for the block AFTER the provided block hash.
-func (s *Server) isSubsidySplitR2AgendaActive(prevBlkHash *chainhash.Hash) (bool, error) {
-	chain := s.cfg.Chain
-	isActive, err := chain.IsSubsidySplitR2AgendaActive(prevBlkHash)
-	if err != nil {
-		context := fmt.Sprintf("Could not obtain modified subsidy split "+
-			"round 2 agenda status for block %s", prevBlkHash)
 		return false, rpcInternalErr(err, context)
 	}
 	return isActive, nil

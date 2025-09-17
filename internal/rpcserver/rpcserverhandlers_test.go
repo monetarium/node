@@ -4305,9 +4305,9 @@ func TestHandleGetBlockSubsidy(t *testing.T) {
 		},
 		result: types.GetBlockSubsidyResult{
 			Developer: int64(0),
-			PoS:       int64(1066666665),
-			PoW:       int64(2133333333),
-			Total:     int64(3199999998),
+			PoS:       int64(1600000000), // 50% with Monetarium split
+			PoW:       int64(1600000000), // 50% with Monetarium split
+			Total:     int64(3200000000),
 		},
 	}, {
 		name:    "handleGetBlockSubsidy: modified subsidy split ok",
@@ -4323,24 +4323,10 @@ func TestHandleGetBlockSubsidy(t *testing.T) {
 		}(),
 		result: types.GetBlockSubsidyResult{
 			Developer: int64(0),
-			PoS:       int64(2560000000),
-			PoW:       int64(320000000),
-			Total:     int64(2880000000),
+			PoS:       int64(1600000000), // 50% with Monetarium split
+			PoW:       int64(1600000000), // 50% with Monetarium split
+			Total:     int64(3200000000),
 		},
-	}, {
-		name:    "handleGetBlockSubsidy: modified subsidy split status failure",
-		handler: handleGetBlockSubsidy,
-		cmd: &types.GetBlockSubsidyCmd{
-			Height: 638977,
-			Voters: 5,
-		},
-		mockChain: func() *testRPCChain {
-			chain := defaultMockRPCChain()
-			chain.subsidySplitActiveErr = errors.New("error getting agenda status")
-			return chain
-		}(),
-		wantErr: true,
-		errCode: dcrjson.ErrRPCInternal.Code,
 	}, {
 		name:    "handleGetBlockSubsidy: modified subsidy split r2 ok",
 		handler: handleGetBlockSubsidy,
@@ -4355,24 +4341,10 @@ func TestHandleGetBlockSubsidy(t *testing.T) {
 		}(),
 		result: types.GetBlockSubsidyResult{
 			Developer: int64(0),
-			PoS:       int64(2848000000),
-			PoW:       int64(32000000),
-			Total:     int64(2880000000),
+			PoS:       int64(1600000000), // 50% with Monetarium split
+			PoW:       int64(1600000000), // 50% with Monetarium split
+			Total:     int64(3200000000),
 		},
-	}, {
-		name:    "handleGetBlockSubsidy: modified subsidy split r2 status failure",
-		handler: handleGetBlockSubsidy,
-		cmd: &types.GetBlockSubsidyCmd{
-			Height: 782208,
-			Voters: 5,
-		},
-		mockChain: func() *testRPCChain {
-			chain := defaultMockRPCChain()
-			chain.subsidySplitR2ActiveErr = errors.New("error getting agenda status")
-			return chain
-		}(),
-		wantErr: true,
-		errCode: dcrjson.ErrRPCInternal.Code,
 	}})
 }
 
