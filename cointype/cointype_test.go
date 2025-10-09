@@ -74,7 +74,7 @@ func TestCoinType_String(t *testing.T) {
 		expected string
 	}{
 		{CoinTypeVAR, "VAR"},
-		{CoinType(1), "SKA"},
+		{CoinType(1), "SKA-1"},
 		{CoinType(2), "SKA-2"},
 		{CoinType(42), "SKA-42"},
 		{CoinType(255), "SKA-255"},

@@ -188,6 +188,10 @@ type BlockChain struct {
 	// including nonces and emission tracking for security.
 	skaEmissionState *SKAEmissionState
 
+	// skaBurnState manages the persistent state for SKA burns
+	// tracking the total amount burned per coin type.
+	skaBurnState *SKABurnState
+
 	// processLock protects concurrent access to overall chain processing
 	// independent from the chain lock which is periodically released to
 	// send notifications.
@@ -733,6 +737,19 @@ func (b *BlockChain) connectBlock(node *blockNode, block, parent *dcrutil.Block,
 			}
 		}
 
+		// Update SKA burn state for any burns in this block.
+		// This must be done atomically with the block connection to ensure
+		// consistency in case of crashes or interruptions.
+		if b.skaBurnState != nil {
+			burns := extractSKABurnsFromBlock(block, node.height, b.chainParams)
+			if len(burns) > 0 {
+				err = b.skaBurnState.ConnectSKABurnsTx(dbTx, burns)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	})
 	if err != nil {
@@ -914,6 +931,19 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block, parent *dcrutil.Blo
 			emissions := extractSKAEmissionsFromBlock(block, node.height)
 			if len(emissions) > 0 {
 				err = b.skaEmissionState.DisconnectSKAEmissionsTx(dbTx, emissions)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Update SKA burn state for any burns in the disconnected block.
+		// This must be done atomically with the block disconnection to ensure
+		// consistency during reorganizations.
+		if b.skaBurnState != nil {
+			burns := extractSKABurnsFromBlock(block, node.height, b.chainParams)
+			if len(burns) > 0 {
+				err = b.skaBurnState.DisconnectSKABurnsTx(dbTx, burns)
 				if err != nil {
 					return err
 				}
@@ -1677,6 +1707,28 @@ func (b *BlockChain) HasSKAEmissionOccurred(coinType cointype.CoinType) bool {
 		return false
 	}
 	return b.skaEmissionState.IsEmitted(coinType)
+}
+
+// GetSKABurnedAmount returns the total amount burned for the specified SKA coin type.
+// Returns 0 if no burns have occurred for this coin type.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) GetSKABurnedAmount(coinType cointype.CoinType) int64 {
+	if b.skaBurnState == nil {
+		return 0
+	}
+	return b.skaBurnState.GetBurnedAmount(coinType)
+}
+
+// GetAllSKABurnedAmounts returns a map of all SKA coin types to their total burned amounts.
+// Only coin types with non-zero burned amounts are included in the result.
+//
+// This function is safe for concurrent access.
+func (b *BlockChain) GetAllSKABurnedAmounts() map[cointype.CoinType]int64 {
+	if b.skaBurnState == nil {
+		return make(map[cointype.CoinType]int64)
+	}
+	return b.skaBurnState.GetAllBurnedAmounts()
 }
 
 // maxBlockSize returns the maximum permitted block size for the block
@@ -2541,6 +2593,15 @@ func New(ctx context.Context, config *Config) (*BlockChain, error) {
 		return nil, fmt.Errorf("failed to initialize SKA emission state: %w", err)
 	}
 	b.skaEmissionState = skaState
+
+	// Initialize the SKA burn state for tracking total burned amounts per coin type.
+	// This must be done before chain state initialization as it may be
+	// referenced during block connection/disconnection.
+	skaBurnState, err := NewSKABurnState(config.DB)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize SKA burn state: %w", err)
+	}
+	b.skaBurnState = skaBurnState
 
 	// Initialize the chain state from the passed database.  When the db
 	// does not yet contain any chain state, both it and the chain state

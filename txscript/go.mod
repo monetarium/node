@@ -1,12 +1,15 @@
 module github.com/decred/dcrd/txscript/v4
 
-go 1.17
+go 1.23
+
+toolchain go1.23.4
 
 require (
 	github.com/dchest/siphash v1.2.3
 	github.com/decred/base58 v1.0.5
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.4
 	github.com/decred/dcrd/chaincfg/v3 v3.2.1
+	github.com/decred/dcrd/cointype v1.0.0
 	github.com/decred/dcrd/crypto/blake256 v1.0.1
 	github.com/decred/dcrd/crypto/ripemd160 v1.0.2
 	github.com/decred/dcrd/dcrec v1.0.1
@@ -21,3 +24,5 @@ require (
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	lukechampine.com/blake3 v1.3.0 // indirect
 )
+
+replace github.com/decred/dcrd/cointype => ../cointype

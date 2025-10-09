@@ -361,6 +361,18 @@ var helpDescsEnUS = map[string]string{
 	"getblocksubsidyresult-pow":       "The Proof-of-Work subsidy",
 	"getblocksubsidyresult-total":     "The total subsidy",
 
+	// GetBurnedCoinsCmd help.
+	"getburnedcoins--synopsis": "Returns information about burned coins for SKA coin types.",
+	"getburnedcoins-cointype":  "Optional: specific SKA coin type to query (1-255). If not specified, returns all coin types with burns.",
+
+	// GetBurnedCoinsResult help.
+	"getburnedcoinsresult-stats": "Array of burn statistics per coin type",
+
+	// GetBurnedCoinsStat help.
+	"getburnedcoinsstat-cointype":    "The coin type number (1-255)",
+	"getburnedcoinsstat-name":        "The name of the coin type (e.g., 'SKA-1', 'SKA-2')",
+	"getburnedcoinsstat-totalburned": "Total amount of coins burned",
+
 	// GetCFilterV2Cmd help.
 	"getcfilterv2--synopsis": "Returns the version 2 block filter for the given block along with a proof that can be used to prove the filter is committed to by the block header",
 	"getcfilterv2-blockhash": "The block hash of the filter to retrieve",
@@ -1051,6 +1063,7 @@ var rpcResultTypes = map[types.Method][]interface{}{
 	"getblockhash":             {(*string)(nil)},
 	"getblockheader":           {(*string)(nil), (*types.GetBlockHeaderVerboseResult)(nil)},
 	"getblocksubsidy":          {(*types.GetBlockSubsidyResult)(nil)},
+	"getburnedcoins":           {(*types.GetBurnedCoinsResult)(nil)},
 	"getcfilterv2":             {(*types.GetCFilterV2Result)(nil)},
 	"getchaintips":             {(*[]types.GetChainTipsResult)(nil)},
 	"getcoinsupply":            {(*int64)(nil)},

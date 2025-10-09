@@ -471,6 +471,14 @@ type Chain interface {
 	// HasSKAEmissionOccurred returns whether the specified coin type has been
 	// emitted in the blockchain.
 	HasSKAEmissionOccurred(cointype.CoinType) bool
+
+	// GetSKABurnedAmount returns the total amount burned for the specified SKA
+	// coin type. Returns 0 if no burns have occurred for this coin type.
+	GetSKABurnedAmount(cointype.CoinType) int64
+
+	// GetAllSKABurnedAmounts returns a map of all SKA coin types to their total
+	// burned amounts. Only coin types with non-zero burned amounts are included.
+	GetAllSKABurnedAmounts() map[cointype.CoinType]int64
 }
 
 // Clock represents a clock for use with the RPC server. The purpose of this

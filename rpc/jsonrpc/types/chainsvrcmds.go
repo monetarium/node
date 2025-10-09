@@ -1205,6 +1205,19 @@ type VersionCmd struct{}
 // version command.
 func NewVersionCmd() *VersionCmd { return new(VersionCmd) }
 
+// GetBurnedCoinsCmd defines the getburnedcoins JSON-RPC command.
+type GetBurnedCoinsCmd struct {
+	CoinType *uint8 `jsonrpcdefault:"null"` // Optional: if null, returns all coin types
+}
+
+// NewGetBurnedCoinsCmd returns a new instance which can be used to issue a
+// getburnedcoins JSON-RPC command.
+func NewGetBurnedCoinsCmd(coinType *uint8) *GetBurnedCoinsCmd {
+	return &GetBurnedCoinsCmd{
+		CoinType: coinType,
+	}
+}
+
 func init() {
 	// No special flags for commands in this file.
 	flags := dcrjson.UsageFlag(0)
@@ -1290,4 +1303,5 @@ func init() {
 	dcrjson.MustRegister(Method("verifychain"), (*VerifyChainCmd)(nil), flags)
 	dcrjson.MustRegister(Method("verifymessage"), (*VerifyMessageCmd)(nil), flags)
 	dcrjson.MustRegister(Method("version"), (*VersionCmd)(nil), flags)
+	dcrjson.MustRegister(Method("getburnedcoins"), (*GetBurnedCoinsCmd)(nil), flags)
 }

@@ -167,6 +167,12 @@ func ExtractAddrsV0(pkScript []byte, params stdaddr.AddressParamsV0) (ScriptType
 		return STTreasuryGenScriptHash, addrToSlice(addr, err)
 	}
 
+	// Check for SKA burn script.  Burn scripts have no associated address
+	// (like null data scripts).
+	if IsSKABurnScriptV0(pkScript) {
+		return STSKABurn, nil
+	}
+
 	// Don't attempt to extract addresses for nonstandard transactions.
 	return STNonStandard, nil
 }

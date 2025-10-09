@@ -22,6 +22,10 @@ import (
 // overhead of creating it multiple times.
 var bigOne = big.NewInt(1)
 
+// SKABurnScriptMarker is the ASCII marker used in SKA burn scripts to identify
+// them as burn outputs. This marker appears in the OP_RETURN data of burn scripts.
+var SKABurnScriptMarker = []byte("SKA_BURN")
+
 // Checkpoint identifies a known good point in the block chain.  Using
 // checkpoints allows a few optimizations for old blocks during initial download
 // and also prevents forks from old blocks.
@@ -994,4 +998,53 @@ func (p *Params) GetSKAEmissionKey(coinType cointype.CoinType) *secp256k1.Public
 // authorized emission key configured.
 func (p *Params) IsSKAEmissionAuthorized(coinType cointype.CoinType) bool {
 	return p.GetSKAEmissionKey(coinType) != nil
+}
+
+// CreateSKABurnScript creates a provably unspendable burn script for the
+// specified SKA coin type. The script uses OP_RETURN to make it consensus-unspendable,
+// ensuring that coins sent to this script are permanently removed from circulation.
+//
+// Returns an error if the coin type is not a valid SKA type (must be 1-255).
+func (p *Params) CreateSKABurnScript(coinType cointype.CoinType) ([]byte, error) {
+	if !coinType.IsSKA() {
+		return nil, fmt.Errorf("invalid coin type for burn script: %d (must be SKA type 1-255)", coinType)
+	}
+
+	// Note: NewSKABurnScriptV0 returns nil for invalid coin types
+	script := make([]byte, 11)
+	script[0] = 0x6a // OP_RETURN
+	script[1] = 0x09 // Push 9 bytes
+	copy(script[2:10], SKABurnScriptMarker)
+	script[10] = byte(coinType)
+
+	return script, nil
+}
+
+// IsSKABurnScript returns true if the provided script is a valid SKA burn script.
+// A valid burn script is an OP_RETURN output containing the "SKA_BURN" marker
+// and a valid SKA coin type (1-255).
+func (p *Params) IsSKABurnScript(script []byte) bool {
+	// Check minimum length: OP_RETURN (1) + push length (1) + marker (8) + cointype (1) = 11 bytes
+	if len(script) != 11 {
+		return false
+	}
+
+	// Check for OP_RETURN opcode
+	if script[0] != 0x6a {
+		return false
+	}
+
+	// Check push length
+	if script[1] != 0x09 {
+		return false
+	}
+
+	// Check for SKA_BURN marker
+	if !bytes.Equal(script[2:10], SKABurnScriptMarker) {
+		return false
+	}
+
+	// Check that coin type is valid SKA (1-255)
+	coinType := cointype.CoinType(script[10])
+	return coinType.IsSKA()
 }

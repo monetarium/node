@@ -37,6 +37,7 @@ func TestScriptTypeStringer(t *testing.T) {
 		{STTreasuryAdd, "treasuryadd"},
 		{STTreasuryGenPubKeyHash, "treasurygen-pubkeyhash"},
 		{STTreasuryGenScriptHash, "treasurygen-scripthash"},
+		{STSKABurn, "skaburn"},
 		{0xff, "invalid"},
 	}
 

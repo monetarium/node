@@ -170,6 +170,14 @@ const (
 	// imposes.  The script is commonly referred to as a redeem script.
 	STTreasuryGenScriptHash
 
+	// STSKABurn identifies a provably unspendable script used to permanently
+	// destroy SKA coins. The script is an OP_RETURN output containing the
+	// "SKA_BURN" marker and the coin type being burned.
+	//
+	// This creates outputs that cannot be spent by consensus rules, making
+	// the burned coins permanently removed from circulation.
+	STSKABurn
+
 	// numScriptTypes is the maximum script type number used in tests.  This
 	// entry MUST be the last entry in the enum.
 	numScriptTypes
@@ -199,6 +207,7 @@ var scriptTypeToName = []string{
 	STTreasuryAdd:                "treasuryadd",
 	STTreasuryGenPubKeyHash:      "treasurygen-pubkeyhash",
 	STTreasuryGenScriptHash:      "treasurygen-scripthash",
+	STSKABurn:                    "skaburn",
 }
 
 // String returns the ScriptType as a human-readable name.

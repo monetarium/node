@@ -77,9 +77,7 @@ func (ct CoinType) String() string {
 	switch {
 	case ct == CoinTypeVAR:
 		return "VAR"
-	case ct == 1:
-		return "SKA" // Backward compatibility: first SKA coin shows as "SKA"
-	case ct > 1 && ct <= CoinTypeMax:
+	case ct >= 1 && ct <= CoinTypeMax:
 		return fmt.Sprintf("SKA-%d", uint8(ct))
 	default:
 		return fmt.Sprintf("Unknown(%d)", uint8(ct))

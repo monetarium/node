@@ -748,6 +748,8 @@ func DetermineScriptTypeV0(script []byte) ScriptType {
 		return STScriptHash
 	case IsMultiSigScriptV0(script):
 		return STMultiSig
+	case IsSKABurnScriptV0(script):
+		return STSKABurn
 	case IsNullDataScriptV0(script):
 		return STNullData
 	case IsStakeSubmissionPubKeyHashScriptV0(script):
@@ -803,7 +805,7 @@ func DetermineRequiredSigsV0(script []byte) uint16 {
 		}
 		return 0
 
-	case STNullData, STTreasuryAdd:
+	case STNullData, STTreasuryAdd, STSKABurn:
 		return 0
 	}
 
@@ -981,4 +983,72 @@ func ExtractAtomicSwapDataPushesV0(redeemScript []byte) *AtomicSwapDataPushesV0 
 	copy(pushes.RecipientHash160[:], template[9].extractedData)
 	copy(pushes.RefundHash160[:], template[16].extractedData)
 	return &pushes
+}
+
+// NewSKABurnScriptV0 creates a version 0 SKA burn script for the specified
+// coin type. The script is an OP_RETURN output with the format:
+// OP_RETURN <0x09> "SKA_BURN" <cointype>
+//
+// This creates a provably unspendable output that permanently destroys coins.
+// Returns nil if the coin type is not a valid SKA type (must be 1-255).
+func NewSKABurnScriptV0(coinType uint8) []byte {
+	// Validate coin type is SKA (1-255)
+	if coinType < 1 {
+		return nil
+	}
+
+	// Script: OP_RETURN <data_length> "SKA_BURN" <cointype>
+	script := make([]byte, 11)
+	script[0] = txscript.OP_RETURN // OP_RETURN opcode
+	script[1] = 0x09               // Data length (9 bytes)
+	copy(script[2:10], "SKA_BURN") // Marker
+	script[10] = coinType          // Coin type
+
+	return script
+}
+
+// IsSKABurnScriptV0 returns whether or not the passed script is a version 0
+// SKA burn script.
+//
+// A valid burn script has the format:
+// OP_RETURN <0x09> "SKA_BURN" <cointype>
+// where cointype is a valid SKA type (1-255).
+func IsSKABurnScriptV0(script []byte) bool {
+	// Must be exactly 11 bytes
+	if len(script) != 11 {
+		return false
+	}
+
+	// Must start with OP_RETURN
+	if script[0] != txscript.OP_RETURN {
+		return false
+	}
+
+	// Must have correct data length
+	if script[1] != 0x09 {
+		return false
+	}
+
+	// Must have SKA_BURN marker
+	if string(script[2:10]) != "SKA_BURN" {
+		return false
+	}
+
+	// Coin type must be valid SKA (1-255)
+	coinType := script[10]
+	return coinType >= 1
+
+}
+
+// ExtractSKABurnCoinTypeV0 extracts the coin type from a version 0 SKA burn
+// script. Returns 0 and an error if the script is not a valid burn script.
+//
+// The caller should verify the script is a burn script using IsSKABurnScriptV0
+// before calling this function, though this function will validate it as well.
+func ExtractSKABurnCoinTypeV0(script []byte) (uint8, error) {
+	if !IsSKABurnScriptV0(script) {
+		return 0, makeError(ErrNonStandardScript, "not a valid SKA burn script")
+	}
+
+	return script[10], nil
 }

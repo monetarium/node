@@ -29,6 +29,10 @@ const (
 	// provably-pruneable script with data that exceeds the maximum allowed
 	// length.
 	ErrTooMuchNullData = ErrorKind("ErrTooMuchNullData")
+
+	// ErrNonStandardScript is returned when a script does not match any
+	// known standard script type.
+	ErrNonStandardScript = ErrorKind("ErrNonStandardScript")
 )
 
 // Error satisfies the error interface and prints human-readable errors.

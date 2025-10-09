@@ -193,7 +193,7 @@ func TestSKACoinTypeStringRepresentation(t *testing.T) {
 		expected string
 	}{
 		{cointype.CoinTypeVAR, "VAR"},
-		{cointype.CoinType(1), "SKA"}, // Backward compatibility
+		{cointype.CoinType(1), "SKA-1"},
 		{cointype.CoinType(2), "SKA-2"},
 		{cointype.CoinType(25), "SKA-25"},
 		{cointype.CoinType(255), "SKA-255"},

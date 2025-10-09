@@ -205,6 +205,7 @@ type testRPCChain struct {
 	subsidySplitR2ActiveErr       error
 	skaEmissionNonce              uint64
 	skaEmissionOccurred           bool
+	skaBurnedAmounts              map[cointype.CoinType]int64
 }
 
 // BestSnapshot returns a mocked blockchain.BestState.
@@ -464,6 +465,27 @@ func (c *testRPCChain) GetSKAEmissionNonce(cointype.CoinType) uint64 {
 // HasSKAEmissionOccurred returns a mocked status of whether emission occurred.
 func (c *testRPCChain) HasSKAEmissionOccurred(cointype.CoinType) bool {
 	return c.skaEmissionOccurred
+}
+
+// GetSKABurnedAmount returns the mocked burned amount for the specified coin type.
+func (c *testRPCChain) GetSKABurnedAmount(ct cointype.CoinType) int64 {
+	if c.skaBurnedAmounts == nil {
+		return 0
+	}
+	return c.skaBurnedAmounts[ct]
+}
+
+// GetAllSKABurnedAmounts returns all mocked burned amounts.
+func (c *testRPCChain) GetAllSKABurnedAmounts() map[cointype.CoinType]int64 {
+	if c.skaBurnedAmounts == nil {
+		return make(map[cointype.CoinType]int64)
+	}
+	// Return a copy
+	result := make(map[cointype.CoinType]int64)
+	for k, v := range c.skaBurnedAmounts {
+		result[k] = v
+	}
+	return result
 }
 
 // testPeer provides a mock peer by implementing the Peer interface.

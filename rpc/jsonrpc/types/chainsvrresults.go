@@ -242,6 +242,20 @@ type GetEmissionStatusResult struct {
 	MaxSupply      int64  `json:"maxsupply"`      // Maximum supply for this coin type
 }
 
+// GetBurnedCoinsStat models burn statistics for a single coin type.
+type GetBurnedCoinsStat struct {
+	CoinType    uint8   `json:"cointype"`    // Coin type (1-255 for SKA)
+	Name        string  `json:"name"`        // Coin name (e.g., "SKA-1")
+	TotalBurned float64 `json:"totalburned"` // Total amount burned in coins
+}
+
+// GetBurnedCoinsResult models the data returned from the getburnedcoins command.
+// When CoinType is specified, returns a single stat.
+// When CoinType is null, returns stats for all coin types with burns.
+type GetBurnedCoinsResult struct {
+	Stats []GetBurnedCoinsStat `json:"stats"` // Burn statistics by coin type
+}
+
 // GetChainTipsResult models the data returns from the getchaintips command.
 type GetChainTipsResult struct {
 	Height    int64  `json:"height"`

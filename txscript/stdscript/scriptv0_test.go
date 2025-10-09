@@ -1643,3 +1643,228 @@ func TestExtractAtomicSwapDataPushesV0(t *testing.T) {
 		}
 	}
 }
+
+// TestNewSKABurnScriptV0 ensures creating version 0 SKA burn scripts works as
+// intended.
+func TestNewSKABurnScriptV0(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		coinType uint8
+		want     []byte
+		wantNil  bool
+	}{{
+		name:     "SKA-1 burn",
+		coinType: 1,
+		want:     []byte{0x6a, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0x01},
+	}, {
+		name:     "SKA-2 burn",
+		coinType: 2,
+		want:     []byte{0x6a, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0x02},
+	}, {
+		name:     "SKA-255 burn (max)",
+		coinType: 255,
+		want:     []byte{0x6a, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0xff},
+	}, {
+		name:     "VAR coin (invalid)",
+		coinType: 0,
+		wantNil:  true,
+	}}
+
+	for _, test := range tests {
+		test := test // capture range variable
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := NewSKABurnScriptV0(test.coinType)
+			if test.wantNil {
+				if got != nil {
+					t.Errorf("expected nil, got %v", got)
+				}
+				return
+			}
+			if !bytes.Equal(got, test.want) {
+				t.Errorf("got %x, want %x", got, test.want)
+			}
+		})
+	}
+}
+
+// TestIsSKABurnScriptV0 ensures detecting version 0 SKA burn scripts works as
+// intended.
+func TestIsSKABurnScriptV0(t *testing.T) {
+	t.Parallel()
+
+	// Valid burn scripts for various coin types.
+	validBurnSKA1 := NewSKABurnScriptV0(1)
+	validBurnSKA255 := NewSKABurnScriptV0(255)
+
+	tests := []struct {
+		name   string
+		script []byte
+		want   bool
+	}{{
+		name:   "valid SKA-1 burn",
+		script: validBurnSKA1,
+		want:   true,
+	}, {
+		name:   "valid SKA-255 burn",
+		script: validBurnSKA255,
+		want:   true,
+	}, {
+		name:   "empty script",
+		script: []byte{},
+		want:   false,
+	}, {
+		name:   "just OP_RETURN",
+		script: []byte{0x6a},
+		want:   false,
+	}, {
+		name:   "wrong marker",
+		script: []byte{0x6a, 0x09, 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 0x01},
+		want:   false,
+	}, {
+		name:   "VAR coin type (invalid)",
+		script: []byte{0x6a, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0x00},
+		want:   false,
+	}, {
+		name:   "wrong length (too short)",
+		script: []byte{0x6a, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N'},
+		want:   false,
+	}, {
+		name:   "wrong length (too long)",
+		script: []byte{0x6a, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0x01, 0x00},
+		want:   false,
+	}, {
+		name:   "wrong opcode",
+		script: []byte{0x00, 0x09, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0x01},
+		want:   false,
+	}, {
+		name:   "wrong data length",
+		script: []byte{0x6a, 0x08, 'S', 'K', 'A', '_', 'B', 'U', 'R', 'N', 0x01},
+		want:   false,
+	}}
+
+	for _, test := range tests {
+		test := test // capture range variable
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := IsSKABurnScriptV0(test.script)
+			if got != test.want {
+				t.Errorf("got %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
+// TestExtractSKABurnCoinTypeV0 ensures extracting the coin type from version 0
+// SKA burn scripts works as intended.
+func TestExtractSKABurnCoinTypeV0(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		script    []byte
+		want      uint8
+		wantError bool
+	}{{
+		name:   "SKA-1 burn",
+		script: NewSKABurnScriptV0(1),
+		want:   1,
+	}, {
+		name:   "SKA-2 burn",
+		script: NewSKABurnScriptV0(2),
+		want:   2,
+	}, {
+		name:   "SKA-255 burn (max)",
+		script: NewSKABurnScriptV0(255),
+		want:   255,
+	}, {
+		name:      "invalid script (empty)",
+		script:    []byte{},
+		wantError: true,
+	}, {
+		name:      "invalid script (just OP_RETURN)",
+		script:    []byte{0x6a},
+		wantError: true,
+	}, {
+		name:      "invalid script (wrong marker)",
+		script:    []byte{0x6a, 0x09, 'X', 'X', 'X', 'X', 'X', 'X', 'X', 'X', 0x01},
+		wantError: true,
+	}}
+
+	for _, test := range tests {
+		test := test // capture range variable
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := ExtractSKABurnCoinTypeV0(test.script)
+			if test.wantError {
+				if err == nil {
+					t.Error("expected error for invalid script")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+				return
+			}
+
+			if got != test.want {
+				t.Errorf("got %d, want %d", got, test.want)
+			}
+		})
+	}
+}
+
+// TestSKABurnScriptRoundTrip ensures creating and extracting SKA burn scripts
+// works correctly for representative coin types.
+func TestSKABurnScriptRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	// Test representative SKA coin types.
+	testCoinTypes := []uint8{1, 2, 100, 200, 255}
+
+	for _, ct := range testCoinTypes {
+		ct := ct // capture range variable
+		t.Run(fmt.Sprintf("SKA-%d", ct), func(t *testing.T) {
+			t.Parallel()
+
+			// Create burn script.
+			script := NewSKABurnScriptV0(ct)
+			if script == nil {
+				t.Fatal("failed to create burn script")
+			}
+
+			// Verify it's detected as a burn script.
+			if !IsSKABurnScriptV0(script) {
+				t.Error("script not detected as burn script")
+			}
+
+			// Extract and verify coin type.
+			got, err := ExtractSKABurnCoinTypeV0(script)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if got != ct {
+				t.Errorf("coin type: got %d, want %d", got, ct)
+			}
+
+			// Verify script type determination.
+			const scriptVersion = 0
+			scriptType := DetermineScriptType(scriptVersion, script)
+			if scriptType != STSKABurn {
+				t.Errorf("script type: got %v, want %v", scriptType, STSKABurn)
+			}
+
+			// Verify required signatures is 0 (unspendable).
+			reqSigs := DetermineRequiredSigs(scriptVersion, script)
+			if reqSigs != 0 {
+				t.Errorf("required sigs: got %d, want 0 (unspendable)", reqSigs)
+			}
+		})
+	}
+}

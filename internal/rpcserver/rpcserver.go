@@ -220,6 +220,7 @@ var rpcHandlersBeforeInit = map[types.Method]commandHandler{
 	"getrawtransaction":        handleGetRawTransaction,
 	"getskainfo":               handleGetSKAInfo,
 	"getemissionstatus":        handleGetEmissionStatus,
+	"getburnedcoins":           handleGetBurnedCoins,
 	"getstakedifficulty":       handleGetStakeDifficulty,
 	"getstakeversioninfo":      handleGetStakeVersionInfo,
 	"getstakeversions":         handleGetStakeVersions,
@@ -3505,6 +3506,51 @@ func handleGetEmissionStatus(_ context.Context, s *Server, icmd interface{}) (in
 		NextNonce:      currentNonce + 1,
 		AlreadyEmitted: alreadyEmitted,
 		MaxSupply:      config.MaxSupply,
+	}, nil
+}
+
+// handleGetBurnedCoins implements the getburnedcoins JSON-RPC command.
+func handleGetBurnedCoins(_ context.Context, s *Server, icmd interface{}) (interface{}, error) {
+	c := icmd.(*types.GetBurnedCoinsCmd)
+
+	// Get burned amounts from blockchain
+	var burnedAmounts map[cointype.CoinType]int64
+
+	if c.CoinType != nil {
+		// Specific coin type requested
+		coinType := cointype.CoinType(*c.CoinType)
+
+		// Validate coin type is in SKA range (1-255)
+		if !coinType.IsSKA() {
+			return nil, dcrjson.NewRPCError(dcrjson.ErrRPCInvalidParameter,
+				"coin type must be between 1 and 255 (SKA types)")
+		}
+
+		// Get burned amount for this coin type
+		amount := s.cfg.Chain.GetSKABurnedAmount(coinType)
+		burnedAmounts = map[cointype.CoinType]int64{coinType: amount}
+	} else {
+		// Get all burned amounts
+		burnedAmounts = s.cfg.Chain.GetAllSKABurnedAmounts()
+	}
+
+	// Convert to result format
+	stats := make([]types.GetBurnedCoinsStat, 0, len(burnedAmounts))
+	for coinType, amount := range burnedAmounts {
+		// Skip coin types with zero burns (shouldn't happen but be defensive)
+		if amount == 0 {
+			continue
+		}
+
+		stats = append(stats, types.GetBurnedCoinsStat{
+			CoinType:    uint8(coinType),
+			Name:        coinType.String(),
+			TotalBurned: dcrutil.Amount(amount).ToCoinType(coinType),
+		})
+	}
+
+	return types.GetBurnedCoinsResult{
+		Stats: stats,
 	}, nil
 }
 
