@@ -31,7 +31,7 @@ func TestNewBlockTemplateBasicErrorScenarios(t *testing.T) {
 	}
 
 	// Create a test address for use in template generation.
-	address, err := stdaddr.DecodeAddress("Dsi8CRt85xYyempXs7ZPL1rBxvDdAGZmgsg",
+	address, err := stdaddr.DecodeAddress("Msepfi5oGbZFsiaHkLHRo8R23bqgmy84RUf",
 		harness.chainParams)
 	if err != nil {
 		t.Fatalf("error decoding address: %v", err)
@@ -73,7 +73,7 @@ func TestNewBlockTemplate(t *testing.T) {
 	}
 
 	// Create a test address for use in template generation.
-	address, err := stdaddr.DecodeAddress("Dsi8CRt85xYyempXs7ZPL1rBxvDdAGZmgsg",
+	address, err := stdaddr.DecodeAddress("Msepfi5oGbZFsiaHkLHRo8R23bqgmy84RUf",
 		harness.chainParams)
 	if err != nil {
 		t.Fatalf("error decoding address: %v", err)
@@ -209,7 +209,7 @@ func TestNewBlockTemplateAutoRevocations(t *testing.T) {
 	harness.chain.isAutoRevocationsAgendaActive = true
 
 	// Create a test address for use in template generation.
-	address, err := stdaddr.DecodeAddress("Dsi8CRt85xYyempXs7ZPL1rBxvDdAGZmgsg",
+	address, err := stdaddr.DecodeAddress("Msepfi5oGbZFsiaHkLHRo8R23bqgmy84RUf",
 		harness.chainParams)
 	if err != nil {
 		t.Fatalf("error decoding address: %v", err)
@@ -421,7 +421,7 @@ func TestNewBlockTemplateAutoRevocationsVotesOnly(t *testing.T) {
 	harness.chain.isAutoRevocationsAgendaActive = true
 
 	// Create a test address for use in template generation.
-	address, err := stdaddr.DecodeAddress("Dsi8CRt85xYyempXs7ZPL1rBxvDdAGZmgsg",
+	address, err := stdaddr.DecodeAddress("Msepfi5oGbZFsiaHkLHRo8R23bqgmy84RUf",
 		harness.chainParams)
 	if err != nil {
 		t.Fatalf("error decoding address: %v", err)

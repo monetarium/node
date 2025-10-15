@@ -2053,11 +2053,11 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		Tree: 0,
 		Amt:  100000000,
 	}}
-	defaultCmdAmount := map[string]int64{"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": 100000000}
+	defaultCmdAmount := map[string]int64{"McSmCFDZ8MykpEWiCGoUUpBVM6DehASf49c": 100000000}
 	defaultCmdCOuts := []types.SStxCommitOut{{
-		Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+		Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 		CommitAmt:  100000000,
-		ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+		ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 		ChangeAmt:  0,
 	}}
 	testRPCServerHandler(t, []rpcTest{{
@@ -2100,13 +2100,13 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		cmd: &types.CreateRawSStxCmd{
 			Inputs: defaultCmdInputs,
 			Amount: map[string]int64{
-				"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": 90000000,
-				"DcqgK4N4Ccucu2Sq4VDAdu4wH4LASLhzLVp": 10000000,
+				"McSmCFDZ8MykpEWiCGoUUpBVM6DehASf49c": 90000000,
+				"McP3BMTS6YjSF9mSrgWsnXWVa7Sy7Mv1umA": 10000000,
 			},
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  90000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  10000000,
 			}},
 		},
@@ -2148,7 +2148,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		cmd: &types.CreateRawSStxCmd{
 			Inputs: defaultCmdInputs,
 			Amount: map[string]int64{
-				"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": int64(cointype.MaxVARAmount) + 1,
+				"McSmCFDZ8MykpEWiCGoUUpBVM6DehASf49c": int64(cointype.MaxVARAmount) + 1,
 			},
 			COuts: defaultCmdCOuts,
 		},
@@ -2159,7 +2159,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		handler: handleCreateRawSStx,
 		cmd: &types.CreateRawSStxCmd{
 			Inputs: defaultCmdInputs,
-			Amount: map[string]int64{"DcuQKx8BES9wU7C6Q5VmLBjw436r27hayjS": -1},
+			Amount: map[string]int64{"McSmCFDZ8MykpEWiCGoUUpBVM6DehASf49c": -1},
 			COuts:  defaultCmdCOuts,
 		},
 		wantErr: true,
@@ -2180,7 +2180,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 		cmd: &types.CreateRawSStxCmd{
 			Inputs: defaultCmdInputs,
 			Amount: map[string]int64{
-				"DkM3EyZ546GghVSkvzb6J47PvGDyntqiDtFgipQhNj78Xm2mUYRpf": 100000000,
+				"Mk6q1QVjCvCrjMiH6k8VxqjypUNopzjnCEDbL2UrB3EpsUmJDZtvX": 100000000,
 			},
 			COuts: defaultCmdCOuts,
 		},
@@ -2203,9 +2203,9 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  100000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  200000000,
 			}},
 		},
@@ -2220,7 +2220,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			COuts: []types.SStxCommitOut{{
 				Addr:       "DsRaInvalidjdA4nMYboMfLERA5V3KhBr4ru",
 				CommitAmt:  100000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  0,
 			}},
 		},
@@ -2233,9 +2233,9 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DkM3EyZ546GghVSkvzb6J47PvGDyntqiDtFgipQhNj78Xm2mUYRpf",
+				Addr:       "Mk6q1QVjCvCrjMiH6k8VxqjypUNopzjnCEDbL2UrB3EpsUmJDZtvX",
 				CommitAmt:  100000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  0,
 			}},
 		},
@@ -2250,7 +2250,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			COuts: []types.SStxCommitOut{{
 				Addr:       "DSXcZv4oSRiEoWL2a9aD8sgfptRo1YEXNKj",
 				CommitAmt:  100000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  0,
 			}},
 		},
@@ -2268,9 +2268,9 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			}},
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  100000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  int64(cointype.MaxVARAmount) + 1,
 			}},
 		},
@@ -2283,9 +2283,9 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  100000000,
-				ChangeAddr: "DsfkbtrSUr5cFdQYq3WSKo9vvFs5qxZXbgF",
+				ChangeAddr: "MscT5B47fV5tUaAJiGEUnuikzwV9TdJQkCs",
 				ChangeAmt:  -1,
 			}},
 		},
@@ -2298,7 +2298,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  100000000,
 				ChangeAddr: "DsfkInvalidcFdQYq3WSKo9vvFs5qxZXbgF",
 				ChangeAmt:  0,
@@ -2313,9 +2313,9 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  100000000,
-				ChangeAddr: "DkM3EyZ546GghVSkvzb6J47PvGDyntqiDtFgipQhNj78Xm2mUYRpf",
+				ChangeAddr: "Mk6q1QVjCvCrjMiH6k8VxqjypUNopzjnCEDbL2UrB3EpsUmJDZtvX",
 				ChangeAmt:  0,
 			}},
 		},
@@ -2328,7 +2328,7 @@ func TestHandleCreateRawSStx(t *testing.T) {
 			Inputs: defaultCmdInputs,
 			Amount: defaultCmdAmount,
 			COuts: []types.SStxCommitOut{{
-				Addr:       "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ",
+				Addr:       "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8",
 				CommitAmt:  100000000,
 				ChangeAddr: "DSXcZv4oSRiEoWL2a9aD8sgfptRo1YEXNKj",
 				ChangeAmt:  0,
@@ -2649,7 +2649,7 @@ func TestHandleCreateRawTransaction(t *testing.T) {
 		Vout:   0,
 		Tree:   0,
 	}}
-	defaultCmdAmounts := map[string]float64{"DcurAwesomeAddressmqDctW5wJCW1Cn2MF": 1}
+	defaultCmdAmounts := map[string]float64{"McTD3EkFhhTyymBGg55YNFL4NzR1AxSSAEh": 1}
 	defaultCmdLockTime := dcrjson.Int64(1)
 	defaultCmdExpiry := dcrjson.Int64(1)
 	testRPCServerHandler(t, []rpcTest{{
@@ -2730,7 +2730,7 @@ func TestHandleCreateRawTransaction(t *testing.T) {
 				Tree:   0,
 			}},
 			Amounts: map[string]float64{
-				"DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ": float64(cointype.MaxVARAmount+1) / 1e8,
+				"MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8": float64(cointype.MaxVARAmount+1) / 1e8,
 			},
 			LockTime: defaultCmdLockTime,
 			Expiry:   defaultCmdExpiry,
@@ -2754,7 +2754,7 @@ func TestHandleCreateRawTransaction(t *testing.T) {
 		cmd: &types.CreateRawTransactionCmd{
 			Inputs: defaultCmdInputs,
 			Amounts: map[string]float64{
-				"DkRMCQhwDFTRwW6umM59KEJiMvTPke9X7akJJfbzKocNPDqZMAUEq": 1,
+				"MkB8xqebN5PbyNNRw6cYz1wJG8cDnk3b5viCusg987k4iwa9fsZnB": 1,
 			},
 			LockTime: defaultCmdLockTime,
 			Expiry:   defaultCmdExpiry,
@@ -2839,7 +2839,7 @@ func TestHandleDecodeRawTransaction(t *testing.T) {
 					ReqSigs: 1,
 					Type:    "scripthash",
 					Addresses: []string{
-						"DcurAwesomeAddressmqDctW5wJCW1Cn2MF",
+						"McTD3EkFhhTyymBGg55YNFL4NzR1AxSSAEh",
 					},
 				},
 			}},
@@ -2882,7 +2882,7 @@ func TestHandleDecodeRawTransaction(t *testing.T) {
 					ReqSigs: 1,
 					Type:    "scripthash",
 					Addresses: []string{
-						"DcurAwesomeAddressmqDctW5wJCW1Cn2MF",
+						"McTD3EkFhhTyymBGg55YNFL4NzR1AxSSAEh",
 					},
 				},
 			}},
@@ -2922,8 +2922,8 @@ func TestHandleDecodeScript(t *testing.T) {
 			"000000000000 OP_EQUALVERIFY OP_CHECKSIG",
 		ReqSigs:   1,
 		Type:      "stakesubmission-pubkeyhash",
-		Addresses: []string{"DsQxuVRvS4eaJ42dhQEsCXauMWjvopWgrVg"},
-		P2sh:      "DcaBW1ecMLBzXSS9Q8YRV3aBc5qQeaA1WPo",
+		Addresses: []string{"MsMfNmdbcherWznPacxufe9jSCMzRa1XDff"},
+		P2sh:      "Mc7YNJjzFG1osZkmCKr8dg1ju8xDKYeRntG",
 	}
 	aHex := "0A"
 	aHexRes := types.DecodeScriptResult{
@@ -2931,7 +2931,7 @@ func TestHandleDecodeScript(t *testing.T) {
 		ReqSigs:   0,
 		Type:      "nonstandard",
 		Addresses: []string{},
-		P2sh:      "DcbuYCoW1nJZhFf1ZyGXjoPL6D3ezNwwWjj",
+		P2sh:      "Mc9GQVtsui8P3NydNAaEtRptPGATfQ21f9U",
 	}
 	// This is a 2 of 2 multisig script.
 	multiSig := "5221030000000000000000000000000000000000000000000000000" +
@@ -2943,9 +2943,9 @@ func TestHandleDecodeScript(t *testing.T) {
 			"000000000000000000000000000002 2 OP_CHECKMULTISIG",
 		ReqSigs: 2,
 		Type:    "multisig",
-		Addresses: []string{"DsdvMfW6wGbGCXSNWidWtfP1tPmnCLNXQyC",
-			"DsSkAQDPhDW3foES4fcfmpkPYYZhnV3R4ws"},
-		P2sh: "DcexHKLpqiM49auD2jbxPH6enwm9u1ZFAo6",
+		Addresses: []string{"Msacpwhn7ubYRUC8PwMZMmwqy5Pqp3TgdQW",
+			"MsPSdgR4srWKtjzBwtLiEwKDdEBmQCRafz8"},
+		P2sh: "McCK9cSCjeAsViDppvufXuYD5zsxZydWFHa",
 	}
 	// This is a pay to script hash script.
 	p2sh := "a914000000000000000000000000000000000000000087"
@@ -2954,7 +2954,7 @@ func TestHandleDecodeScript(t *testing.T) {
 			"OP_EQUAL",
 		ReqSigs:   1,
 		Type:      "scripthash",
-		Addresses: []string{"DcXTb4QtmnyRsnzUVViYQawqFE5PuYTdX2C"},
+		Addresses: []string{"Mc4pTMWGfioFDvK6Hh2FZDPPYHCCaXby3JV"},
 	}
 	testRPCServerHandler(t, []rpcTest{{
 		name:    "handleDecodeScript: ok no version",
@@ -3197,7 +3197,7 @@ func TestHandleEstimateStakeDiff(t *testing.T) {
 func TestHandleExistsAddress(t *testing.T) {
 	t.Parallel()
 
-	validAddr := "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ"
+	validAddr := "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8"
 	testRPCServerHandler(t, []rpcTest{{
 		name:    "handleExistsAddress: ok, index is synced",
 		handler: handleExistsAddress,
@@ -3295,7 +3295,7 @@ func TestHandleExistsAddress(t *testing.T) {
 func TestHandleExistsAddresses(t *testing.T) {
 	t.Parallel()
 
-	validAddr := "DsQxvhTW4PzcmNzhFTvad81YmcRfKh1mTCJ"
+	validAddr := "MsMfPyfBF2ztzKkT8ged6EaNrJ3iwQXmZR8"
 	validAddrs := []string{validAddr, validAddr, validAddr}
 	existsSlice := []bool{false, true, true}
 	// existsSlice as a bitset is 110 binary which is 6 in hex.
@@ -5701,11 +5701,11 @@ func TestHandleValidateAddress(t *testing.T) {
 		name:    "handleValidateAddress: ok",
 		handler: handleValidateAddress,
 		cmd: &types.ValidateAddressCmd{
-			Address: "DcdacYDf5SUH5dYyDxufRngdiaVhi6n83ka",
+			Address: "McAwUqK2yNJ6Rksb2ADNaR8C1dcWP6KJCSA",
 		},
 		result: types.ValidateAddressChainResult{
 			IsValid: true,
-			Address: "DcdacYDf5SUH5dYyDxufRngdiaVhi6n83ka",
+			Address: "McAwUqK2yNJ6Rksb2ADNaR8C1dcWP6KJCSA",
 		},
 	}, {
 		name:    "handleValidateAddress: invalid address",
@@ -6461,7 +6461,7 @@ func TestHandleTSpendVotes(t *testing.T) {
 func TestTicketsForAddress(t *testing.T) {
 	t.Parallel()
 
-	addr := "DsRM6qwzT3r85evKvDBJBviTgYcaLKL4ipD"
+	addr := "MsN3a89fdgrQJbg5oRuLf3HHmEEdx8VUa8n"
 	hashStrings := []string{"822e537612dfd03b0dd2c2610083a93fde655f11c32adc7511d75e460abf4283",
 		"8319c4e0623f0f2c73444047eff595493aa87fe195a192c086204c06a758cdee",
 		"c870cd4c47be2ff342997b6d48a56f55b44932b4925098943c58d01b0ed5e725"}
@@ -6895,11 +6895,11 @@ func TestHandleVerifyMessage(t *testing.T) {
 
 	// private key : 0x0000000000000000000000000000000000000000000000000000000000000001
 	msg := "test message"
-	p2shAddr := "DcXTb4QtmnyRsnzUVViYQawqFE5PuYTdX2C"
-	compressedPKHAddr := "DsmcYVbP1Nmag2H4AS17UTvmWXmGeA7nLDx"
+	p2shAddr := "Mc4pTMWGfioFDvK6Hh2FZDPPYHCCaXby3JV"
+	compressedPKHAddr := "MsiK1mo4C1mrty2p3ej9waVbbDPLFqhGWiA"
 	compressedCompactSig := "H18ier4CIfSBOk0FKPjO4mggno0ES1w2P+41GpJnnyiSRW" +
 		"dE2n02YwE29Sw0n2ALT3M1Q1+GQW7moKqsem1COF8="
-	uncompressedPKHAddr := "DsbnCMAYV13buumdjHuwiJeJWZWvgjZRTbE"
+	uncompressedPKHAddr := "MsYUfdNDfe3t8rXPcWdzBRD8bF8zJQQMV2p"
 	uncompressedCompactSig := "G18ier4CIfSBOk0FKPjO4mggno0ES1w2P+41GpJnnyiS" +
 		"RWdE2n02YwE29Sw0n2ALT3M1Q1+GQW7moKqsem1COF8="
 	malformedCompactSig := "MEUCIQD8wKh2jPvO/PLK3Xz7D7GO0I3S4q6EvvGkdKPTUbJ" +
@@ -7623,7 +7623,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 				Hex:       "76a914762432e9619f5ddaf122ac663684152ffe9eb0ec88ac",
 				ReqSigs:   1,
 				Type:      "pubkeyhash",
-				Addresses: []string{"DsbjabD32RuS1deAj2uTjKfFZ6nSza5qVf3"},
+				Addresses: []string{"MsYS3sQiD4uiEaPvcFdWCSE5dnQWcK1ewoy"},
 			}}, {
 			Value:    144.27441143,
 			N:        1,
@@ -7635,7 +7635,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 				Hex:       "76a914762432e9619f5ddaf122ac663684152ffe9eb0ec88ac",
 				ReqSigs:   1,
 				Type:      "pubkeyhash",
-				Addresses: []string{"DsbjabD32RuS1deAj2uTjKfFZ6nSza5qVf3"},
+				Addresses: []string{"MsYS3sQiD4uiEaPvcFdWCSE5dnQWcK1ewoy"},
 			}}, {
 			Value:    68.00443066,
 			N:        2,
@@ -7647,7 +7647,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 				Hex:       "76a914bc3c059489f447afbf542ff33432adb9ded7f8e988ac",
 				ReqSigs:   1,
 				Type:      "pubkeyhash",
-				Addresses: []string{"Dsi8CRt85xYyempXs7ZPL1rBxvDdAGZmgsg"},
+				Addresses: []string{"Msepfi5oGbZFsiaHkLHRo8R23bqgmy84RUf"},
 			},
 		}},
 		BlockHash: "00000000000000001fc4c4c7a3f2ec6d552dda16a3a928f27b" +
@@ -7723,7 +7723,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 				Hex:       "76a914762432e9619f5ddaf122ac663684152ffe9eb0ec88ac",
 				ReqSigs:   1,
 				Type:      "pubkeyhash",
-				Addresses: []string{"DsbjabD32RuS1deAj2uTjKfFZ6nSza5qVf3"},
+				Addresses: []string{"MsYS3sQiD4uiEaPvcFdWCSE5dnQWcK1ewoy"},
 			}}, {
 			Value:    144.27441143,
 			N:        1,
@@ -7735,7 +7735,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 				Hex:       "76a914762432e9619f5ddaf122ac663684152ffe9eb0ec88ac",
 				ReqSigs:   1,
 				Type:      "pubkeyhash",
-				Addresses: []string{"DsbjabD32RuS1deAj2uTjKfFZ6nSza5qVf3"},
+				Addresses: []string{"MsYS3sQiD4uiEaPvcFdWCSE5dnQWcK1ewoy"},
 			}}, {
 			Value:    68.00443066,
 			N:        2,
@@ -7747,7 +7747,7 @@ func TestHandleGetRawTransaction(t *testing.T) {
 				Hex:       "76a914bc3c059489f447afbf542ff33432adb9ded7f8e988ac",
 				ReqSigs:   1,
 				Type:      "pubkeyhash",
-				Addresses: []string{"Dsi8CRt85xYyempXs7ZPL1rBxvDdAGZmgsg"},
+				Addresses: []string{"Msepfi5oGbZFsiaHkLHRo8R23bqgmy84RUf"},
 			},
 		}},
 		BlockHash:     "",

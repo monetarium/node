@@ -89,11 +89,8 @@ func MainNetParams() *Params {
 		Name:        "mainnet",
 		Net:         wire.MainNet,
 		DefaultPort: "9108",
-		DNSSeeds: []DNSSeed{
-			{"mainnet-seed.decred.mindcry.org", true},
-			{"mainnet-seed.decred.netpurgatory.com", true},
-			{"mainnet-seed.decred.org", true},
-		},
+		// DNSSeeds disabled - Monetarium uses manual peer connections for bootstrap
+		DNSSeeds: []DNSSeed{},
 
 		// Chain parameters
 		GenesisBlock:         &genesisBlock,
@@ -504,13 +501,13 @@ func MainNetParams() *Params {
 		AcceptNonStdTxs: false,
 
 		// Address encoding magics
-		NetworkAddressPrefix: "D",
-		PubKeyAddrID:         [2]byte{0x13, 0x86}, // starts with Dk
-		PubKeyHashAddrID:     [2]byte{0x07, 0x3f}, // starts with Ds
-		PKHEdwardsAddrID:     [2]byte{0x07, 0x1f}, // starts with De
-		PKHSchnorrAddrID:     [2]byte{0x07, 0x01}, // starts with DS
-		ScriptHashAddrID:     [2]byte{0x07, 0x1a}, // starts with Dc
-		PrivateKeyID:         [2]byte{0x22, 0xde}, // starts with Pm
+		NetworkAddressPrefix: "M",
+		PubKeyAddrID:         [2]byte{0x1f, 0xc5}, // starts with Mk
+		PubKeyHashAddrID:     [2]byte{0x0b, 0xc0}, // starts with Ms
+		PKHEdwardsAddrID:     [2]byte{0x0b, 0x9f}, // starts with Me
+		PKHSchnorrAddrID:     [2]byte{0x0b, 0x81}, // starts with MS
+		ScriptHashAddrID:     [2]byte{0x0b, 0x9a}, // starts with Mc
+		PrivateKeyID:         [2]byte{0x22, 0xdc}, // starts with Pm
 
 		// BIP32 hierarchical deterministic extended key magics
 		HDPrivateKeyID: [4]byte{0x02, 0xfd, 0xa4, 0xe8}, // starts with dprv
@@ -576,12 +573,9 @@ func MainNetParams() *Params {
 		TreasuryVoteRequiredMultiplier: 3, // 60% yes votes required
 		TreasuryVoteRequiredDivisor:    5,
 
-		seeders: []string{
-			"mainnet-seed-1.decred.org",
-			"mainnet-seed-2.decred.org",
-			"mainnet-seed.dcrdata.org",
-			"mainnet-seed.jholdstock.uk",
-		},
+		// HTTP seeders disabled - Monetarium uses manual peer connections for bootstrap
+		// To add peers, use --connect=<ip>:9108 or --addpeer=<ip>:9108
+		seeders: []string{},
 
 		// SKA (Skarb) dual-coin system parameters for mainnet
 		SKAMinRelayTxFee: 1e4, // 0.0001 SKA minimum relay fee
@@ -599,9 +593,9 @@ func MainNetParams() *Params {
 				Description:    "Primary asset-backed SKA coin type for mainnet",
 				// Governance-approved emission distribution (TO BE REPLACED WITH REAL ADDRESSES)
 				EmissionAddresses: []string{
-					"DsExampleTreasuryAddress1234567890", // Treasury fund (70%)
-					"DsExampleDevFundAddress1234567890",  // Development fund (20%)
-					"DsExampleStakingAddress1234567890",  // Staking rewards (10%)
+					"MsExampleTreasuryAddress1234567890", // Treasury fund (70%)
+					"MsExampleDevFundAddress1234567890",  // Development fund (20%)
+					"MsExampleStakingAddress1234567890",  // Staking rewards (10%)
 				},
 				EmissionAmounts: []int64{
 					7e6 * 1e8, // 7,000,000 SKA-1 to treasury
@@ -623,7 +617,7 @@ func MainNetParams() *Params {
 				Description:    "Secondary SKA coin type for proof of concept testing",
 				// Governance-approved emission distribution (TO BE REPLACED WITH REAL ADDRESSES)
 				EmissionAddresses: []string{
-					"DsExampleTreasuryAddress1234567890", // Full amount to treasury
+					"MsExampleTreasuryAddress1234567890", // Full amount to treasury
 				},
 				EmissionAmounts: []int64{
 					5e6 * 1e8, // 5,000,000 SKA-2 to treasury

@@ -221,7 +221,7 @@ func TestSKAEmissionNetworkReplayProtection(t *testing.T) {
 	testnetParams.SKACoins[1].EmissionKey = pubKey
 
 	// Create emission for mainnet
-	addresses := []string{"DsWKp7wtdTZYabYFYSc9cnxhwFEjA5g4pFc"}
+	addresses := []string{"MsPDyEAjtHYGz9JyT6u92hKi2EzhPodiZMm"}
 	amounts := []int64{1000000}
 
 	mainnetTx := createTestEmissionTx(t, addresses, amounts, 1, mainnetParams)
