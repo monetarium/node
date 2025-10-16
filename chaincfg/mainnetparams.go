@@ -133,9 +133,9 @@ func MainNetParams() *Params {
 		// forks rejection checkpoint.  This is intended to be updated
 		// periodically with new releases.
 		//
-		// Block f04628f2fe7fd0d33055dc326936a6af3772ec5226525bc8fca50631f3081faa
+		// Block *newHashFromStr("f04628f2fe7fd0d33055dc326936a6af3772ec5226525bc8fca50631f3081faa")
 		// Height: 865184
-		AssumeValid: *newHashFromStr("f04628f2fe7fd0d33055dc326936a6af3772ec5226525bc8fca50631f3081faa"),
+		AssumeValid: chainhash.Hash{},
 
 		// MinKnownChainWork is the minimum amount of known total work for the
 		// chain at a given point in time.
@@ -544,10 +544,7 @@ func MainNetParams() *Params {
 		BlockOneLedger:              tokenPayouts_MainNetParams(),
 
 		// Sanctioned Politeia keys.
-		PiKeys: [][]byte{
-			hexDecode("03f6e7041f1cf51ee10e0a01cd2b0385ce3cd9debaabb2296f7e9dee9329da946c"),
-			hexDecode("0319a37405cb4d1691971847d7719cfce70857c0f6e97d7c9174a3998cf0ab86dd"),
-		},
+		PiKeys: [][]byte{},
 
 		// ~1 day for tspend inclusion
 		TreasuryVoteInterval: 288,
