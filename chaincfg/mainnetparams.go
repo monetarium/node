@@ -532,7 +532,7 @@ func MainNetParams() *Params {
 		StakeVersionInterval:    144 * 2 * 7, // ~1 week
 		MaxFreshStakePerBlock:   20,          // 4*TicketsPerBlock
 		StakeEnabledHeight:      256 + 256,   // CoinbaseMaturity + TicketMaturity
-		StakeValidationHeight:   4096,        // ~14 days
+		StakeValidationHeight:   1024,        // ~14 days
 		StakeBaseSigScript:      []byte{0x00, 0x00},
 		StakeMajorityMultiplier: 3,
 		StakeMajorityDivisor:    4,
@@ -583,7 +583,7 @@ func MainNetParams() *Params {
 				Name:           "Skarb-1",
 				Symbol:         "SKA-1",
 				MaxSupply:      10e6 * 1e8, // 10 million SKA-1
-				EmissionHeight: 100000,     // Emit at block 100k
+				EmissionHeight: 1024,       // Emit at block 1024 (when staking is activated)
 				EmissionWindow: 4320,       // 30-day emission window (~144 blocks/day * 30)
 				Active:         true,
 				Description:    "Primary asset-backed SKA coin type for mainnet",

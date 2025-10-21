@@ -4173,7 +4173,7 @@ func newServer(ctx context.Context, profiler *profileServer,
 
 		s.cpuMiner = cpuminer.New(&cpuminer.Config{
 			ChainParams:                s.chainParams,
-			PermitConnectionlessMining: cfg.SimNet || cfg.RegNet,
+			PermitConnectionlessMining: cfg.SimNet || cfg.RegNet || cfg.Generate,
 			BgBlkTmplGenerator:         s.bg,
 			ProcessBlock:               s.syncManager.ProcessBlock,
 			ConnectedCount:             s.ConnectedCount,
