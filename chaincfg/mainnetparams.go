@@ -176,8 +176,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1493164800, // Apr 26th, 2017
-				ExpireTime: 1524700800, // Apr 26th, 2018
+				ForcedChoiceID: "yes",
+				StartTime:      1493164800, // Apr 26th, 2017
+				ExpireTime:     1524700800, // Apr 26th, 2018
 			}, {
 				Vote: Vote{
 					Id:          VoteIDLNSupport,
@@ -231,8 +232,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1505260800, // Sep 13th, 2017
-				ExpireTime: 1536796800, // Sep 13th, 2018
+				ForcedChoiceID: "yes",
+				StartTime:      1505260800, // Sep 13th, 2017
+				ExpireTime:     1536796800, // Sep 13th, 2018
 			}},
 			6: {{
 				Vote: Vote{
