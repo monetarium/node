@@ -2323,8 +2323,15 @@ func extractDeployments(params *chaincfg.Params) (map[string]deploymentInfo, err
 				return nil, err
 			}
 
-			// Prevent forced choices on the main network.
-			if isMainNet(params) && forcedState != nil {
+			// Prevent forced choices on the main network, except for legacy
+			// deployments that need early activation on Monetarium mainnet.
+			// These exceptions allow DCP0001 (stake difficulty), DCP0002 (OP_SHA256),
+			// and DCP0003 (CSV/LN features) to be forced active without voting.
+			legacyDeployments := map[string]bool{
+				chaincfg.VoteIDSDiffAlgorithm: true, // DCP0001
+				chaincfg.VoteIDLNFeatures:     true, // DCP0002 & DCP0003
+			}
+			if isMainNet(params) && forcedState != nil && !legacyDeployments[id] {
 				str := fmt.Sprintf("deployment ID %s has a forced choice for "+
 					"the main network", id)
 				return nil, contextError(ErrForcedMainNetChoice, str)
