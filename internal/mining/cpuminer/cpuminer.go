@@ -187,7 +187,7 @@ out:
 
 // submitBlock submits the passed block to network after ensuring it passes all
 // of the consensus validation rules.
-func (m *CPUMiner) submitBlock(block *dcrutil.Block, isBlake3PowActive bool) bool {
+func (m *CPUMiner) submitBlock(block *dcrutil.Block, isBlake3PowActive bool, startTime time.Time) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
@@ -226,8 +226,13 @@ func (m *CPUMiner) submitBlock(block *dcrutil.Block, isBlake3PowActive bool) boo
 	if powHash != *blockHash {
 		powHashStr = ", pow hash " + powHash.String()
 	}
-	log.Infof("Block submitted via CPU miner accepted (hash %s, height %d%s)",
-		blockHash, block.Height(), powHashStr)
+
+	// Calculate mining interval
+	interval := time.Since(startTime)
+	intervalStr := ", interval " + interval.Round(time.Second).String()
+
+	log.Infof("Block submitted via CPU miner accepted (hash %s, height %d%s%s)",
+		blockHash, block.Height(), powHashStr, intervalStr)
 	return true
 }
 
@@ -362,6 +367,9 @@ func (m *CPUMiner) solveBlock(ctx context.Context, header *wire.BlockHeader,
 func (m *CPUMiner) solver(ctx context.Context, template *mining.BlockTemplate,
 	speedStats *speedStats, isBlake3PowActive bool) {
 
+	// Track when mining started for this template to calculate interval
+	templateStartTime := time.Now()
+
 	for {
 		if ctx.Err() != nil {
 			return
@@ -419,7 +427,7 @@ func (m *CPUMiner) solver(ctx context.Context, template *mining.BlockTemplate,
 			}
 
 			block := dcrutil.NewBlock(&shallowBlockCopy)
-			if !m.submitBlock(block, isBlake3PowActive) {
+			if !m.submitBlock(block, isBlake3PowActive, templateStartTime) {
 				m.Lock()
 				m.minedOnParents[prevBlock]++
 				m.Unlock()
@@ -799,11 +807,12 @@ out:
 		//
 		// The block in the template is shallow copied to avoid mutating the
 		// data of the shared template.
+		templateStartTime := time.Now()
 		shallowBlockCopy := *templateNtfn.Template.Block
 		shallowBlockHdr := &shallowBlockCopy.Header
 		if m.solveBlock(ctx, shallowBlockHdr, &stats, isBlake3PowActive) {
 			block := dcrutil.NewBlock(&shallowBlockCopy)
-			if m.submitBlock(block, isBlake3PowActive) {
+			if m.submitBlock(block, isBlake3PowActive, templateStartTime) {
 				m.discretePrevTemplate.Store(templateNtfn.Template)
 				blockHashes = append(blockHashes, block.Hash())
 			}

@@ -2327,9 +2327,17 @@ func extractDeployments(params *chaincfg.Params) (map[string]deploymentInfo, err
 			// deployments that need early activation on Monetarium mainnet.
 			// These exceptions allow DCP0001 (stake difficulty), DCP0002 (OP_SHA256),
 			// and DCP0003 (CSV/LN features) to be forced active without voting.
+			// Technical upgrades like DCP0004, DCP0005, DCP0008, DCP0009, DCP0010,
+			// and DCP0011 (BLAKE3) are also allowed to be forced active on Monetarium
+			// mainnet.
 			legacyDeployments := map[string]bool{
-				chaincfg.VoteIDSDiffAlgorithm: true, // DCP0001
-				chaincfg.VoteIDLNFeatures:     true, // DCP0002 & DCP0003
+				chaincfg.VoteIDSDiffAlgorithm:          true, // DCP0001
+				chaincfg.VoteIDLNFeatures:              true, // DCP0002 & DCP0003
+				chaincfg.VoteIDFixLNSeqLocks:           true, // DCP0004
+				chaincfg.VoteIDHeaderCommitments:       true, // DCP0005
+				chaincfg.VoteIDExplicitVersionUpgrades: true, // DCP0008
+				chaincfg.VoteIDAutoRevocations:         true, // DCP0009
+				chaincfg.VoteIDBlake3Pow:               true, // DCP0011
 			}
 			if isMainNet(params) && forcedState != nil && !legacyDeployments[id] {
 				str := fmt.Sprintf("deployment ID %s has a forced choice for "+

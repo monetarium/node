@@ -261,8 +261,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1548633600, // Jan 28th, 2019
-				ExpireTime: 1580169600, // Jan 28th, 2020
+				ForcedChoiceID: "yes",
+				StartTime:      1548633600, // Jan 28th, 2019
+				ExpireTime:     1580169600, // Jan 28th, 2020
 			}},
 			7: {{
 				Vote: Vote{
@@ -289,8 +290,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1567641600, // Sep 5th, 2019
-				ExpireTime: 1599264000, // Sep 5th, 2020
+				ForcedChoiceID: "yes",
+				StartTime:      1567641600, // Sep 5th, 2019
+				ExpireTime:     1599264000, // Sep 5th, 2020
 			}},
 			8: {{
 				Vote: Vote{
@@ -372,8 +374,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1631750400, // Sep 16th, 2021
-				ExpireTime: 1694822400, // Sep 16th, 2023
+				ForcedChoiceID: "yes",
+				StartTime:      1631750400, // Sep 16th, 2021
+				ExpireTime:     1694822400, // Sep 16th, 2023
 			}, {
 				Vote: Vote{
 					Id:          VoteIDAutoRevocations,
@@ -399,8 +402,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1631750400, // Sep 16th, 2021
-				ExpireTime: 1694822400, // Sep 16th, 2023
+				ForcedChoiceID: "yes",
+				StartTime:      1631750400, // Sep 16th, 2021
+				ExpireTime:     1694822400, // Sep 16th, 2023
 			}, {
 				Vote: Vote{
 					Id:          VoteIDChangeSubsidySplit,
@@ -454,8 +458,9 @@ func MainNetParams() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1682294400, // Apr 24th, 2023
-				ExpireTime: 1745452800, // Apr 24th, 2025
+				ForcedChoiceID: "yes",
+				StartTime:      1682294400, // Apr 24th, 2023
+				ExpireTime:     1745452800, // Apr 24th, 2025
 			}, {
 				Vote: Vote{
 					Id:          VoteIDChangeSubsidySplitR2,
