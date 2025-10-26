@@ -112,8 +112,8 @@ func MainNetParams() *Params {
 		RetargetAdjustmentFactor: 4,
 
 		// Version 2 difficulty algorithm (ASERT + BLAKE3) parameters.
-		WorkDiffV2Blake3StartBits: 0x1b00a5a6,
-		WorkDiffV2HalfLifeSecs:    43200, // 144 * TimePerBlock (12 hours)
+		WorkDiffV2Blake3StartBits: 0x1d00ffff, // Difficulty 1 - easy CPU mining for bootstrap
+		WorkDiffV2HalfLifeSecs:    43200,       // 144 * TimePerBlock (12 hours)
 
 		// Subsidy parameters.
 		BaseSubsidy:              6400000000, // 64 VAR per block
