@@ -599,7 +599,7 @@ func MainNetParams() *Params {
 					"MsMz7mvUPBu5GDFexM2W8KiFxEeToFAC4Wv",
 				},
 				EmissionAmounts: []int64{
-					1e6 * 1e8, // 1,000,000 SKA-1 to staking rewards
+					10e6 * 1e8, // 1,000,000 SKA-1 to staking rewards
 				},
 				// SECURITY NOTE: This is a placeholder key for development ONLY
 				// Production deployment MUST generate secure keys with proper key ceremony
