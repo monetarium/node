@@ -978,7 +978,8 @@ func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, txDesc *TxD
 	}
 
 	// Record transaction fee for coin-type-specific tracking
-	if mp.feeCalculator != nil {
+	// Skip feeless system transactions (votes and revocations) from fee statistics
+	if mp.feeCalculator != nil && txDesc.Type != stake.TxTypeSSGen && txDesc.Type != stake.TxTypeSSRtx {
 		// Determine the primary coin type from outputs
 		// (inputs and outputs always have the same coin type)
 		primaryCoinType := mp.determinePrimaryCoinType(msgTx)
@@ -2725,10 +2726,13 @@ func (mp *TxPool) ProcessConfirmedTransactions(block *dcrutil.Block, isTreasuryE
 		for _, tx := range txns {
 			mp.mtx.RLock()
 			if poolTxDesc, exists := mp.pool[*tx.Hash()]; exists {
-				// Determine coin type from outputs (inputs and outputs always match)
-				primaryCoinType := mp.determinePrimaryCoinType(tx.MsgTx())
-				txSize := int64(tx.MsgTx().SerializeSize())
-				mp.feeCalculator.RecordTransactionFee(primaryCoinType, poolTxDesc.Fee, txSize, true) // true = confirmed
+				// Skip feeless system transactions (votes and revocations) from fee statistics
+				if poolTxDesc.Type != stake.TxTypeSSGen && poolTxDesc.Type != stake.TxTypeSSRtx {
+					// Determine coin type from outputs (inputs and outputs always match)
+					primaryCoinType := mp.determinePrimaryCoinType(tx.MsgTx())
+					txSize := int64(tx.MsgTx().SerializeSize())
+					mp.feeCalculator.RecordTransactionFee(primaryCoinType, poolTxDesc.Fee, txSize, true) // true = confirmed
+				}
 			}
 			mp.mtx.RUnlock()
 		}

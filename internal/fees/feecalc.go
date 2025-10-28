@@ -414,6 +414,19 @@ func (calc *CoinTypeFeeCalculator) calculatePercentileFees(recentFees []int64) [
 	p50 := calcPercentile(sortedFees, 0.50) // Normal fee
 	p10 := calcPercentile(sortedFees, 0.10) // Slow fee
 
+	// Enforce minimum relay fee floor - no fee estimate should be below minRelayFee
+	// This ensures RPC fee estimates are always acceptable to the mempool
+	minRelayFee := int64(calc.defaultMinRelayFee)
+	if p90 < minRelayFee {
+		p90 = minRelayFee
+	}
+	if p50 < minRelayFee {
+		p50 = minRelayFee
+	}
+	if p10 < minRelayFee {
+		p10 = minRelayFee
+	}
+
 	return [3]dcrutil.Amount{
 		dcrutil.Amount(p90),
 		dcrutil.Amount(p50),

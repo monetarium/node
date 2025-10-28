@@ -2188,7 +2188,8 @@ nextPriorityQueueItem:
 			transactionTracker.AddTransaction(bundledTx)
 
 			// Record transaction fee for coin-type-specific fee estimation
-			if g.cfg.FeeCalculator != nil {
+			// Skip feeless system transactions (votes and revocations) from fee statistics
+			if g.cfg.FeeCalculator != nil && bundledTxDesc.Type != stake.TxTypeSSGen && bundledTxDesc.Type != stake.TxTypeSSRtx {
 				bundledCoinType := blockalloc.GetTransactionCoinType(bundledTx)
 				bundledSize := int64(bundledTx.MsgTx().SerializeSize())
 				g.cfg.FeeCalculator.RecordTransactionFee(bundledCoinType,

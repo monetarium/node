@@ -2698,6 +2698,11 @@ func handleGetMempoolFeesInfo(_ context.Context, s *Server, cmd interface{}) (in
 	totalSize := int64(0)
 
 	for _, txDesc := range mempoolTxns {
+		// Skip feeless system transactions (votes and revocations) from fee statistics
+		if txDesc.Type == stake.TxTypeSSGen || txDesc.Type == stake.TxTypeSSRtx {
+			continue
+		}
+
 		// Determine the primary coin type for this transaction
 		// For simplicity, use the coin type of the first output
 		msgTx := txDesc.Tx.MsgTx()
@@ -2777,6 +2782,25 @@ func handleGetMempoolFeesInfo(_ context.Context, s *Server, cmd interface{}) (in
 		p75Fee := calculatePercentile(feeRates, 0.75)
 		p90Fee := calculatePercentile(feeRates, 0.90)
 		avgSize := float64(totalCoinTypeSize) / float64(len(txs))
+
+		// Enforce minimum relay fee floor - no fee estimate should be below minRelayFee
+		// This ensures fee estimates are always acceptable to the mempool
+		minRelayFee := float64(s.cfg.MinRelayTxFee)
+		if minFee < minRelayFee {
+			minFee = minRelayFee
+		}
+		if medianFee < minRelayFee {
+			medianFee = minRelayFee
+		}
+		if p25Fee < minRelayFee {
+			p25Fee = minRelayFee
+		}
+		if p75Fee < minRelayFee {
+			p75Fee = minRelayFee
+		}
+		if p90Fee < minRelayFee {
+			p90Fee = minRelayFee
+		}
 
 		// Calculate utilization rate (simplified - could be enhanced with actual block space limits)
 		utilizationRate := float64(totalCoinTypeSize) / (1024 * 1024) * 100 // Percentage based on 1MB blocks
