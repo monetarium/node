@@ -2094,28 +2094,27 @@ nextPriorityQueueItem:
 			}
 		}
 
-		// Skip transactions that do not pay enough fee except for stake
-		// transactions and SKA emission transactions. Use coin-type-aware fee validation when available.
+		// Reject transactions with insufficient fees, but use static minimum
+		// fee (not dynamic multiplier) to avoid rejecting valid mempool
+		// transactions when network conditions change. The priority queue
+		// already handles fee-based prioritization for block space allocation.
+		//
+		// This protects against:
+		// - 0-fee spam transactions
+		// - Transactions from non-validating peers
+		// - Direct RPC submissions bypassing mempool
+		//
+		// But allows valid mempool transactions (that passed dynamic fee
+		// validation at entry time) to eventually be mined.
 		skipForLowFee := false
 		isSKAEmission := wire.IsSKAEmissionTransaction(tx.MsgTx())
 		if tx.Tree() != wire.TxTreeStake && !isSKAEmission {
-			if g.cfg.FeeCalculator != nil {
-				// Use coin-type-specific fee validation
-				txSize := int64(tx.MsgTx().SerializeSize())
-				err := g.cfg.FeeCalculator.ValidateTransactionFees(prioItem.txDesc.Fee,
-					txSize, prioItem.coinType, false)
-				if err != nil {
-					log.Debugf("Skipping tx %s with coin type %d: %v",
-						tx.Hash(), prioItem.coinType, err)
-					skipForLowFee = true
-				}
-			} else {
-				// Fallback to standard fee validation
-				if prioItem.feePerKB < float64(g.cfg.Policy.TxMinFreeFee) {
-					log.Debugf("Skipping tx %s with feePerKB %.2f < TxMinFreeFee %d ",
-						tx.Hash(), prioItem.feePerKB, g.cfg.Policy.TxMinFreeFee)
-					skipForLowFee = true
-				}
+			// Only enforce static minimum relay fee, not dynamic multiplier
+			minStaticFee := float64(g.cfg.Policy.TxMinFreeFee)
+			if prioItem.feePerKB < minStaticFee {
+				log.Debugf("Skipping tx %s with feePerKB %.2f < static minimum %.2f",
+					tx.Hash(), prioItem.feePerKB, minStaticFee)
+				skipForLowFee = true
 			}
 		}
 
