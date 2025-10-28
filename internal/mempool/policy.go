@@ -361,6 +361,11 @@ func checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType, height int64,
 		return txRuleError(ErrNonStandard, str)
 	}
 
+	// SKA emission transactions have special authorization scripts with the
+	// SKA marker that are not push-only by definition. Skip signature script
+	// push-only validation for SKA emission transactions.
+	isSKAEmission := wire.IsSKAEmissionTransaction(msgTx)
+
 	for i, txIn := range msgTx.TxIn {
 		// TSpends should only have one input and that input has a
 		// specific format which is checked by IsTSpend, so if this tx
@@ -383,7 +388,9 @@ func checkTransactionStandard(tx *dcrutil.Tx, txType stake.TxType, height int64,
 
 		// Each transaction input signature script must only contain
 		// opcodes which push data onto the stack.
-		if !txscript.IsPushOnlyScript(txIn.SignatureScript) {
+		// Skip this check for SKA emission transactions since their
+		// authorization scripts contain the SKA marker and raw data.
+		if !isSKAEmission && !txscript.IsPushOnlyScript(txIn.SignatureScript) {
 			str := fmt.Sprintf("transaction input %d: signature "+
 				"script is not push only", i)
 			return txRuleError(ErrNonStandard, str)
