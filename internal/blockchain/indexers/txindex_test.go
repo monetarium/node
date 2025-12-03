@@ -261,6 +261,13 @@ func (tc *testChain) FetchUtxoEntryAmount(outpoint wire.OutPoint) (int64, bool, 
 	return 0, true, nil
 }
 
+// FetchUtxoEntryDetails implements the ChainQueryer interface.
+func (tc *testChain) FetchUtxoEntryDetails(outpoint wire.OutPoint) (int64, int64, uint32, bool, error) {
+	// Mock implementation: Return zero values and spent=true for all queries.
+	// This is sufficient for the indexer tests which don't rely on actual UTXO data.
+	return 0, 0, 0, true, nil
+}
+
 // notifyAndWait sends the provided notification and waits for done signal
 // with a one second timeout.
 func notifyAndWait(t *testing.T, subber *IndexSubscriber, ntfn *IndexNtfn) {

@@ -52,17 +52,17 @@ func TestCreateMinerSSFeeTx(t *testing.T) {
 					t.Errorf("Expected 2 outputs, got %d", len(tx.TxOut))
 				}
 
-				// First output should be payment
-				if tx.TxOut[0].Value != 100000 {
+				// First output should be OP_RETURN - standard SSFee format
+				if tx.TxOut[0].Value != 0 {
 					t.Errorf("Expected payment value 100000, got %d", tx.TxOut[0].Value)
 				}
 				if tx.TxOut[0].CoinType != cointype.CoinType(1) {
 					t.Errorf("Expected coin type 1, got %d", tx.TxOut[0].CoinType)
 				}
 
-				// Second output should be OP_RETURN (0 value)
-				if tx.TxOut[1].Value != 0 {
-					t.Errorf("Expected OP_RETURN value 0, got %d", tx.TxOut[1].Value)
+				// Second output should be payment - standard SSFee format
+				if tx.TxOut[1].Value != 100000 {
+					t.Errorf("Expected payment value 100000, got %d", tx.TxOut[1].Value)
 				}
 
 				// Check version
@@ -79,8 +79,8 @@ func TestCreateMinerSSFeeTx(t *testing.T) {
 			height:       2000,
 			expectError:  false,
 			validateTx: func(t *testing.T, tx *wire.MsgTx) {
-				if tx.TxOut[0].Value != 50000 {
-					t.Errorf("Expected payment value 50000, got %d", tx.TxOut[0].Value)
+				if tx.TxOut[0].Value != 0 {
+					t.Errorf("Expected OP_RETURN value 0, got %d", tx.TxOut[0].Value)
 				}
 				if tx.TxOut[0].CoinType != cointype.CoinType(2) {
 					t.Errorf("Expected coin type 2, got %d", tx.TxOut[0].CoinType)
@@ -119,10 +119,10 @@ func TestCreateMinerSSFeeTx(t *testing.T) {
 			height:       1000,
 			expectError:  false,
 			validateTx: func(t *testing.T, tx *wire.MsgTx) {
-				// First output should use OP_SSGEN + OP_TRUE script (anyone-can-spend)
+				// Second output (payment) should use OP_SSGEN + OP_TRUE script (anyone-can-spend)
 				// OP_SSGEN (0xbb) + OP_TRUE (0x51)
-				if len(tx.TxOut[0].PkScript) != 2 || tx.TxOut[0].PkScript[0] != 0xbb || tx.TxOut[0].PkScript[1] != 0x51 {
-					t.Errorf("Expected OP_SSGEN + OP_TRUE script for nil address, got %x", tx.TxOut[0].PkScript)
+				if len(tx.TxOut[1].PkScript) != 2 || tx.TxOut[1].PkScript[0] != 0xbb || tx.TxOut[1].PkScript[1] != 0x51 {
+					t.Errorf("Expected OP_SSGEN + OP_TRUE script for nil address, got %x", tx.TxOut[1].PkScript)
 				}
 			},
 		},
@@ -130,9 +130,9 @@ func TestCreateMinerSSFeeTx(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Pass nil utxoView to test without UTXO augmentation
+			// Pass nil SSFeeIndex and blockUtxos to test null-input SSFee creation (no augmentation)
 			minerSSFeeTx, err := createMinerSSFeeTx(test.coinType, test.totalFee,
-				test.minerAddress, test.height, nil)
+				test.minerAddress, test.height, nil, nil)
 
 			if test.expectError {
 				if err == nil {
@@ -175,8 +175,8 @@ func TestMinerSSFeeOpReturn(t *testing.T) {
 	}
 
 	height := int64(12345)
-	// Pass nil utxoView to test without UTXO augmentation
-	minerSSFeeTx, err := createMinerSSFeeTx(cointype.CoinType(1), 100000, mockAddr, height, nil)
+	// Pass nil SSFeeIndex and blockUtxos to test null-input SSFee creation (no augmentation)
+	minerSSFeeTx, err := createMinerSSFeeTx(cointype.CoinType(1), 100000, mockAddr, height, nil, nil)
 	if err != nil {
 		t.Fatalf("Failed to create miner SSFee tx: %v", err)
 	}
@@ -187,7 +187,8 @@ func TestMinerSSFeeOpReturn(t *testing.T) {
 		t.Fatal("Expected at least 2 outputs")
 	}
 
-	opReturnOut := tx.TxOut[len(tx.TxOut)-1]
+	// OP_RETURN should be at index 0 (standard SSFee format)
+	opReturnOut := tx.TxOut[0]
 	if opReturnOut.Value != 0 {
 		t.Error("OP_RETURN output should have 0 value")
 	}
@@ -240,8 +241,8 @@ func TestMinerSSFeeDistribution(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		// Pass nil utxoView to test without UTXO augmentation
-		minerSSFeeTx, err := createMinerSSFeeTx(tc.coinType, tc.feeAmount, minerAddr, 1000, nil)
+		// Pass nil SSFeeIndex and blockUtxos to test null-input SSFee creation (no augmentation)
+		minerSSFeeTx, err := createMinerSSFeeTx(tc.coinType, tc.feeAmount, minerAddr, 1000, nil, nil)
 		if err != nil {
 			t.Errorf("Failed to create miner SSFee for coin type %d: %v", tc.coinType, err)
 			continue
@@ -255,16 +256,16 @@ func TestMinerSSFeeDistribution(t *testing.T) {
 				tc.coinType, tc.feeAmount, tx.TxIn[0].ValueIn)
 		}
 
-		// Verify output value matches fee amount (excluding OP_RETURN)
-		if tx.TxOut[0].Value != tc.feeAmount {
+		// Verify payment output value matches fee amount (output[1] in standard SSFee format)
+		if tx.TxOut[1].Value != tc.feeAmount {
 			t.Errorf("Output value mismatch for coin type %d: expected %d, got %d",
-				tc.coinType, tc.feeAmount, tx.TxOut[0].Value)
+				tc.coinType, tc.feeAmount, tx.TxOut[1].Value)
 		}
 
 		// Verify coin type is correct
-		if tx.TxOut[0].CoinType != tc.coinType {
+		if tx.TxOut[1].CoinType != tc.coinType {
 			t.Errorf("Output coin type mismatch: expected %d, got %d",
-				tc.coinType, tx.TxOut[0].CoinType)
+				tc.coinType, tx.TxOut[1].CoinType)
 		}
 	}
 }

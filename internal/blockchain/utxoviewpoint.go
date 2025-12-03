@@ -969,9 +969,24 @@ func (view *UtxoViewpoint) fetchInputUtxos(block *dcrutil.Block,
 			continue
 		}
 
-		// Ignore SSFee transactions since they have null inputs like treasurybase.
+		// Handle SSFee transactions:
+		// - SSFee with null input (creating new UTXO): skip (like treasurybase)
+		// - SSFee with real input (augmenting existing UTXO): fetch the UTXO
 		isSSFee := stake.IsSSFee(msgTx)
 		if isSSFee {
+			// Augmented SSFee transactions have exactly one input with a real outpoint.
+			// Non-augmented SSFee have one input with a null outpoint (hash = all zeros).
+			// The null outpoint check: both hash bytes == 0 AND index == MaxPrevOutIndex
+			if len(msgTx.TxIn) > 0 {
+				outpoint := &msgTx.TxIn[0].PreviousOutPoint
+				// Check if this is NOT a null outpoint
+				// Null outpoint has Index == MaxPrevOutIndex (0xffffffff)
+				if outpoint.Index != wire.MaxPrevOutIndex {
+					// This is an augmented SSFee with a real input - fetch the UTXO
+					filteredSet.add(view, outpoint)
+				}
+			}
+			// Skip to next transaction (SSFee never has more than one input)
 			continue
 		}
 

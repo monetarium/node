@@ -853,8 +853,6 @@ func createSSFeeTx(coinType cointype.CoinType, totalFee int64, voters []*dcrutil
 				ValueIn:          augmentValue,
 				SignatureScript:  []byte{}, // Placeholder - SSFee outputs are anyone-can-spend
 			})
-			log.Debugf("Creating augmented SSFee for voter %d: input %d + fee %d = output %d",
-				voterIdx, augmentValue, voterFee, augmentValue+voterFee)
 		} else {
 			// Null input - create new UTXO (fallback behavior)
 			tx.AddTxIn(&wire.TxIn{
@@ -866,8 +864,6 @@ func createSSFeeTx(coinType cointype.CoinType, totalFee int64, voters []*dcrutil
 				ValueIn:         voterFee,
 				SignatureScript: []byte{},
 			})
-			log.Debugf("Creating new SSFee for voter %d: fee %d (no existing UTXO found)",
-				voterIdx, voterFee)
 		}
 
 		// Create output to voter with augmented value
@@ -926,7 +922,8 @@ func createSSFeeTx(coinType cointype.CoinType, totalFee int64, voters []*dcrutil
 //   - Error if extraction or transaction creation fails
 func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 	voters []*dcrutil.Tx, nextBlockHeight int64,
-	ssfeeIndex *indexers.SSFeeIndex) ([]*dcrutil.Tx, error) {
+	ssfeeIndex *indexers.SSFeeIndex,
+	blockUtxos *blockchain.UtxoViewpoint) ([]*dcrutil.Tx, error) {
 
 	if len(voters) == 0 {
 		return nil, nil
@@ -1002,18 +999,42 @@ func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 		// Step 3: Look up existing UTXO for augmentation (if index provided)
 		var existingOutpoint *wire.OutPoint
 		var existingValue int64
+		var existingBlockHeight int64
+		var existingBlockIndex uint32
 
 		if ssfeeIndex != nil {
-			outpoint, value, err := ssfeeIndex.LookupUTXO(coinType, group.hash160)
+			outpoint, value, blockHeight, blockIndex, err := ssfeeIndex.LookupUTXO(coinType, group.hash160)
 			if err != nil {
 				// Log but don't fail - fall back to null input
 				log.Debugf("Failed to query SSFeeIndex for UTXO lookup: %v", err)
-			} else if outpoint != nil {
-				// Found existing UTXO for augmentation
-				existingOutpoint = outpoint
-				existingValue = value
-				log.Debugf("Found augmentable UTXO for consolidation address %x: %v with value %d",
-					group.hash160, existingOutpoint, existingValue)
+			} else if outpoint != nil && value > 0 {
+				// CRITICAL: Verify UTXO is still available (not spent in mempool/current block)
+				if blockUtxos != nil {
+					entry := blockUtxos.LookupEntry(*outpoint)
+					if entry == nil || entry.IsSpent() {
+						// UTXO already spent in mempool or current block template
+						log.Debugf("SSFee UTXO %v found by index but already spent in mempool/block - creating new UTXO instead",
+							outpoint)
+						// Don't use this UTXO - fall back to null input
+					} else {
+						// UTXO is available - safe to use for augmentation
+						existingOutpoint = outpoint
+						existingValue = value
+						existingBlockHeight = blockHeight
+						existingBlockIndex = blockIndex
+						log.Debugf("Found augmentable UTXO %v (value=%d, height=%d, index=%d) for consolidation address %x",
+							outpoint, value, blockHeight, blockIndex, group.hash160)
+					}
+				} else {
+					// No blockUtxos provided (shouldn't happen in production) - use cautiously
+					existingOutpoint = outpoint
+					existingValue = value
+					existingBlockHeight = blockHeight
+					existingBlockIndex = blockIndex
+				}
+			} else {
+				log.Debugf("No existing UTXO found in SSFeeIndex for consolidation address %x (will create new UTXO)",
+					group.hash160)
 			}
 		}
 
@@ -1027,12 +1048,10 @@ func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 			tx.AddTxIn(&wire.TxIn{
 				PreviousOutPoint: *existingOutpoint,
 				Sequence:         wire.MaxTxInSequenceNum,
-				BlockHeight:      wire.NullBlockHeight,
-				BlockIndex:       wire.NullBlockIndex,
+				BlockHeight:      uint32(existingBlockHeight),
+				BlockIndex:       existingBlockIndex,
 				ValueIn:          existingValue,
 			})
-			log.Debugf("Creating augmented SSFee for consolidation address %x: input %d + fee %d = output %d",
-				group.hash160, existingValue, groupFee, existingValue+groupFee)
 		} else {
 			// Create null input (new UTXO)
 			tx.AddTxIn(&wire.TxIn{
@@ -1045,21 +1064,20 @@ func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 				BlockIndex:  wire.NullBlockIndex,
 				ValueIn:     0,
 			})
-			log.Debugf("Creating new SSFee for consolidation address %x: fee %d (no existing UTXO found)",
-				group.hash160, groupFee)
 		}
 
-		// Add SSFee marker output (OP_RETURN)
+		// Add OP_RETURN output with consolidation address (output[0] - standard SSFee format)
 		// Use first voter in group to determine the sequence
 		voterSeq := uint16(group.voterIndices[0])
 		ssfeeMarker := stake.CreateStakerSSFeeMarker(nextBlockHeight, voterSeq)
 		tx.AddTxOut(&wire.TxOut{
 			Value:    0,
 			Version:  0,
+			CoinType: coinType,
 			PkScript: ssfeeMarker,
 		})
 
-		// Add payment output to consolidation address
+		// Add payment output to consolidation address (output[1] - standard SSFee format)
 		outputValue := groupFee
 		if existingValue > 0 {
 			// Augmenting: new value = existing value + fee
@@ -1075,6 +1093,7 @@ func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 
 		retTx := dcrutil.NewTx(tx)
 		retTx.SetTree(wire.TxTreeStake)
+
 		ssFeeTxns = append(ssFeeTxns, retTx)
 	}
 
@@ -1097,7 +1116,8 @@ func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 // If no matching UTXO exists, falls back to null input (creates new UTXO).
 func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 	minerAddress stdaddr.Address, nextBlockHeight int64,
-	utxoView *blockchain.UtxoViewpoint) (*dcrutil.Tx, error) {
+	ssfeeIndex *indexers.SSFeeIndex,
+	blockUtxos *blockchain.UtxoViewpoint) (*dcrutil.Tx, error) {
 
 	// SSFee cannot be used for VAR fees (those go through coinbase)
 	if coinType == cointype.CoinTypeVAR {
@@ -1130,17 +1150,54 @@ func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 		payScript = []byte{txscript.OP_SSGEN, txscript.OP_TRUE}
 	}
 
-	// Try to find existing UTXO to augment (prevent dust accumulation)
+	// Extract hash160 from payScript for SSFeeIndex lookup
+	// This is needed to find existing miner SSFee UTXOs for consolidation
+	var minerHash160 []byte
+	if minerAddress != nil && len(payScript) == 26 {
+		// OP_SSGEN-tagged P2PKH script format (26 bytes):
+		// OP_SSGEN OP_DUP OP_HASH160 OP_DATA_20 <20 bytes hash160> OP_EQUALVERIFY OP_CHECKSIG
+		minerHash160 = payScript[4:24]
+	}
+
+	// Try to find existing UTXO to augment using SSFeeIndex (prevent dust accumulation)
 	var inputOutpoint *wire.OutPoint
 	var augmentValue int64
+	var existingBlockHeight int64
+	var existingBlockIndex uint32
 
-	if utxoView != nil && payScript != nil {
-		outpoint, entry := findAugmentableUTXO(utxoView, payScript, coinType)
-		if outpoint != nil && entry != nil {
-			inputOutpoint = outpoint
-			augmentValue = entry.Amount()
-			log.Debugf("Augmenting miner SSFee for coin type %d: found existing UTXO %v with value %d, adding fee %d",
-				coinType, outpoint, augmentValue, totalFee)
+	if ssfeeIndex != nil && minerHash160 != nil {
+		outpoint, value, blockHeight, blockIndex, err := ssfeeIndex.LookupUTXO(coinType, minerHash160)
+		if err != nil {
+			// Log but don't fail - fall back to null input
+			log.Debugf("Failed to query SSFeeIndex for miner UTXO lookup: %v", err)
+		} else if outpoint != nil && value > 0 {
+			// CRITICAL: Verify UTXO is still available (not spent in mempool/current block)
+			if blockUtxos != nil {
+				entry := blockUtxos.LookupEntry(*outpoint)
+				if entry == nil || entry.IsSpent() {
+					// UTXO already spent in mempool or current block template
+					log.Debugf("Miner SSFee UTXO %v found by index but already spent in mempool/block - creating new UTXO instead",
+						outpoint)
+					// Don't use this UTXO - fall back to null input
+				} else {
+					// UTXO is available - safe to use for augmentation
+					inputOutpoint = outpoint
+					augmentValue = value
+					existingBlockHeight = blockHeight
+					existingBlockIndex = blockIndex
+					log.Debugf("Found augmentable miner SSFee UTXO %v (value=%d, height=%d, index=%d) for coin type %d",
+						outpoint, value, blockHeight, blockIndex, coinType)
+				}
+			} else {
+				// No blockUtxos provided (shouldn't happen) - use cautiously
+				inputOutpoint = outpoint
+				augmentValue = value
+				existingBlockHeight = blockHeight
+				existingBlockIndex = blockIndex
+			}
+		} else {
+			log.Debugf("No existing miner SSFee UTXO found in SSFeeIndex for hash160 %x (will create new UTXO)",
+				minerHash160)
 		}
 	}
 
@@ -1151,12 +1208,12 @@ func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 	// Add input: either real UTXO (augmentation) or null input (creation)
 	// SignatureScript must be explicitly empty (not nil) for validation
 	if inputOutpoint != nil {
-		// UTXO augmentation: use real input
+		// UTXO augmentation: use real input with fraud proof data
 		tx.AddTxIn(&wire.TxIn{
 			PreviousOutPoint: *inputOutpoint,
 			Sequence:         wire.MaxTxInSequenceNum,
-			BlockHeight:      wire.NullBlockHeight,
-			BlockIndex:       wire.NullBlockIndex,
+			BlockHeight:      uint32(existingBlockHeight),
+			BlockIndex:       existingBlockIndex,
 			ValueIn:          augmentValue,
 			SignatureScript:  []byte{}, // Anyone-can-spend (OP_SSGEN output)
 		})
@@ -1176,7 +1233,14 @@ func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 	// Calculate output value: fee + existing UTXO value (if augmenting)
 	outputValue := totalFee + augmentValue
 
-	// Create single output to miner
+	// Add OP_RETURN output for unique hash (output[0] - consistent with voter SSFee)
+	tx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		CoinType: coinType,
+		PkScript: opReturnScript,
+	})
+
+	// Create payment output to miner (output[1] - consistent with voter SSFee)
 	tx.AddTxOut(&wire.TxOut{
 		Value:    outputValue,
 		CoinType: coinType,
@@ -1184,15 +1248,9 @@ func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 		PkScript: payScript,
 	})
 
-	// Add OP_RETURN output for unique hash (at the end)
-	tx.AddTxOut(&wire.TxOut{
-		Value:    0,
-		CoinType: coinType,
-		PkScript: opReturnScript,
-	})
-
 	retTx := dcrutil.NewTx(tx)
 	retTx.SetTree(wire.TxTreeStake)
+
 	return retTx, nil
 }
 
@@ -2919,7 +2977,8 @@ nextPriorityQueueItem:
 				// Create batched SSFee transactions for this coin type (one per consolidation address)
 				// Use SSFeeIndex for UTXO augmentation if available
 				// Note: Both VAR and non-VAR staker fees use SSFee (only VAR miner fees go to coinbase)
-				voterSSFeeTxns, err := createSSFeeTxBatched(coinType, stakerFee, votes, nextBlockHeight, g.cfg.SSFeeIndex)
+				voterSSFeeTxns, err := createSSFeeTxBatched(coinType, stakerFee, votes, nextBlockHeight,
+					g.cfg.SSFeeIndex, blockUtxos)
 				if err != nil {
 					// Critical error: staker fees cannot be distributed
 					// This is a serious issue as fees would be lost if we continue
@@ -2938,6 +2997,10 @@ nextPriorityQueueItem:
 					// Track for fee accounting (SSFee has no input fees)
 					txFeesMap[*ssFeeTx.Hash()] = 0
 					txSigOpCountsMap[*ssFeeTx.Hash()] = 0
+
+					// Update the UTXO view with SSFee transaction outputs so they are
+					// available for validation and future augmentation
+					spendTransaction(blockUtxos, ssFeeTx, nextBlockHeight, isTreasuryEnabled)
 				}
 
 				log.Debugf("Created %d SSFee txs for coin type %d, distributing %d total to %d voters",
@@ -2958,10 +3021,8 @@ nextPriorityQueueItem:
 			}
 
 			// Create miner SSFee transaction for this coin type
-			// Note: Miner augmentation is not yet implemented for batched consolidation
-			// as it requires additional work to extract miner address hash160
-			// For now, miners will always get new UTXOs (not augmented)
-			minerSSFeeTx, err := createMinerSSFeeTx(coinType, minerFee, payToAddress, nextBlockHeight, nil)
+			// Uses SSFeeIndex to find existing miner SSFee UTXOs for consolidation
+			minerSSFeeTx, err := createMinerSSFeeTx(coinType, minerFee, payToAddress, nextBlockHeight, g.cfg.SSFeeIndex, blockUtxos)
 			if err != nil {
 				// Critical error: miner fees cannot be distributed
 				// This is a serious issue as fees would be lost if we continue
@@ -2980,8 +3041,10 @@ nextPriorityQueueItem:
 			txFeesMap[*minerSSFeeTx.Hash()] = 0
 			txSigOpCountsMap[*minerSSFeeTx.Hash()] = 0
 
-			log.Debugf("Created miner SSFee tx for coin type %d, distributing %d to miner",
-				coinType, minerFee)
+			// Update the UTXO view with miner SSFee transaction outputs so they are
+			// available for validation and future augmentation
+			spendTransaction(blockUtxos, minerSSFeeTx, nextBlockHeight, isTreasuryEnabled)
+
 		}
 
 		// Now update totalFees to only include VAR miner fees for the coinbase

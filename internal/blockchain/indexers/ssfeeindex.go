@@ -243,28 +243,56 @@ func makeSSFeeIndexKey(coinType cointype.CoinType, hash160 []byte) ([]byte, erro
 
 // extractHash160FromPkScript extracts the address hash160 from a P2PKH script.
 //
-// P2PKH script format (25 bytes total):
+// Supports two formats:
 //
-//	OP_DUP OP_HASH160 <20 bytes hash160> OP_EQUALVERIFY OP_CHECKSIG
+//  1. Standard P2PKH (25 bytes):
+//     OP_DUP OP_HASH160 <20 bytes hash160> OP_EQUALVERIFY OP_CHECKSIG
+//
+//  2. OP_SSGEN-tagged P2PKH (26 bytes) - used by SSFee outputs:
+//     OP_SSGEN OP_DUP OP_HASH160 <20 bytes hash160> OP_EQUALVERIFY OP_CHECKSIG
 func extractHash160FromPkScript(pkScript []byte) ([]byte, error) {
-	// P2PKH scripts are exactly 25 bytes
-	if len(pkScript) != 25 {
-		return nil, fmt.Errorf("invalid P2PKH script length: %d (expected 25)", len(pkScript))
+	const opSSGen = 0xbb // txscript.OP_SSGEN
+
+	// Check for OP_SSGEN-tagged P2PKH (26 bytes)
+	if len(pkScript) == 26 {
+		// Validate OP_SSGEN prefix
+		if pkScript[0] != opSSGen {
+			return nil, fmt.Errorf("26-byte script must start with OP_SSGEN")
+		}
+
+		// Validate P2PKH structure after OP_SSGEN
+		if pkScript[1] != txscript.OP_DUP ||
+			pkScript[2] != txscript.OP_HASH160 ||
+			pkScript[3] != txscript.OP_DATA_20 ||
+			pkScript[24] != txscript.OP_EQUALVERIFY ||
+			pkScript[25] != txscript.OP_CHECKSIG {
+			return nil, fmt.Errorf("not a valid OP_SSGEN-tagged P2PKH script")
+		}
+
+		// Extract hash160 (bytes 4-23)
+		hash160 := make([]byte, 20)
+		copy(hash160, pkScript[4:24])
+		return hash160, nil
 	}
 
-	// Validate P2PKH script format
-	if pkScript[0] != txscript.OP_DUP ||
-		pkScript[1] != txscript.OP_HASH160 ||
-		pkScript[2] != txscript.OP_DATA_20 ||
-		pkScript[23] != txscript.OP_EQUALVERIFY ||
-		pkScript[24] != txscript.OP_CHECKSIG {
-		return nil, fmt.Errorf("not a valid P2PKH script")
+	// Check for standard P2PKH (25 bytes)
+	if len(pkScript) == 25 {
+		// Validate P2PKH script format
+		if pkScript[0] != txscript.OP_DUP ||
+			pkScript[1] != txscript.OP_HASH160 ||
+			pkScript[2] != txscript.OP_DATA_20 ||
+			pkScript[23] != txscript.OP_EQUALVERIFY ||
+			pkScript[24] != txscript.OP_CHECKSIG {
+			return nil, fmt.Errorf("not a valid P2PKH script")
+		}
+
+		// Extract hash160 (bytes 3-22)
+		hash160 := make([]byte, 20)
+		copy(hash160, pkScript[3:23])
+		return hash160, nil
 	}
 
-	// Extract and return hash160 (bytes 3-22)
-	hash160 := make([]byte, 20)
-	copy(hash160, pkScript[3:23])
-	return hash160, nil
+	return nil, fmt.Errorf("invalid P2PKH script length: %d (expected 25 or 26)", len(pkScript))
 }
 
 // serializeOutPoints serializes a list of OutPoints into a byte slice.
@@ -350,6 +378,8 @@ func (idx *SSFeeIndex) ConnectBlock(dbTx database.Tx, block *dcrutil.Block) erro
 		return fmt.Errorf("ssfee index bucket not found")
 	}
 
+	ssfeeCount := 0 // Track number of SSFee txs indexed
+
 	// Iterate through stake transactions in the block
 	for _, stx := range block.STransactions() {
 		// Check if this is an SSFee transaction
@@ -357,22 +387,28 @@ func (idx *SSFeeIndex) ConnectBlock(dbTx database.Tx, block *dcrutil.Block) erro
 			continue
 		}
 
-		// SSFee output[0] is the payment to consolidation address
-		if len(stx.MsgTx().TxOut) < 1 {
-			return fmt.Errorf("SSFee transaction %v has no outputs", stx.Hash())
+		ssfeeCount++
+
+		// Ensure SSFee has at least 2 outputs
+		if len(stx.MsgTx().TxOut) < 2 {
+			return fmt.Errorf("SSFee transaction %v has insufficient outputs (need 2, got %d)",
+				stx.Hash(), len(stx.MsgTx().TxOut))
 		}
 
-		txOut := stx.MsgTx().TxOut[0]
+		// SSFee standard format: output[0] = OP_RETURN marker, output[1] = payment
+		paymentOutput := stx.MsgTx().TxOut[1]
+		const paymentIndex uint32 = 1
 
-		// Extract hash160 from the consolidation address pkScript
-		hash160, err := extractHash160FromPkScript(txOut.PkScript)
+		// Extract hash160 from the payment output
+		hash160, err := extractHash160FromPkScript(paymentOutput.PkScript)
 		if err != nil {
 			// Skip non-P2PKH outputs (shouldn't happen for valid SSFee)
+			log.Debugf("SSFeeIndex: Skipping SSFee tx %s: failed to extract hash160: %v", stx.Hash(), err)
 			continue
 		}
 
 		// Create index key for this (coinType, address)
-		key, err := makeSSFeeIndexKey(txOut.CoinType, hash160)
+		key, err := makeSSFeeIndexKey(paymentOutput.CoinType, hash160)
 		if err != nil {
 			return fmt.Errorf("failed to create index key: %w", err)
 		}
@@ -387,7 +423,7 @@ func (idx *SSFeeIndex) ConnectBlock(dbTx database.Tx, block *dcrutil.Block) erro
 		// Add this outpoint to the list
 		newOutpoint := wire.OutPoint{
 			Hash:  *stx.Hash(),
-			Index: 0, // SSFee payment is always output[0]
+			Index: paymentIndex,
 			Tree:  wire.TxTreeStake,
 		}
 		existingOutpoints = append(existingOutpoints, newOutpoint)
@@ -397,6 +433,11 @@ func (idx *SSFeeIndex) ConnectBlock(dbTx database.Tx, block *dcrutil.Block) erro
 		if err := bucket.Put(key, updatedData); err != nil {
 			return fmt.Errorf("failed to store outpoints: %w", err)
 		}
+	}
+
+	if ssfeeCount > 0 {
+		log.Debugf("SSFeeIndex: Indexed %d SSFee transaction(s) in block %s (height %d)",
+			ssfeeCount, block.Hash(), block.Height())
 	}
 
 	// Update the current index tip.
@@ -426,22 +467,25 @@ func (idx *SSFeeIndex) DisconnectBlock(dbTx database.Tx, block *dcrutil.Block) e
 			continue
 		}
 
-		// SSFee output[0] is the payment to consolidation address
-		if len(stx.MsgTx().TxOut) < 1 {
-			return fmt.Errorf("SSFee transaction %v has no outputs", stx.Hash())
+		// Ensure SSFee has at least 2 outputs
+		if len(stx.MsgTx().TxOut) < 2 {
+			return fmt.Errorf("SSFee transaction %v has insufficient outputs (need 2, got %d)",
+				stx.Hash(), len(stx.MsgTx().TxOut))
 		}
 
-		txOut := stx.MsgTx().TxOut[0]
+		// SSFee standard format: output[0] = OP_RETURN marker, output[1] = payment
+		paymentOutput := stx.MsgTx().TxOut[1]
+		const paymentIndex uint32 = 1
 
-		// Extract hash160 from the consolidation address pkScript
-		hash160, err := extractHash160FromPkScript(txOut.PkScript)
+		// Extract hash160 from the payment output
+		hash160, err := extractHash160FromPkScript(paymentOutput.PkScript)
 		if err != nil {
 			// Skip non-P2PKH outputs
 			continue
 		}
 
 		// Create index key for this (coinType, address)
-		key, err := makeSSFeeIndexKey(txOut.CoinType, hash160)
+		key, err := makeSSFeeIndexKey(paymentOutput.CoinType, hash160)
 		if err != nil {
 			return fmt.Errorf("failed to create index key: %w", err)
 		}
@@ -457,7 +501,7 @@ func (idx *SSFeeIndex) DisconnectBlock(dbTx database.Tx, block *dcrutil.Block) e
 		targetHash := *stx.Hash()
 		filtered := make([]wire.OutPoint, 0, len(existingOutpoints))
 		for _, op := range existingOutpoints {
-			if op.Hash != targetHash || op.Index != 0 {
+			if op.Hash != targetHash || op.Index != paymentIndex {
 				filtered = append(filtered, op)
 			}
 		}
@@ -486,13 +530,17 @@ func (idx *SSFeeIndex) DisconnectBlock(dbTx database.Tx, block *dcrutil.Block) e
 // Returns:
 //   - outpoint: The first unspent outpoint found, or nil if none exist
 //   - value: The value of the UTXO
+//   - blockHeight: The block height where the UTXO was created (for fraud proofs)
+//   - blockIndex: The transaction index within the block (for fraud proofs)
 //   - error: Any error encountered during lookup
 //
 // This is the primary query method used by block template generation to find
 // existing SSFee UTXOs for augmentation.
-func (idx *SSFeeIndex) LookupUTXO(coinType cointype.CoinType, addressHash160 []byte) (*wire.OutPoint, int64, error) {
+func (idx *SSFeeIndex) LookupUTXO(coinType cointype.CoinType, addressHash160 []byte) (*wire.OutPoint, int64, int64, uint32, error) {
 	var outpoint *wire.OutPoint
 	var value int64
+	var blockHeight int64
+	var blockIndex uint32
 
 	err := idx.db.View(func(dbTx database.Tx) error {
 		// Get the SSFee index bucket
@@ -511,6 +559,7 @@ func (idx *SSFeeIndex) LookupUTXO(coinType cointype.CoinType, addressHash160 []b
 		data := bucket.Get(key)
 		if data == nil {
 			// No UTXOs exist for this address
+			log.Debugf("SSFeeIndex: No outpoints found for key=%x (bucket.Get returned nil)", key)
 			return nil
 		}
 
@@ -522,10 +571,9 @@ func (idx *SSFeeIndex) LookupUTXO(coinType cointype.CoinType, addressHash160 []b
 		// Query blockchain UTXO set to find an unspent output
 		// Try each outpoint until we find an unspent one
 		for _, op := range outpoints {
-			// Fetch UTXO amount and spent status from blockchain
-			amount, spent, err := idx.chain.FetchUtxoEntryAmount(op)
+			// Fetch UTXO details including fraud proof data (block height and index)
+			amount, height, index, spent, err := idx.chain.FetchUtxoEntryDetails(op)
 			if err != nil {
-				// Skip on error, try next outpoint
 				continue
 			}
 
@@ -534,15 +582,20 @@ func (idx *SSFeeIndex) LookupUTXO(coinType cointype.CoinType, addressHash160 []b
 				continue
 			}
 
-			// Found valid unspent UTXO - return it
+			// Found valid unspent UTXO - return it with fraud proof data
 			outpoint = &op
 			value = amount
+			blockHeight = height
+			blockIndex = index
+			log.Debugf("SSFeeIndex: Selected outpoint %v with value %d (height=%d, index=%d)",
+				op, amount, height, index)
 			return nil
 		}
 
 		// No valid UTXO found - return nil (mining will use null input)
+		log.Debugf("SSFeeIndex: No valid unspent UTXO found among %d outpoint(s)", len(outpoints))
 		return nil
 	})
 
-	return outpoint, value, err
+	return outpoint, value, blockHeight, blockIndex, err
 }

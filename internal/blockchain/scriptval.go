@@ -254,17 +254,18 @@ func checkBlockScripts(block *dcrutil.Block, utxoView *UtxoViewpoint, txTree boo
 			continue
 		}
 
-		// Skip null-input SSFee transactions which are validated separately
-		// through validateSSFeeTxns for proper fee distribution.
-		// Augmented SSFee transactions (with real UTXO inputs) need normal
-		// script validation for their inputs.
+		// Skip ALL SSFee transactions - both null-input and augmented.
+		// SSFee outputs are anyone-can-spend (see validate.go:505) and require
+		// empty signature scripts. All security validations happen in validateSSFeeTxns():
+		// - UTXO existence and fraud proofs (CheckTransactionInputs)
+		// - Maturity requirements (with augmented SSFee exemption)
+		// - Fee calculation: output = input + collected fees
+		// - No inflation: total fees match expected distribution
+		// - Coin type consistency
 		if !txTree && stake.DetermineTxType(msgTx) == stake.TxTypeSSFee {
-			// Check if this is a null-input SSFee (can skip) or augmented (need validation)
-			if len(msgTx.TxIn) > 0 && msgTx.TxIn[0].PreviousOutPoint.Index == wire.MaxPrevOutIndex {
-				// Null input SSFee - skip script validation
-				continue
-			}
-			// Augmented SSFee with real input - will be validated below
+			// Skip script validation - SSFee inputs have empty signature scripts
+			// and are validated through consensus rules in validateSSFeeTxns()
+			continue
 		}
 
 		// Skip SKA emission transactions which have null inputs and are

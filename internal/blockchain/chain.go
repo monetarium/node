@@ -2409,6 +2409,28 @@ func (q *ChainQueryerAdapter) FetchUtxoEntryAmount(outpoint wire.OutPoint) (int6
 	return entry.Amount(), false, nil
 }
 
+// FetchUtxoEntryDetails returns the amount, block height, and block index
+// of the specified unspent transaction output from the point of view of the
+// main chain tip. This is used for fraud proof data when creating transactions.
+// Returns (amount=0, height=0, index=0, spent=true) if the UTXO doesn't exist or is spent.
+// Returns (amount>0, height>0, index>=0, spent=false) if the UTXO exists and is unspent.
+//
+// This is part of the indexers.ChainQueryer interface.
+func (q *ChainQueryerAdapter) FetchUtxoEntryDetails(outpoint wire.OutPoint) (int64, int64, uint32, bool, error) {
+	entry, err := q.FetchUtxoEntry(outpoint)
+	if err != nil {
+		return 0, 0, 0, true, err
+	}
+
+	// If entry is nil or is spent, return spent=true
+	if entry == nil || entry.IsSpent() {
+		return 0, 0, 0, true, nil
+	}
+
+	// Return the amount, block height, block index, and spent=false for unspent UTXOs
+	return entry.Amount(), entry.BlockHeight(), entry.BlockIndex(), false, nil
+}
+
 // isTestNet3 returns whether or not the chain instance is for version 3 of the
 // test network.
 func (b *BlockChain) isTestNet3() bool {

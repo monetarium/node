@@ -73,6 +73,13 @@ type ChainQueryer interface {
 	// Returns (amount=0, spent=true) if the UTXO doesn't exist or is spent.
 	// Returns (amount>0, spent=false) if the UTXO exists and is unspent.
 	FetchUtxoEntryAmount(outpoint wire.OutPoint) (amount int64, spent bool, err error)
+
+	// FetchUtxoEntryDetails returns the amount, block height, and block index
+	// of the specified unspent transaction output from the point of view of the
+	// main chain tip. This is used for fraud proof data when creating transactions.
+	// Returns (amount=0, height=0, index=0, spent=true) if the UTXO doesn't exist or is spent.
+	// Returns (amount>0, height>0, index>=0, spent=false) if the UTXO exists and is unspent.
+	FetchUtxoEntryDetails(outpoint wire.OutPoint) (amount int64, blockHeight int64, blockIndex uint32, spent bool, err error)
 }
 
 // Indexer defines a generic interface for an indexer.

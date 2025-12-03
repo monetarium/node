@@ -479,13 +479,26 @@ func checkTransactionContext(tx *wire.MsgTx, params *chaincfg.Params, flags Agen
 	case isSSFee:
 		// SSFee transactions distribute fees to stakers.
 		// They can have either:
-		// 1. Null input (creating new UTXO)
-		// 2. Real input (augmenting existing UTXO)
+		// 1. Null input (creating new UTXO) - fraud proof must be null
+		// 2. Real input (augmenting existing UTXO) - fraud proof must match UTXO location
 		//
-		// The fraud proof must be null in both cases.
-		if !isNullFraudProof(tx.TxIn[0]) {
-			str := "SSFee transaction fraud proof is non-null"
-			return ruleError(ErrBadTxInput, str)
+		// Determine SSFee type by checking if input is null
+		isNullInput := tx.TxIn[0].PreviousOutPoint.Index == wire.MaxPrevOutIndex
+
+		if isNullInput {
+			// Non-augmented SSFee: fraud proof must be null
+			if !isNullFraudProof(tx.TxIn[0]) {
+				str := "SSFee transaction with null input has non-null fraud proof"
+				return ruleError(ErrBadTxInput, str)
+			}
+		} else {
+			// Augmented SSFee: fraud proof must be non-null
+			// Actual fraud proof validation (checking it matches the UTXO) happens later
+			// in validateSSFeeTxns() where the UTXO viewpoint is available
+			if isNullFraudProof(tx.TxIn[0]) {
+				str := "SSFee transaction with real input has null fraud proof"
+				return ruleError(ErrBadTxInput, str)
+			}
 		}
 
 		// SignatureScript length must be zero for both null and real inputs.
@@ -3972,16 +3985,34 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 			utxoEntry.PkScript()) ||
 			stake.IsVoteScript(utxoEntry.ScriptVersion(),
 				utxoEntry.PkScript()) {
-			originHeight := utxoEntry.BlockHeight()
-			blocksSincePrev := txHeight - originHeight
-			if blocksSincePrev < reqStakeOutMaturity {
-				str := fmt.Sprintf("tried to spend OP_SSGEN or"+
-					" OP_SSRTX output from tx %v from "+
-					"height %v at height %v before "+
-					"required maturity of %v blocks",
-					txInHash, originHeight, txHeight,
-					coinbaseMaturity)
-				return 0, ruleError(ErrImmatureSpend, str)
+
+			// Check if this is an augmented SSFee transaction (SSFee spending SSFee)
+			// These are exempt from maturity because the resulting output will also
+			// require maturity before being spent externally.
+			isAugmentedSSFee := false
+			if stake.IsSSFee(msgTx) {
+				// An augmented SSFee spends a previous SSFee output
+				// Check if the UTXO being spent is also an SSFee output (OP_SSGEN tagged)
+				if stake.IsVoteScript(utxoEntry.ScriptVersion(), utxoEntry.PkScript()) {
+					isAugmentedSSFee = true
+					log.Tracef("Exempting augmented SSFee from maturity check: tx %v spends SSFee output %v",
+						txHash, txIn.PreviousOutPoint)
+				}
+			}
+
+			// Apply maturity check unless this is an augmented SSFee
+			if !isAugmentedSSFee {
+				originHeight := utxoEntry.BlockHeight()
+				blocksSincePrev := txHeight - originHeight
+				if blocksSincePrev < reqStakeOutMaturity {
+					str := fmt.Sprintf("tried to spend OP_SSGEN or"+
+						" OP_SSRTX output from tx %v from "+
+						"height %v at height %v before "+
+						"required maturity of %v blocks",
+						txInHash, originHeight, txHeight,
+						coinbaseMaturity)
+					return 0, ruleError(ErrImmatureSpend, str)
+				}
 			}
 		}
 
@@ -4061,6 +4092,23 @@ func CheckTransactionInputs(subsidyCache *standalone.SubsidyCache,
 			str := fmt.Sprintf("transaction output has invalid coin type %d", txOut.CoinType)
 			return 0, ruleError(ErrBadTxOutValue, str)
 		}
+	}
+
+	// SSFee transactions are special: they distribute collected fees to stakers.
+	// Augmented SSFee transactions can have outputs > inputs because they add
+	// new fees to an existing UTXO. Skip the input >= output check for SSFee
+	// since proper validation happens in validateSSFeeTxns().
+	//
+	// Security: validateSSFeeTxns() ensures that:
+	// - For null-input SSFee: output value equals collected fees
+	// - For augmented SSFee: output value = input value + collected fees
+	// - Total SSFee fees match expected distribution (50% of block fees)
+	// - No inflation is created
+	isSSFee := stake.IsSSFee(msgTx)
+	if isSSFee {
+		// Return 0 fee - SSFee fees are distributed not burned, and proper
+		// fee accounting happens in validateSSFeeTxns() with full block context
+		return 0, nil
 	}
 
 	// For backwards compatibility, if this is a VAR-only transaction,

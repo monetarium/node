@@ -147,7 +147,7 @@ func TestExtractHash160FromPkScript(t *testing.T) {
 		},
 		{
 			name:      "script too long",
-			pkScript:  make([]byte, 26),
+			pkScript:  make([]byte, 27),
 			want:      nil,
 			wantErr:   true,
 			errSubstr: "invalid P2PKH script length",
