@@ -137,6 +137,16 @@ func IsCoinBaseTx(tx *wire.MsgTx, isTreasuryEnabled bool) bool {
 		}
 	}
 
+	// Avoid detecting SKA emission transactions as coinbase.
+	// SKA emissions have a signature script starting with [0x01][0x53][0x4B][0x41] marker.
+	if len(tx.TxIn[0].SignatureScript) >= 4 {
+		sigScript := tx.TxIn[0].SignatureScript
+		// SKA marker: 0x01 (length) + "SKA" (0x53 0x4B 0x41)
+		if sigScript[0] == 0x01 && sigScript[1] == 0x53 && sigScript[2] == 0x4B && sigScript[3] == 0x41 {
+			return false // This is SKA emission, not coinbase
+		}
+	}
+
 	return true
 }
 
