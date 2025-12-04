@@ -1107,13 +1107,14 @@ func (b *BlockChain) FetchUtxoView(tx *dcrutil.Tx, includeRegularTxns bool) (*Ut
 		outpoint.Index = uint32(txOutIdx)
 		filteredSet.add(view, &outpoint)
 	}
-	// Ignore coinbases, treasurybases, treasury spends, and SSFee transactions
-	// since none of them have real inputs (they have null inputs).
+	// Ignore coinbases, treasurybases, treasury spends, SSFee, and SKA emission
+	// transactions since none of them have real inputs (they have null inputs).
 	isCoinBase := standalone.IsCoinBaseTx(msgTx, isTreasuryEnabled)
 	isTreasuryBase := txType == stake.TxTypeTreasuryBase
 	isTreasurySpend := txType == stake.TxTypeTSpend
 	isSSFee := txType == stake.TxTypeSSFee
-	if !isCoinBase && !isTreasuryBase && !isTreasurySpend && !isSSFee {
+	isSKAEmission := wire.IsSKAEmissionTransaction(msgTx)
+	if !isCoinBase && !isTreasuryBase && !isTreasurySpend && !isSSFee && !isSKAEmission {
 		isVote := txType == stake.TxTypeSSGen
 		for txInIdx, txIn := range msgTx.TxIn {
 			// Ignore stakebase since it has no input.

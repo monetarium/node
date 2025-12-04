@@ -528,9 +528,9 @@ func MainNetParams() *Params {
 		MinimumStakeDiff:        2 * 1e8, // 2 Coin
 		TicketPoolSize:          8192,
 		TicketsPerBlock:         5,
-		TicketMaturity:          256,   // PRODUCTION: Normal mainnet value (temporary: 16)
+		TicketMaturity:          16,    // PRODUCTION: Normal mainnet value (temporary: 16)
 		TicketExpiry:            40960, // 5*TicketPoolSize
-		CoinbaseMaturity:        256,   // PRODUCTION: Normal mainnet value (temporary: 16)
+		CoinbaseMaturity:        16,    // PRODUCTION: Normal mainnet value (temporary: 16)
 		SStxChangeMaturity:      1,
 		TicketPoolSizeWeight:    4,
 		StakeDiffAlpha:          1, // Minimal
@@ -538,8 +538,8 @@ func MainNetParams() *Params {
 		StakeDiffWindows:        20,
 		StakeVersionInterval:    144 * 2 * 7, // ~1 week
 		MaxFreshStakePerBlock:   20,          // 4*TicketsPerBlock
-		StakeEnabledHeight:      256 + 256,   // PRODUCTION: CoinbaseMaturity + TicketMaturity = 512 (temporary: 16 + 16 = 32)
-		StakeValidationHeight:   1024,        // PRODUCTION: Normal mainnet value (temporary: 64)
+		StakeEnabledHeight:      32,          // PRODUCTION: CoinbaseMaturity + TicketMaturity = 512 (temporary: 16 + 16 = 32)
+		StakeValidationHeight:   64,          // PRODUCTION: Normal mainnet value (temporary: 64)
 		StakeBaseSigScript:      []byte{0x00, 0x00},
 		StakeMajorityMultiplier: 3,
 		StakeMajorityDivisor:    4,
@@ -590,7 +590,7 @@ func MainNetParams() *Params {
 				Name:           "Skarb-1",
 				Symbol:         "SKA-1",
 				MaxSupply:      10e6 * 1e8, // 10 million SKA-1
-				EmissionHeight: 1024,       // PRODUCTION: Emit at block 1024, aligned with StakeValidationHeight (temporary: 64)
+				EmissionHeight: 64,         // PRODUCTION: Emit at block 1024, aligned with StakeValidationHeight (temporary: 64)
 				EmissionWindow: 4320,       // 30-day emission window (~144 blocks/day * 30)
 				Active:         true,
 				Description:    "Primary asset-backed SKA coin type for mainnet",
