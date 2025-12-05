@@ -492,7 +492,7 @@ func MainNetParams() *Params {
 				Vote: Vote{
 					Id:          "activateska2",
 					Description: "Activate SKA-2 coin type for transactions",
-					Mask:        0x0006,
+					Mask:        0x0018,
 					Choices: []Choice{{
 						Id:          "abstain",
 						Description: "abstain from voting",
@@ -502,13 +502,13 @@ func MainNetParams() *Params {
 					}, {
 						Id:          "no",
 						Description: "keep SKA-2 inactive",
-						Bits:        0x0002,
+						Bits:        0x0008,
 						IsAbstain:   false,
 						IsNo:        true,
 					}, {
 						Id:          "yes",
 						Description: "activate SKA-2 for use",
-						Bits:        0x0004,
+						Bits:        0x0010,
 						IsAbstain:   false,
 						IsNo:        false,
 					}},
