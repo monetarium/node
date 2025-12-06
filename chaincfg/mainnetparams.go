@@ -525,9 +525,9 @@ func MainNetParams() *Params {
 		// Reject previous block versions once a majority of the network has
 		// upgraded.
 		// 95% (950 / 1000)
-		BlockEnforceNumRequired: 750,
-		BlockRejectNumRequired:  950,
-		BlockUpgradeNumToCheck:  1000,
+		BlockEnforceNumRequired: 24, // PRODUCTION: 750 (75% of 1000) (temporary: 75% of 32)
+		BlockRejectNumRequired:  30, // PRODUCTION: 950 (95% of 1000) (temporary: 95% of 32)
+		BlockUpgradeNumToCheck:  32, // PRODUCTION: 1000 (temporary: 32)
 
 		// AcceptNonStdTxs is a mempool param to either accept and relay non
 		// standard txs to the network or reject them
