@@ -609,7 +609,7 @@ func SimNetParams() *Params {
 		// Organization address is ScuQxvveKGfpG1ypt6u27F99Anf7EW3cqhq
 		OrganizationPkScript:        hexDecode("a914cbb08d6ca783b533b2c7d24a51fbca92d937bf9987"),
 		OrganizationPkScriptVersion: 0,
-		BlockOneLedger:              tokenPayouts_SimNetParams(),
+		BlockOneLedger:              nil,
 
 		// Commands to generate simnet Pi keys:
 		// $ treasurykey.go -simnet

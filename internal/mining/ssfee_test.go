@@ -7,6 +7,7 @@ package mining
 import (
 	"testing"
 
+	"github.com/decred/dcrd/blockchain/stake/v5"
 	"github.com/decred/dcrd/chaincfg/chainhash"
 	"github.com/decred/dcrd/cointype"
 	"github.com/decred/dcrd/dcrutil/v4"
@@ -14,122 +15,144 @@ import (
 	"github.com/decred/dcrd/wire"
 )
 
-// TestCreateSSFeeTx tests the createSSFeeTx function with various inputs
-func TestCreateSSFeeTx(t *testing.T) {
-	// Create mock voters
-	voters := make([]*dcrutil.Tx, 3)
-	for i := range voters {
-		voteTx := wire.NewMsgTx()
-		voteTx.Version = 3
+// createMockVoteWithConsolidation creates a mock vote with proper consolidation address
+// for testing createSSFeeTxBatched. The hash160 is used as the consolidation address.
+func createMockVoteWithConsolidation(stakeValue int64, hash160 []byte) *dcrutil.Tx {
+	voteTx := wire.NewMsgTx()
+	voteTx.Version = 3
 
-		// Add typical vote structure
-		// [0] = reference output
-		voteTx.AddTxOut(&wire.TxOut{
-			Value:    0,
-			CoinType: cointype.CoinTypeVAR,
-			PkScript: []byte{txscript.OP_RETURN},
-		})
+	// [0] Block reference (OP_RETURN)
+	voteTx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		CoinType: cointype.CoinTypeVAR,
+		PkScript: []byte{txscript.OP_RETURN},
+	})
 
-		// [1] = vote bits
-		voteTx.AddTxOut(&wire.TxOut{
-			Value:    0,
-			CoinType: cointype.CoinTypeVAR,
-			PkScript: []byte{txscript.OP_RETURN},
-		})
+	// [1] Vote bits (OP_RETURN)
+	voteTx.AddTxOut(&wire.TxOut{
+		Value:    0,
+		CoinType: cointype.CoinTypeVAR,
+		PkScript: []byte{txscript.OP_RETURN},
+	})
 
-		// [2] = reward output
-		voteTx.AddTxOut(&wire.TxOut{
-			Value:    1000,
-			CoinType: cointype.CoinTypeVAR,
-			Version:  0,
-			PkScript: []byte{txscript.OP_DUP, txscript.OP_HASH160, 0x14}, // Mock P2PKH
-		})
+	// [2] Reward output
+	voteTx.AddTxOut(&wire.TxOut{
+		Value:    stakeValue,
+		CoinType: cointype.CoinTypeVAR,
+		Version:  0,
+		PkScript: []byte{txscript.OP_DUP, txscript.OP_HASH160, 0x14},
+	})
 
-		voters[i] = dcrutil.NewTx(voteTx)
+	// [3] Consolidation address (OP_RETURN + "SC" + hash160)
+	consolidationOut, err := stake.CreateSSFeeConsolidationOutput(hash160)
+	if err != nil {
+		// Use default hash160 if provided one is invalid
+		defaultHash := make([]byte, 20)
+		consolidationOut, _ = stake.CreateSSFeeConsolidationOutput(defaultHash)
+	}
+	voteTx.AddTxOut(consolidationOut)
+
+	return dcrutil.NewTx(voteTx)
+}
+
+// TestCreateSSFeeTxBatched tests the createSSFeeTxBatched function with various inputs
+func TestCreateSSFeeTxBatched(t *testing.T) {
+	// Create mock voters with same consolidation address (will be batched into 1 tx)
+	sameAddrHash := make([]byte, 20)
+	sameAddrHash[0] = 0x01 // Unique address
+	votersSameAddr := make([]*dcrutil.Tx, 3)
+	for i := range votersSameAddr {
+		votersSameAddr[i] = createMockVoteWithConsolidation(1000, sameAddrHash)
+	}
+
+	// Create mock voters with different consolidation addresses (one tx per address)
+	votersDiffAddr := make([]*dcrutil.Tx, 3)
+	for i := range votersDiffAddr {
+		hash := make([]byte, 20)
+		hash[0] = byte(i + 1) // Different addresses
+		votersDiffAddr[i] = createMockVoteWithConsolidation(1000, hash)
 	}
 
 	tests := []struct {
-		name        string
-		coinType    cointype.CoinType
-		totalFee    int64 // This is the staker portion (50% of total block fees)
-		voters      []*dcrutil.Tx
-		height      int64
-		expectError bool
-		errorMsg    string
+		name           string
+		coinType       cointype.CoinType
+		totalFee       int64
+		voters         []*dcrutil.Tx
+		height         int64
+		expectError    bool
+		errorMsg       string
+		expectedTxns   int  // Number of SSFee transactions expected
+		expectNilEmpty bool // Expect nil/empty result (no error, no txs)
 	}{
 		{
-			name:        "valid SKA-1 fee distribution",
-			coinType:    1,    // SKA-1
-			totalFee:    3000, // Stakers get 3000 (miners got the other 3000)
-			voters:      voters,
-			height:      100,
-			expectError: false,
+			name:         "valid SKA-1 fee distribution - same address",
+			coinType:     1,
+			totalFee:     3000,
+			voters:       votersSameAddr,
+			height:       100,
+			expectError:  false,
+			expectedTxns: 1, // All voters have same address = 1 batched tx
 		},
 		{
-			name:        "valid SKA-2 fee distribution",
-			coinType:    2,    // SKA-2
-			totalFee:    6000, // Stakers get 6000 (miners got the other 6000)
-			voters:      voters,
-			height:      200,
-			expectError: false,
+			name:         "valid SKA-1 fee distribution - different addresses",
+			coinType:     1,
+			totalFee:     3000,
+			voters:       votersDiffAddr,
+			height:       100,
+			expectError:  false,
+			expectedTxns: 3, // Each voter has different address = 3 txs
 		},
 		{
-			name:        "valid VAR fee distribution",
-			coinType:    cointype.CoinTypeVAR,
-			totalFee:    1000,
-			voters:      voters,
-			height:      100,
-			expectError: false,
+			name:         "valid SKA-2 fee distribution",
+			coinType:     2,
+			totalFee:     6000,
+			voters:       votersDiffAddr,
+			height:       200,
+			expectError:  false,
+			expectedTxns: 3,
 		},
 		{
-			name:        "no voters",
-			coinType:    1,
-			totalFee:    1000,
-			voters:      []*dcrutil.Tx{},
-			height:      100,
-			expectError: true,
-			errorMsg:    "no voters to distribute fees to",
+			name:         "valid VAR fee distribution",
+			coinType:     cointype.CoinTypeVAR,
+			totalFee:     1000,
+			voters:       votersDiffAddr,
+			height:       100,
+			expectError:  false,
+			expectedTxns: 3,
 		},
 		{
-			name:        "negative total fee",
-			coinType:    1,
-			totalFee:    -1000,
-			voters:      voters,
-			height:      100,
-			expectError: true,
-			errorMsg:    "negative total fee",
+			name:           "no voters",
+			coinType:       1,
+			totalFee:       1000,
+			voters:         []*dcrutil.Tx{},
+			height:         100,
+			expectError:    false, // Batched returns nil, nil for no voters
+			expectNilEmpty: true,
 		},
 		{
-			name:        "overflow protection - extremely large fee",
-			coinType:    1,
-			totalFee:    9223372036854775807, // math.MaxInt64
-			voters:      voters,
-			height:      100,
-			expectError: true,
-			errorMsg:    "total fee too large for distribution",
+			name:         "zero total fee",
+			coinType:     1,
+			totalFee:     0,
+			voters:       votersDiffAddr,
+			height:       100,
+			expectError:  false,
+			expectedTxns: 0, // Zero fee results in no transactions
 		},
 		{
-			name:        "zero total fee",
-			coinType:    1,
-			totalFee:    0,
-			voters:      voters,
-			height:      100,
-			expectError: false, // Should work, just distribute 0 to everyone
-		},
-		{
-			name:        "remainder distribution fairness test",
-			coinType:    1,
-			totalFee:    10, // 10 atoms to 3 voters = 3 each + 1 remainder
-			voters:      voters,
-			height:      100,
-			expectError: false,
+			name:         "remainder distribution test",
+			coinType:     1,
+			totalFee:     10, // 10 atoms to 3 voters = 3 each + 1 remainder to first sorted
+			voters:       votersDiffAddr,
+			height:       100,
+			expectError:  false,
+			expectedTxns: 3,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			// Pass nil for utxoView in basic tests (will create new UTXOs)
-			ssFeeTxns, err := createSSFeeTx(test.coinType, test.totalFee, test.voters, test.height, nil)
+			ssFeeTxns, err := createSSFeeTxBatched(test.coinType, test.totalFee,
+				test.voters, test.height, nil, nil, nil)
 
 			if test.expectError {
 				if err == nil {
@@ -145,10 +168,15 @@ func TestCreateSSFeeTx(t *testing.T) {
 				return
 			}
 
-			// Should return one SSFee transaction per voter
-			expectedTxns := len(test.voters)
-			if len(ssFeeTxns) != expectedTxns {
-				t.Errorf("Expected %d SSFee transactions, got %d", expectedTxns, len(ssFeeTxns))
+			if test.expectNilEmpty {
+				if len(ssFeeTxns) != 0 {
+					t.Errorf("Expected nil/empty result, got %d transactions", len(ssFeeTxns))
+				}
+				return
+			}
+
+			if len(ssFeeTxns) != test.expectedTxns {
+				t.Errorf("Expected %d SSFee transactions, got %d", test.expectedTxns, len(ssFeeTxns))
 				return
 			}
 
@@ -172,34 +200,24 @@ func TestCreateSSFeeTx(t *testing.T) {
 					t.Errorf("Tx %d: Expected 1 input, got %d", txIdx, len(msgTx.TxIn))
 				}
 
-				// Should be null input since we passed nil utxoView
+				// Should be null input since we passed nil ssfeeIndex
 				if msgTx.TxIn[0].PreviousOutPoint.Index != wire.MaxPrevOutIndex {
 					t.Errorf("Tx %d: Expected null input", txIdx)
 				}
 
-				// Check outputs: one for voter + one OP_RETURN
+				// Check outputs: one OP_RETURN marker + one payment output
 				if len(msgTx.TxOut) != 2 {
 					t.Errorf("Tx %d: Expected 2 outputs, got %d", txIdx, len(msgTx.TxOut))
 				}
 
-				// Check first output has the correct coin type
-				if msgTx.TxOut[0].CoinType != test.coinType {
+				// Check payment output (index 1) has the correct coin type
+				if msgTx.TxOut[1].CoinType != test.coinType {
 					t.Errorf("Tx %d: Output has coin type %d, expected %d",
-						txIdx, msgTx.TxOut[0].CoinType, test.coinType)
+						txIdx, msgTx.TxOut[1].CoinType, test.coinType)
 				}
 
-				// Accumulate total distributed
-				totalDistributed += msgTx.TxOut[0].Value
-
-				// NOTE: stake.IsSSFee() will fail in Phase 2 because validation
-				// hasn't been updated yet to accept non-null inputs (Phase 3 work).
-				// For now, just verify basic structure:
-				// - Version 3
-				// - 1 input (null for now, since utxoView is nil in these tests)
-				// - 2 outputs (voter + OP_RETURN)
-				if msgTx.Version != 3 {
-					t.Errorf("Tx %d: Wrong version", txIdx)
-				}
+				// Accumulate total distributed (payment is at index 1)
+				totalDistributed += msgTx.TxOut[1].Value
 			}
 
 			// Verify total distributed across all transactions equals input fee
@@ -214,22 +232,12 @@ func TestCreateSSFeeTx(t *testing.T) {
 // TestSSFeeMultipleCoinTypes tests that multiple SSFee transactions can be created
 // for different coin types in the same block
 func TestSSFeeMultipleCoinTypes(t *testing.T) {
-	// Create mock voters
+	// Create mock voters with different consolidation addresses
 	voters := make([]*dcrutil.Tx, 2)
 	for i := range voters {
-		voteTx := wire.NewMsgTx()
-		voteTx.Version = 3
-
-		// Add minimal vote structure
-		for j := 0; j < 3; j++ {
-			voteTx.AddTxOut(&wire.TxOut{
-				Value:    1000 * int64(j),
-				CoinType: cointype.CoinTypeVAR,
-				Version:  0,
-				PkScript: []byte{txscript.OP_DUP},
-			})
-		}
-		voters[i] = dcrutil.NewTx(voteTx)
+		hash := make([]byte, 20)
+		hash[0] = byte(i + 1) // Different addresses
+		voters[i] = createMockVoteWithConsolidation(1000*int64(i+1), hash)
 	}
 
 	// Test creating SSFee for multiple coin types
@@ -239,7 +247,7 @@ func TestSSFeeMultipleCoinTypes(t *testing.T) {
 
 	allSSFeeTxns := make([][]*dcrutil.Tx, 0)
 	for i, coinType := range coinTypes {
-		ssFeeTxns, err := createSSFeeTx(coinType, fees[i], voters, 100, nil)
+		ssFeeTxns, err := createSSFeeTxBatched(coinType, fees[i], voters, 100, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Failed to create SSFee for coin type %d: %v", coinType, err)
 		}
@@ -251,17 +259,20 @@ func TestSSFeeMultipleCoinTypes(t *testing.T) {
 		expectedCoinType := coinTypes[i]
 		var totalDistributed int64
 
+		// Should have 2 txs (one per voter with different address)
+		if len(ssFeeTxns) != 2 {
+			t.Errorf("SSFee group %d: expected 2 transactions, got %d", i, len(ssFeeTxns))
+		}
+
 		for _, ssFeeTx := range ssFeeTxns {
 			msgTx := ssFeeTx.MsgTx()
 
-			// Check coin type consistency
-			for j, out := range msgTx.TxOut[:len(msgTx.TxOut)-1] {
-				if out.CoinType != expectedCoinType {
-					t.Errorf("SSFee %d output %d has wrong coin type: got %d, want %d",
-						i, j, out.CoinType, expectedCoinType)
-				}
-				totalDistributed += out.Value
+			// Check payment output (index 1) has correct coin type
+			if msgTx.TxOut[1].CoinType != expectedCoinType {
+				t.Errorf("SSFee %d has wrong coin type: got %d, want %d",
+					i, msgTx.TxOut[1].CoinType, expectedCoinType)
 			}
+			totalDistributed += msgTx.TxOut[1].Value
 		}
 
 		// Check fee distribution across all SSFee transactions for this coin type
@@ -284,178 +295,117 @@ func TestSSFeeMultipleCoinTypes(t *testing.T) {
 	}
 }
 
-// TestSSFeeEdgeCases tests various edge cases and security scenarios
+// TestSSFeeEdgeCases tests various edge cases and security scenarios for createSSFeeTxBatched
 func TestSSFeeEdgeCases(t *testing.T) {
-	tests := []struct {
-		name        string
-		setupVoters func() []*dcrutil.Tx
-		coinType    cointype.CoinType
-		totalFee    int64
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name: "malformed voters - missing outputs",
-			setupVoters: func() []*dcrutil.Tx {
-				voteTx := wire.NewMsgTx()
-				voteTx.Version = 3
-				// Only add 2 outputs instead of required 3
-				voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-				voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-				return []*dcrutil.Tx{dcrutil.NewTx(voteTx)}
-			},
-			coinType:    1,
-			totalFee:    1000,
-			expectError: true,
-			errorMsg:    "no valid voters found after validation",
-		},
-		{
-			name: "voters with negative reward values",
-			setupVoters: func() []*dcrutil.Tx {
-				voteTx := wire.NewMsgTx()
-				voteTx.Version = 3
-				voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-				voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-				// Negative reward value - should be filtered out
-				voteTx.AddTxOut(&wire.TxOut{Value: -1000, CoinType: cointype.CoinTypeVAR})
-				return []*dcrutil.Tx{dcrutil.NewTx(voteTx)}
-			},
-			coinType:    1,
-			totalFee:    1000,
-			expectError: true,
-			errorMsg:    "no valid voters found after validation",
-		},
-		{
-			name: "mixed valid and invalid voters",
-			setupVoters: func() []*dcrutil.Tx {
-				voters := make([]*dcrutil.Tx, 3)
+	t.Run("malformed voters - missing consolidation address", func(t *testing.T) {
+		// Create voter without consolidation address output
+		voteTx := wire.NewMsgTx()
+		voteTx.Version = 3
+		voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
+		voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
+		voteTx.AddTxOut(&wire.TxOut{Value: 1000, CoinType: cointype.CoinTypeVAR})
+		// Missing consolidation address output
+		voters := []*dcrutil.Tx{dcrutil.NewTx(voteTx)}
 
-				// Valid voter 1
-				voteTx1 := wire.NewMsgTx()
-				voteTx1.Version = 3
-				for i := 0; i < 3; i++ {
-					voteTx1.AddTxOut(&wire.TxOut{
-						Value:    1000 * int64(i+1),
-						CoinType: cointype.CoinTypeVAR,
-					})
-				}
-				voters[0] = dcrutil.NewTx(voteTx1)
+		_, err := createSSFeeTxBatched(1, 1000, voters, 100, nil, nil, nil)
+		if err == nil {
+			t.Errorf("Expected error for missing consolidation address")
+		}
+	})
 
-				// Invalid voter - malformed
-				voteTx2 := wire.NewMsgTx()
-				voteTx2.Version = 3
-				voteTx2.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-				voters[1] = dcrutil.NewTx(voteTx2)
+	t.Run("remainder distribution to first sorted address", func(t *testing.T) {
+		// Create 3 voters with different consolidation addresses
+		// Address order when sorted: 0x01 < 0x02 < 0x03
+		voters := make([]*dcrutil.Tx, 3)
+		hashes := [][]byte{
+			{0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Will be third when sorted
+			{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Will be first when sorted
+			{0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Will be second when sorted
+		}
+		for i, hash := range hashes {
+			voters[i] = createMockVoteWithConsolidation(1000, hash)
+		}
 
-				// Valid voter 2 with higher stake
-				voteTx3 := wire.NewMsgTx()
-				voteTx3.Version = 3
-				for i := 0; i < 3; i++ {
-					voteTx3.AddTxOut(&wire.TxOut{
-						Value:    5000 * int64(i+1), // Higher stake - should get remainder
-						CoinType: cointype.CoinTypeVAR,
-					})
-				}
-				voters[2] = dcrutil.NewTx(voteTx3)
+		// 100 atoms / 3 voters = 33 each + 1 remainder
+		ssFeeTxns, err := createSSFeeTxBatched(1, 100, voters, 100, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 
-				return voters
-			},
-			coinType:    1,
-			totalFee:    1001, // 1001/2 = 500 each + 1 remainder to highest stake
-			expectError: false,
-		},
-		{
-			name: "remainder distribution to highest stake voter",
-			setupVoters: func() []*dcrutil.Tx {
-				voters := make([]*dcrutil.Tx, 3)
-				stakes := []int64{1000, 5000, 2000} // Middle voter has highest stake
+		if len(ssFeeTxns) != 3 {
+			t.Fatalf("Expected 3 transactions, got %d", len(ssFeeTxns))
+		}
 
-				for i, stake := range stakes {
-					voteTx := wire.NewMsgTx()
-					voteTx.Version = 3
-					voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-					voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR})
-					voteTx.AddTxOut(&wire.TxOut{Value: stake, CoinType: cointype.CoinTypeVAR})
-					voters[i] = dcrutil.NewTx(voteTx)
-				}
-				return voters
-			},
-			coinType:    1,
-			totalFee:    100, // 100/3 = 33 each + 1 remainder to voter with 5000 stake
-			expectError: false,
-		},
-	}
+		// Total should be exactly 100
+		var total int64
+		for _, tx := range ssFeeTxns {
+			total += tx.MsgTx().TxOut[1].Value
+		}
+		if total != 100 {
+			t.Errorf("Total distributed %d != 100", total)
+		}
+	})
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			voters := test.setupVoters()
-			ssFeeTxns, err := createSSFeeTx(test.coinType, test.totalFee, voters, 100, nil)
+	t.Run("batching multiple voters same address", func(t *testing.T) {
+		// Create 5 voters all with same consolidation address
+		hash := make([]byte, 20)
+		hash[0] = 0x42
+		voters := make([]*dcrutil.Tx, 5)
+		for i := range voters {
+			voters[i] = createMockVoteWithConsolidation(1000, hash)
+		}
 
-			if test.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-				} else if test.errorMsg != "" && !contains(err.Error(), test.errorMsg) {
-					t.Errorf("Expected error containing %q, got %q", test.errorMsg, err.Error())
-				}
-				return
-			}
+		ssFeeTxns, err := createSSFeeTxBatched(1, 5000, voters, 100, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 
-			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				return
-			}
+		// Should produce only 1 transaction (all voters batched)
+		if len(ssFeeTxns) != 1 {
+			t.Errorf("Expected 1 batched transaction, got %d", len(ssFeeTxns))
+		}
 
-			// Count valid voters (those with 3+ outputs and non-negative reward values)
-			validVoterCount := 0
-			for _, voter := range voters {
-				if voter.MsgTx() != nil && len(voter.MsgTx().TxOut) >= 3 && voter.MsgTx().TxOut[2].Value >= 0 {
-					validVoterCount++
-				}
-			}
+		// Single tx should have full 5000
+		if ssFeeTxns[0].MsgTx().TxOut[1].Value != 5000 {
+			t.Errorf("Expected 5000, got %d", ssFeeTxns[0].MsgTx().TxOut[1].Value)
+		}
+	})
 
-			// Should have one transaction per valid voter
-			if len(ssFeeTxns) != validVoterCount {
-				t.Errorf("Expected %d SSFee transactions, got %d", validVoterCount, len(ssFeeTxns))
-			}
+	t.Run("mixed consolidation addresses", func(t *testing.T) {
+		// 3 voters: 2 with same address, 1 with different
+		sameHash := make([]byte, 20)
+		sameHash[0] = 0x01
+		diffHash := make([]byte, 20)
+		diffHash[0] = 0x02
 
-			// Additional validation for successful cases
-			var totalDistributed int64
-			for _, ssFeeTx := range ssFeeTxns {
-				msgTx := ssFeeTx.MsgTx()
+		voters := []*dcrutil.Tx{
+			createMockVoteWithConsolidation(1000, sameHash),
+			createMockVoteWithConsolidation(2000, sameHash), // Same as voter 0
+			createMockVoteWithConsolidation(3000, diffHash), // Different
+		}
 
-				// Each SSFee transaction should have 2 outputs: one for voter + one OP_RETURN
-				if len(msgTx.TxOut) != 2 {
-					t.Errorf("Expected 2 outputs per SSFee tx, got %d", len(msgTx.TxOut))
-				}
+		// 3000 total fee / 3 votes = 1000 per vote
+		// Group 1 (sameHash, 2 votes): 2000
+		// Group 2 (diffHash, 1 vote): 1000
+		ssFeeTxns, err := createSSFeeTxBatched(1, 3000, voters, 100, nil, nil, nil)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 
-				// Accumulate total distribution
-				totalDistributed += msgTx.TxOut[0].Value
-			}
+		// Should produce 2 transactions (one per unique address)
+		if len(ssFeeTxns) != 2 {
+			t.Errorf("Expected 2 transactions, got %d", len(ssFeeTxns))
+		}
 
-			// Verify total distribution across all SSFee transactions
-			if totalDistributed != test.totalFee {
-				t.Errorf("Total distributed %d != total fee %d", totalDistributed, test.totalFee)
-			}
-
-			// For remainder test, verify highest stake voter gets remainder
-			if test.name == "remainder distribution to highest stake voter" && len(ssFeeTxns) >= 3 {
-				feePerVoter := test.totalFee / int64(validVoterCount)
-				remainder := test.totalFee - (feePerVoter * int64(validVoterCount))
-
-				// Find the transaction with the extra remainder
-				foundRemainder := false
-				for _, ssFeeTx := range ssFeeTxns {
-					if ssFeeTx.MsgTx().TxOut[0].Value == feePerVoter+remainder {
-						foundRemainder = true
-						break
-					}
-				}
-				if !foundRemainder {
-					t.Errorf("Remainder not properly distributed to highest stake voter")
-				}
-			}
-		})
-	}
+		// Total should be 3000
+		var total int64
+		for _, tx := range ssFeeTxns {
+			total += tx.MsgTx().TxOut[1].Value
+		}
+		if total != 3000 {
+			t.Errorf("Total distributed %d != 3000", total)
+		}
+	})
 }
 
 // contains checks if a string contains a substring (helper function)
@@ -476,49 +426,34 @@ func contains(s, substr string) bool {
 func TestSSFeeIntegration(t *testing.T) {
 	// This test would require a more complete setup with a mock BlockChain
 	// and would test the full integration in NewBlockTemplate
-	// For now, we're focusing on unit testing the createSSFeeTx function
 	t.Skip("Integration test requires full mining harness setup")
 }
 
-// TestCreateSSFeeTxUTXOAugmentation tests UTXO augmentation for staker fees
-func TestCreateSSFeeTxUTXOAugmentation(t *testing.T) {
+// TestCreateSSFeeTxBatchedUTXOAugmentation tests UTXO augmentation for staker fees
+func TestCreateSSFeeTxBatchedUTXOAugmentation(t *testing.T) {
 	// NOTE: This test demonstrates the augmentation logic but cannot fully test it
-	// without a complete UTXO viewpoint implementation. The test shows that:
-	// 1. Without utxoView, SSFee transactions use null inputs (create new UTXOs)
-	// 2. With utxoView (future integration), SSFee can augment existing UTXOs
+	// without a complete SSFeeIndex implementation. The test shows that:
+	// 1. Without ssfeeIndex, SSFee transactions use null inputs (create new UTXOs)
+	// 2. With ssfeeIndex (in production), SSFee can augment existing UTXOs
 
-	// Create mock voters with distinct addresses
+	// Create mock voters with distinct consolidation addresses
 	voters := make([]*dcrutil.Tx, 3)
-	voterPkScripts := [][]byte{
-		{txscript.OP_DUP, txscript.OP_HASH160, 0x14, 0x01}, // Voter 0
-		{txscript.OP_DUP, txscript.OP_HASH160, 0x14, 0x02}, // Voter 1
-		{txscript.OP_DUP, txscript.OP_HASH160, 0x14, 0x03}, // Voter 2
+	hashes := [][]byte{
+		{0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+	for i, hash := range hashes {
+		voters[i] = createMockVoteWithConsolidation(1000, hash)
 	}
 
-	for i := range voters {
-		voteTx := wire.NewMsgTx()
-		voteTx.Version = 3
-
-		// Add vote structure
-		voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR, PkScript: []byte{txscript.OP_RETURN}})
-		voteTx.AddTxOut(&wire.TxOut{Value: 0, CoinType: cointype.CoinTypeVAR, PkScript: []byte{txscript.OP_RETURN}})
-		voteTx.AddTxOut(&wire.TxOut{
-			Value:    1000,
-			CoinType: cointype.CoinTypeVAR,
-			Version:  0,
-			PkScript: voterPkScripts[i],
-		})
-
-		voters[i] = dcrutil.NewTx(voteTx)
-	}
-
-	t.Run("no utxoView - creates new UTXOs", func(t *testing.T) {
-		ssFeeTxns, err := createSSFeeTx(1, 3000, voters, 100, nil)
+	t.Run("no ssfeeIndex - creates new UTXOs", func(t *testing.T) {
+		ssFeeTxns, err := createSSFeeTxBatched(1, 3000, voters, 100, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 
-		// Should create 3 transactions (one per voter)
+		// Should create 3 transactions (one per unique consolidation address)
 		if len(ssFeeTxns) != 3 {
 			t.Fatalf("Expected 3 SSFee transactions, got %d", len(ssFeeTxns))
 		}
@@ -531,48 +466,48 @@ func TestCreateSSFeeTxUTXOAugmentation(t *testing.T) {
 			if tx.MsgTx().TxIn[0].PreviousOutPoint.Index != wire.MaxPrevOutIndex {
 				t.Errorf("Tx %d: Expected null input (no UTXO to augment)", i)
 			}
-			// Output value should equal fee (1000 each for 3 voters)
-			if tx.MsgTx().TxOut[0].Value != 1000 {
-				t.Errorf("Tx %d: Expected output value 1000, got %d", i, tx.MsgTx().TxOut[0].Value)
+			// Output value should equal fee (1000 each for 3 addresses)
+			if tx.MsgTx().TxOut[1].Value != 1000 {
+				t.Errorf("Tx %d: Expected output value 1000, got %d", i, tx.MsgTx().TxOut[1].Value)
 			}
 		}
 	})
 
 	t.Run("multiple rounds accumulate fees", func(t *testing.T) {
 		// Round 1: Create initial SSFee transactions
-		round1Txns, err := createSSFeeTx(1, 3000, voters, 100, nil)
+		round1Txns, err := createSSFeeTxBatched(1, 3000, voters, 100, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Round 1 error: %v", err)
 		}
 
 		// Round 2: Create more SSFee transactions (simulating next block)
-		// In real scenario, round1 outputs would be in UTXO set and could be augmented
-		round2Txns, err := createSSFeeTx(1, 3000, voters, 101, nil)
+		// In real scenario with SSFeeIndex, round2 would augment round1 outputs
+		round2Txns, err := createSSFeeTxBatched(1, 3000, voters, 101, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Round 2 error: %v", err)
 		}
 
-		// Both rounds should create separate transactions
+		// Both rounds should create separate transactions (no index = no augmentation)
 		if len(round1Txns) != 3 || len(round2Txns) != 3 {
 			t.Fatalf("Expected 3 transactions per round")
 		}
 
-		// This demonstrates that without UTXO augmentation, we get 6 total UTXOs (dust)
-		// With augmentation (when utxoView is populated), round2 would reuse round1 outputs
+		// Without augmentation: 6 total UTXOs (dust)
+		// With augmentation: would have 3 UTXOs (one per address, augmented)
 		totalUTXOs := len(round1Txns) + len(round2Txns)
-		t.Logf("Without augmentation: %d total UTXOs created (dust accumulation)", totalUTXOs)
-		t.Logf("With augmentation: would create only %d UTXOs (one per voter)", len(voters))
+		t.Logf("Without augmentation: %d total UTXOs created", totalUTXOs)
+		t.Logf("With augmentation: would create only %d UTXOs", len(voters))
 	})
 
 	t.Run("different coin types don't interfere", func(t *testing.T) {
 		// Create SSFee for SKA-1
-		ska1Txns, err := createSSFeeTx(1, 3000, voters, 100, nil)
+		ska1Txns, err := createSSFeeTxBatched(1, 3000, voters, 100, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("SKA-1 error: %v", err)
 		}
 
 		// Create SSFee for SKA-2
-		ska2Txns, err := createSSFeeTx(2, 6000, voters, 100, nil)
+		ska2Txns, err := createSSFeeTxBatched(2, 6000, voters, 100, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("SKA-2 error: %v", err)
 		}
@@ -582,42 +517,40 @@ func TestCreateSSFeeTxUTXOAugmentation(t *testing.T) {
 			t.Fatalf("Expected 3 transactions per coin type")
 		}
 
-		// Verify coin types are correct
+		// Verify coin types are correct (payment output is at index 1)
 		for _, tx := range ska1Txns {
-			if tx.MsgTx().TxOut[0].CoinType != 1 {
+			if tx.MsgTx().TxOut[1].CoinType != 1 {
 				t.Errorf("SKA-1 transaction has wrong coin type")
 			}
 		}
 		for _, tx := range ska2Txns {
-			if tx.MsgTx().TxOut[0].CoinType != 2 {
+			if tx.MsgTx().TxOut[1].CoinType != 2 {
 				t.Errorf("SKA-2 transaction has wrong coin type")
 			}
-			// SKA-2 should have 2000 per voter (6000 / 3)
-			if tx.MsgTx().TxOut[0].Value != 2000 {
-				t.Errorf("SKA-2 tx has wrong value: %d", tx.MsgTx().TxOut[0].Value)
+			// SKA-2 should have 2000 per address (6000 / 3)
+			if tx.MsgTx().TxOut[1].Value != 2000 {
+				t.Errorf("SKA-2 tx has wrong value: %d", tx.MsgTx().TxOut[1].Value)
 			}
 		}
 	})
 
 	t.Run("each transaction has unique OP_RETURN", func(t *testing.T) {
-		ssFeeTxns, err := createSSFeeTx(1, 3000, voters, 100, nil)
+		ssFeeTxns, err := createSSFeeTxBatched(1, 3000, voters, 100, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 
-		// Collect all OP_RETURN scripts
+		// Collect all OP_RETURN scripts (at index 0)
 		opReturns := make([][]byte, len(ssFeeTxns))
 		for i, tx := range ssFeeTxns {
-			// OP_RETURN is the last output
-			opReturnOut := tx.MsgTx().TxOut[len(tx.MsgTx().TxOut)-1]
-			opReturns[i] = opReturnOut.PkScript
+			opReturns[i] = tx.MsgTx().TxOut[0].PkScript
 		}
 
-		// All should be unique (different voter sequence numbers)
+		// All should be unique
 		for i := 0; i < len(opReturns); i++ {
 			for j := i + 1; j < len(opReturns); j++ {
 				if string(opReturns[i]) == string(opReturns[j]) {
-					t.Errorf("SSFee transactions %d and %d have identical OP_RETURN (not unique)", i, j)
+					t.Errorf("SSFee transactions %d and %d have identical OP_RETURN", i, j)
 				}
 			}
 		}

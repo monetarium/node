@@ -154,7 +154,7 @@ func TestSSFeeAugmentation_SKA_Miner_NullInput(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			minerAddr := createMockAddress(t)
 
-			minerSSFeeTx, err := createMinerSSFeeTx(tc.coinType, tc.fee, minerAddr, 250, nil, nil)
+			minerSSFeeTx, err := createMinerSSFeeTx(tc.coinType, tc.fee, minerAddr, 250, nil, nil, nil)
 			if err != nil {
 				t.Fatalf("Failed to create SKA miner SSFee: %v", err)
 			}

@@ -575,7 +575,7 @@ func MainNetParams() *Params {
 		// Organization address is Dcur2mcGjmENx4DhNqDctW5wJCVyT3Qeqkx
 		OrganizationPkScript:        hexDecode("a914f5916158e3e2c4551c1796708db8367207ed13bb87"),
 		OrganizationPkScriptVersion: 0,
-		BlockOneLedger:              tokenPayouts_MainNetParams(),
+		BlockOneLedger:              nil,
 
 		// Sanctioned Politeia keys.
 		PiKeys: [][]byte{},

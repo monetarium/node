@@ -353,6 +353,7 @@ type peerState struct {
 	persistentPeers map[int32]*serverPeer
 	banned          map[string]time.Time
 	outboundGroups  map[string]int
+	lastMaxIPLog    map[string]time.Time // tracks last INFO log time per IP
 
 	// subCache houses the network address submission cache and is protected
 	// by its own mutex.
@@ -369,6 +370,7 @@ func makePeerState() peerState {
 		outboundPeers:   make(map[int32]*serverPeer),
 		banned:          make(map[string]time.Time),
 		outboundGroups:  make(map[string]int),
+		lastMaxIPLog:    make(map[string]time.Time),
 		subCache: &naSubmissionCache{
 			cache: make(map[string]*naSubmission, maxCachedNaSubmissions),
 			limit: maxCachedNaSubmissions,
@@ -2433,8 +2435,15 @@ func (s *server) handleAddPeer(sp *serverPeer) bool {
 	if cfg.MaxSameIP > 0 && !isInboundWhitelisted && !peerIP.IsLoopback() &&
 		state.connectionsWithIP(peerIP)+1 > cfg.MaxSameIP {
 
-		srvrLog.Infof("Max connections with %s reached [%d] - disconnecting "+
-			"peer", sp, cfg.MaxSameIP)
+		// Rate-limit logging: INFO once per IP per 10 minutes, DEBUG otherwise
+		ipStr := peerIP.String()
+		now := time.Now()
+		if lastLog, exists := state.lastMaxIPLog[ipStr]; !exists || now.Sub(lastLog) > 10*time.Minute {
+			state.lastMaxIPLog[ipStr] = now
+			srvrLog.Infof("Max connections with %s reached [%d] - disconnecting peer", sp, cfg.MaxSameIP)
+		} else {
+			srvrLog.Debugf("Max connections with %s reached [%d] - disconnecting peer", sp, cfg.MaxSameIP)
+		}
 		sp.Disconnect()
 		return false
 	}

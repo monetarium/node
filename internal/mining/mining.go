@@ -725,171 +725,6 @@ func createTreasuryBaseTx(subsidyCache *standalone.SubsidyCache, nextBlockHeight
 	return retTx, nil
 }
 
-// createSSFeeTx creates stake fee distribution transactions.
-// These transactions distribute transaction fees to the stakers who voted in the block.
-//
-// UTXO Augmentation (Phase 2):
-// If utxoView is provided and a voter has an existing UTXO matching their address and coin type,
-// this function creates an SSFee transaction that uses that UTXO as input and adds the fee to its value.
-// This prevents dust accumulation by consolidating fees into existing UTXOs.
-// If no matching UTXO exists, falls back to null input (creates new UTXO).
-//
-// Returns one SSFee transaction per voter. Each transaction has:
-// - Version 3+ (same as modern votes)
-// - Single input: either null input (creating new) or real UTXO input (augmenting existing)
-// - Single output to the voter (with fee added to existing value if augmenting)
-// - OP_RETURN marker with voter index for uniqueness
-// - All outputs have the same coin type (VAR or SKA)
-func createSSFeeTx(coinType cointype.CoinType, totalFee int64, voters []*dcrutil.Tx,
-	nextBlockHeight int64, utxoView *blockchain.UtxoViewpoint) ([]*dcrutil.Tx, error) {
-
-	// Need at least one voter to distribute to
-	if len(voters) == 0 {
-		return nil, fmt.Errorf("no voters to distribute fees to")
-	}
-
-	// Validate totalFee to prevent overflow
-	if totalFee < 0 {
-		return nil, fmt.Errorf("negative total fee: %d", totalFee)
-	}
-	if totalFee > math.MaxInt64/int64(len(voters)) {
-		return nil, fmt.Errorf("total fee too large for distribution: %d", totalFee)
-	}
-
-	// Find valid voters and track highest stake for remainder distribution
-	var highestStakeIdx int
-	var highestStakeValue int64
-	validVoters := make([]int, 0, len(voters))
-
-	for i, voter := range voters {
-		// Enhanced validation of voter transaction structure
-		msgTx := voter.MsgTx()
-		if msgTx == nil {
-			continue // Skip invalid transaction
-		}
-		if len(msgTx.TxOut) < 3 {
-			continue // Skip malformed vote
-		}
-
-		// The first reward output is at index 2
-		rewardOut := msgTx.TxOut[2]
-		if rewardOut == nil {
-			continue // Skip invalid reward output
-		}
-
-		// Validate reward output value for overflow protection
-		if rewardOut.Value < 0 {
-			continue // Skip negative values
-		}
-
-		validVoters = append(validVoters, i)
-
-		// Track highest stake voter for remainder distribution
-		if rewardOut.Value > highestStakeValue {
-			highestStakeValue = rewardOut.Value
-			highestStakeIdx = i
-		}
-	}
-
-	// Ensure we have valid voters after validation
-	if len(validVoters) == 0 {
-		return nil, fmt.Errorf("no valid voters found after validation")
-	}
-
-	// Calculate fee per valid voter (equal distribution)
-	validVotersCount := int64(len(validVoters))
-	feePerVoter := totalFee / validVotersCount
-	remainder := totalFee - (feePerVoter * validVotersCount)
-
-	// Create separate SSFee transaction for each valid voter
-	// This allows independent UTXO augmentation per voter
-	ssFeeTxns := make([]*dcrutil.Tx, 0, len(validVoters))
-
-	for voterSeq, voterIdx := range validVoters {
-		voter := voters[voterIdx]
-		rewardOut := voter.MsgTx().TxOut[2]
-
-		// Calculate this voter's fee amount
-		voterFee := feePerVoter
-		if voterIdx == highestStakeIdx && remainder > 0 {
-			// Highest stake voter gets any remainder from division
-			voterFee += remainder
-		}
-
-		// Validate final fee amount to prevent overflow
-		if voterFee < 0 || voterFee > totalFee {
-			return nil, fmt.Errorf("invalid voter fee calculated: %d", voterFee)
-		}
-
-		// Try to find existing UTXO to augment for this voter
-		var inputOutpoint *wire.OutPoint
-		var augmentValue int64
-
-		if utxoView != nil {
-			outpoint, entry := findAugmentableUTXO(utxoView, rewardOut.PkScript, coinType)
-			if outpoint != nil && entry != nil {
-				inputOutpoint = outpoint
-				augmentValue = entry.Amount()
-				log.Debugf("Found augmentable UTXO for voter %d (seq %d): %v with value %d",
-					voterIdx, voterSeq, outpoint, augmentValue)
-			}
-		}
-
-		// Create OP_RETURN output for unique hash (includes voter sequence for uniqueness)
-		opReturnScript := stake.CreateStakerSSFeeMarker(nextBlockHeight, uint16(voterSeq))
-
-		// Create the SSFee transaction for this voter
-		tx := wire.NewMsgTx()
-		tx.Version = 3 // Same version as modern votes
-
-		// Add input: either real UTXO (augmentation) or null input (new UTXO)
-		if inputOutpoint != nil {
-			// Real UTXO input - augment existing
-			tx.AddTxIn(&wire.TxIn{
-				PreviousOutPoint: *inputOutpoint,
-				Sequence:         wire.MaxTxInSequenceNum,
-				BlockHeight:      wire.NullBlockHeight,
-				BlockIndex:       wire.NullBlockIndex,
-				ValueIn:          augmentValue,
-				SignatureScript:  []byte{}, // Placeholder - SSFee outputs are anyone-can-spend
-			})
-		} else {
-			// Null input - create new UTXO (fallback behavior)
-			tx.AddTxIn(&wire.TxIn{
-				PreviousOutPoint: *wire.NewOutPoint(&chainhash.Hash{},
-					wire.MaxPrevOutIndex, wire.TxTreeRegular),
-				Sequence:        wire.MaxTxInSequenceNum,
-				BlockHeight:     wire.NullBlockHeight,
-				BlockIndex:      wire.NullBlockIndex,
-				ValueIn:         voterFee,
-				SignatureScript: []byte{},
-			})
-		}
-
-		// Create output to voter with augmented value
-		outputValue := augmentValue + voterFee
-		tx.AddTxOut(&wire.TxOut{
-			Value:    outputValue,
-			CoinType: coinType,
-			Version:  rewardOut.Version,
-			PkScript: rewardOut.PkScript,
-		})
-
-		// Add OP_RETURN output for unique hash
-		tx.AddTxOut(&wire.TxOut{
-			Value:    0,
-			CoinType: coinType,
-			PkScript: opReturnScript,
-		})
-
-		retTx := dcrutil.NewTx(tx)
-		retTx.SetTree(wire.TxTreeStake)
-		ssFeeTxns = append(ssFeeTxns, retTx)
-	}
-
-	return ssFeeTxns, nil
-}
-
 // createSSFeeTxBatched creates batched staker fee distribution transactions for all coin types,
 // grouping voters by consolidation address to reduce UTXO fragmentation.
 //
@@ -1134,7 +969,8 @@ func createSSFeeTxBatched(coinType cointype.CoinType, totalFee int64,
 func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 	minerAddress stdaddr.Address, nextBlockHeight int64,
 	ssfeeIndex *indexers.SSFeeIndex,
-	blockUtxos *blockchain.UtxoViewpoint) (*dcrutil.Tx, error) {
+	blockUtxos *blockchain.UtxoViewpoint,
+	fetchUtxoEntry func(wire.OutPoint) (*blockchain.UtxoEntry, error)) (*dcrutil.Tx, error) {
 
 	// SSFee cannot be used for VAR fees (those go through coinbase)
 	if coinType == cointype.CoinTypeVAR {
@@ -1189,28 +1025,44 @@ func createMinerSSFeeTx(coinType cointype.CoinType, totalFee int64,
 			log.Debugf("Failed to query SSFeeIndex for miner UTXO lookup: %v", err)
 		} else if outpoint != nil && value > 0 {
 			// CRITICAL: Verify UTXO is still available (not spent in mempool/current block)
+			var entry *blockchain.UtxoEntry
+			var isSpent bool
+
+			// First check blockUtxos (for UTXOs already used in current template)
 			if blockUtxos != nil {
-				entry := blockUtxos.LookupEntry(*outpoint)
-				if entry == nil || entry.IsSpent() {
-					// UTXO already spent in mempool or current block template
-					log.Debugf("Miner SSFee UTXO %v found by index but already spent in mempool/block - creating new UTXO instead",
-						outpoint)
-					// Don't use this UTXO - fall back to null input
+				entry = blockUtxos.LookupEntry(*outpoint)
+			}
+
+			if entry != nil {
+				// Entry found in block template view - check if spent
+				isSpent = entry.IsSpent()
+			} else if fetchUtxoEntry != nil {
+				// Entry not in block template - fetch from chain UTXO set
+				chainEntry, err := fetchUtxoEntry(*outpoint)
+				if err != nil {
+					log.Debugf("Failed to fetch miner UTXO %v from chain: %v", outpoint, err)
+					isSpent = true
+				} else if chainEntry == nil || chainEntry.IsSpent() {
+					isSpent = true
 				} else {
-					// UTXO is available - safe to use for augmentation
-					inputOutpoint = outpoint
-					augmentValue = value
-					existingBlockHeight = blockHeight
-					existingBlockIndex = blockIndex
-					log.Debugf("Found augmentable miner SSFee UTXO %v (value=%d, height=%d, index=%d) for coin type %d",
-						outpoint, value, blockHeight, blockIndex, coinType)
+					entry = chainEntry
+					isSpent = false
 				}
 			} else {
-				// No blockUtxos provided (shouldn't happen) - use cautiously
+				// No way to verify - assume available (legacy behavior)
+				isSpent = false
+			}
+
+			if isSpent {
+				log.Debugf("Miner SSFee UTXO %v is spent - creating new UTXO instead", outpoint)
+			} else {
+				// UTXO is available - safe to use for augmentation
 				inputOutpoint = outpoint
 				augmentValue = value
 				existingBlockHeight = blockHeight
 				existingBlockIndex = blockIndex
+				log.Debugf("Found augmentable miner SSFee UTXO %v (value=%d, height=%d, index=%d) for coin type %d",
+					outpoint, value, blockHeight, blockIndex, coinType)
 			}
 		} else {
 			log.Debugf("No existing miner SSFee UTXO found in SSFeeIndex for hash160 %x (will create new UTXO)",
@@ -2959,24 +2811,12 @@ nextPriorityQueueItem:
 		txSigOpCounts = append(txSigOpCounts, tsos)
 	}
 
-	// Scale the fees according to the number of voters once stake validation
-	// height is reached.
+	// Distribute fees once stake validation height is reached.
+	// Note: Unlike subsidies, fees are NOT scaled by voter count.
+	// Fees are distributed fully among actual voters since we know the
+	// exact voter count at block template time. This differs from subsidies
+	// where wallets create vote transactions before knowing the final count.
 	if nextBlockHeight >= stakeValidationHeight {
-		// Scale all coin type fees proportionally with overflow protection
-		for coinType := range totalFees {
-			// Check for potential overflow before multiplication
-			// MaxInt64 / voters gives us the max safe value for totalFees[coinType]
-			if voters > 0 && totalFees[coinType] > math.MaxInt64/int64(voters) {
-				// Fee would overflow, cap it at maximum safe value
-				log.Warnf("Fee overflow protection triggered for coin type %d: capping fee at maximum safe value", coinType)
-				totalFees[coinType] = math.MaxInt64 / int64(voters)
-			}
-
-			// Now safe to scale
-			scaledFee := totalFees[coinType] * int64(voters) / int64(g.cfg.ChainParams.TicketsPerBlock)
-			totalFees[coinType] = scaledFee
-		}
-
 		// Get subsidy proportions for fee splitting
 		work, stake, _, _ := standalone.GetSubsidyProportions(subsidySplitVariant)
 
@@ -3039,7 +2879,7 @@ nextPriorityQueueItem:
 
 			// Create miner SSFee transaction for this coin type
 			// Uses SSFeeIndex to find existing miner SSFee UTXOs for consolidation
-			minerSSFeeTx, err := createMinerSSFeeTx(coinType, minerFee, payToAddress, nextBlockHeight, g.cfg.SSFeeIndex, blockUtxos)
+			minerSSFeeTx, err := createMinerSSFeeTx(coinType, minerFee, payToAddress, nextBlockHeight, g.cfg.SSFeeIndex, blockUtxos, g.cfg.FetchUtxoEntry)
 			if err != nil {
 				// Critical error: miner fees cannot be distributed
 				// This is a serious issue as fees would be lost if we continue
