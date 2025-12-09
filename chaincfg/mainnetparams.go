@@ -60,17 +60,12 @@ func MainNetParams() *Params {
 			SerType: wire.TxSerializeFull,
 			Version: 1,
 			TxIn: []*wire.TxIn{{
-				// Fully null.
 				PreviousOutPoint: wire.OutPoint{
 					Hash:  chainhash.Hash{},
 					Index: 0xffffffff,
-					Tree:  0,
 				},
 				SignatureScript: hexDecode("0000"),
 				Sequence:        0xffffffff,
-				BlockHeight:     wire.NullBlockHeight,
-				BlockIndex:      wire.NullBlockIndex,
-				ValueIn:         wire.NullValueIn,
 			}},
 			TxOut: []*wire.TxOut{{
 				Value:    0x00000000,
