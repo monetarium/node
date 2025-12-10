@@ -350,8 +350,8 @@ func (calc *CoinTypeFeeCalculator) GetFeeStats(coinType cointype.CoinType) (*Coi
 		}, nil
 	}
 
-	// Calculate percentile fees from recent transactions
-	percentileFees := calc.calculatePercentileFees(stats.RecentTxFees)
+	// Calculate percentile fees from recent transactions using coin-type-specific min fee
+	percentileFees := calc.calculatePercentileFees(stats.RecentTxFees, feeRate.MinRelayFee)
 
 	return &CoinTypeFeeStats{
 		CoinType:             coinType,
@@ -383,14 +383,21 @@ type CoinTypeFeeStats struct {
 	LastUpdated          time.Time         `json:"lastupdated"`
 }
 
-// calculatePercentileFees calculates fee percentiles from recent transaction data
-func (calc *CoinTypeFeeCalculator) calculatePercentileFees(recentFees []int64) [3]dcrutil.Amount {
+// calculatePercentileFees calculates fee percentiles from recent transaction data.
+// The minRelayFee parameter should be the coin-type-specific minimum relay fee,
+// ensuring SKA coins use their own fee rate (e.g., 10 atoms/KB) rather than VAR's default.
+func (calc *CoinTypeFeeCalculator) calculatePercentileFees(recentFees []int64, minRelayFee dcrutil.Amount) [3]dcrutil.Amount {
 	if len(recentFees) == 0 {
-		// Return default fees if no data
+		// Return default fees based on coin-type-specific minRelayFee
+		// Ensure SlowFee is at least 1 atom to avoid zero fees
+		slowFee := minRelayFee / 2
+		if slowFee < 1 {
+			slowFee = 1
+		}
 		return [3]dcrutil.Amount{
-			calc.defaultMinRelayFee * 2, // Fast
-			calc.defaultMinRelayFee,     // Normal
-			calc.defaultMinRelayFee / 2, // Slow
+			minRelayFee * 2, // Fast
+			minRelayFee,     // Normal
+			slowFee,         // Slow
 		}
 	}
 
@@ -414,17 +421,17 @@ func (calc *CoinTypeFeeCalculator) calculatePercentileFees(recentFees []int64) [
 	p50 := calcPercentile(sortedFees, 0.50) // Normal fee
 	p10 := calcPercentile(sortedFees, 0.10) // Slow fee
 
-	// Enforce minimum relay fee floor - no fee estimate should be below minRelayFee
+	// Enforce minimum relay fee floor using coin-type-specific minRelayFee
 	// This ensures RPC fee estimates are always acceptable to the mempool
-	minRelayFee := int64(calc.defaultMinRelayFee)
-	if p90 < minRelayFee {
-		p90 = minRelayFee
+	minFeeFloor := int64(minRelayFee)
+	if p90 < minFeeFloor {
+		p90 = minFeeFloor
 	}
-	if p50 < minRelayFee {
-		p50 = minRelayFee
+	if p50 < minFeeFloor {
+		p50 = minFeeFloor
 	}
-	if p10 < minRelayFee {
-		p10 = minRelayFee
+	if p10 < minFeeFloor {
+		p10 = minFeeFloor
 	}
 
 	return [3]dcrutil.Amount{
