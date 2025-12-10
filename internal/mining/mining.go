@@ -2381,11 +2381,22 @@ nextPriorityQueueItem:
 		skipForLowFee := false
 		// Note: isSKAEmission already declared above for blockspace check
 		if tx.Tree() != wire.TxTreeStake && !isSKAEmission {
-			// Only enforce static minimum relay fee, not dynamic multiplier
-			minStaticFee := float64(g.cfg.Policy.TxMinFreeFee)
-			if prioItem.feePerKB < minStaticFee {
-				log.Debugf("Skipping tx %s with feePerKB %.2f < static minimum %.2f",
-					tx.Hash(), prioItem.feePerKB, minStaticFee)
+			// Use coin-type-specific minimum relay fee
+			var minStaticFee float64
+			if prioItem.coinType == cointype.CoinTypeVAR {
+				minStaticFee = float64(g.cfg.Policy.TxMinFreeFee)
+			} else {
+				// SKA and other coin types use chain-specific fee rate
+				minStaticFee = float64(g.cfg.ChainParams.SKAMinRelayTxFee)
+			}
+			// Apply 10% tolerance to account for integer division rounding in fee calculation.
+			// Wallet calculates: fee = (feePerKB * txSize) / 1000 (truncates)
+			// Miner recalculates: feePerKB = (fee * 1000) / txSize (can be slightly lower)
+			// Example: 50 atoms/KB, 211 bytes → 10 atoms fee → 47.39 atoms/KB recalculated
+			minStaticFeeWithTolerance := minStaticFee * 0.90
+			if prioItem.feePerKB < minStaticFeeWithTolerance {
+				log.Debugf("Skipping tx %s with feePerKB %.2f < minimum %.2f (tolerance: %.2f)",
+					tx.Hash(), prioItem.feePerKB, minStaticFee, minStaticFeeWithTolerance)
 				skipForLowFee = true
 			}
 		}
