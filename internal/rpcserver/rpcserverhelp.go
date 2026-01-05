@@ -526,7 +526,7 @@ var helpDescsEnUS = map[string]string{
 	"getemissionstatusresult-nextnonce":         "The required nonce for the next emission",
 	"getemissionstatusresult-alreadyemitted":    "Whether this coin type has already been emitted",
 	"getemissionstatusresult-maxsupply":         "The maximum supply for this coin type in atoms",
-	"getemissionstatusresult-circulatingsupply": "The current circulating supply (max supply minus burned), 0 if not yet emitted",
+	"getemissionstatusresult-circulatingsupply": "The current circulating supply in atoms (max supply minus burned), 0 if not yet emitted",
 
 	// GetMempoolInfoCmd help.
 	"getmempoolinfo--synopsis": "Returns memory pool information",

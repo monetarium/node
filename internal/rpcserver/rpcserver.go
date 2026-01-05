@@ -3519,11 +3519,10 @@ func handleGetEmissionStatus(_ context.Context, s *Server, icmd interface{}) (in
 	alreadyEmitted := s.cfg.Chain.HasSKAEmissionOccurred(coinType)
 
 	// Calculate circulating supply (max - burned), 0 if not yet emitted
-	var circulatingSupply float64
+	var circulatingSupply int64
 	if alreadyEmitted {
 		burnedAmount := s.cfg.Chain.GetSKABurnedAmount(coinType)
-		circulatingAtoms := config.MaxSupply - burnedAmount
-		circulatingSupply = dcrutil.Amount(circulatingAtoms).ToCoinType(coinType)
+		circulatingSupply = config.MaxSupply - burnedAmount
 	}
 
 	return types.GetEmissionStatusResult{
