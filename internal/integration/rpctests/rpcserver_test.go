@@ -14,7 +14,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/monetarium/node/chaincfg"
 	"github.com/decred/dcrtest/dcrdtest"
 )
 

@@ -9,8 +9,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/wire"
 )
 
 // TestVarIntSerializeSize ensures the serialize size for variable length

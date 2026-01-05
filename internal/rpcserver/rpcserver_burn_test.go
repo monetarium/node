@@ -8,8 +8,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/rpc/jsonrpc/types/v4"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/rpc/jsonrpc/types"
 )
 
 // Helper function to create testRPCChain with burn amounts

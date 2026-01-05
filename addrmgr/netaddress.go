@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/wire"
 )
 
 // NetAddress defines information about a peer on the network.

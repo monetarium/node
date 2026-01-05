@@ -7,10 +7,10 @@ package mining
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/txscript/stdaddr"
+	"github.com/monetarium/node/wire"
 )
 
 // TestCreateMinerSSFeeTx tests the createMinerSSFeeTx function.

@@ -16,7 +16,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/monetarium/node/chaincfg"
 )
 
 type payout struct {

@@ -8,9 +8,9 @@ package ffldb
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/database/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/database"
+	"github.com/monetarium/node/dcrutil"
 )
 
 // BenchmarkBlockHeader benchmarks how long it takes to load the mainnet genesis

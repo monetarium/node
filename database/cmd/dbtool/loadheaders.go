@@ -8,8 +8,8 @@ package main
 import (
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database/v3"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/database"
 )
 
 // headersCmd defines the configuration options for the loadheaders command.

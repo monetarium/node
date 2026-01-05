@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/decred/dcrd/dcrjson/v4"
+	"github.com/monetarium/node/dcrjson"
 )
 
 // TestChainSvrWsNtfns tests all of the chain server websocket-specific

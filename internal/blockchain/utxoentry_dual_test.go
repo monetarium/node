@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/cointype"
 )
 
 // TestCoinTypeString tests the String method of CoinType.

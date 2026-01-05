@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/wire"
 )
 
 // TestBlock tests the API for Block.

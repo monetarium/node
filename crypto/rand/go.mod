@@ -1,4 +1,4 @@
-module github.com/decred/dcrd/crypto/rand
+module github.com/monetarium/node/crypto/rand
 
 go 1.18
 

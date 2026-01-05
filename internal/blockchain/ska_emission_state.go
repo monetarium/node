@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/database/v3"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/database"
 )
 
 // SKA emission state management

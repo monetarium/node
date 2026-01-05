@@ -11,11 +11,11 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/txscript/v4/stdscript"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/rpc/jsonrpc/types"
+	"github.com/monetarium/node/txscript/stdscript"
+	"github.com/monetarium/node/wire"
 	"github.com/decred/dcrtest/dcrdtest"
 )
 

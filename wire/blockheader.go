@@ -10,7 +10,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"lukechampine.com/blake3"
 )
 

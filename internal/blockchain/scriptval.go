@@ -11,10 +11,10 @@ import (
 	"math"
 	"runtime"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/txscript/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/txscript"
+	"github.com/monetarium/node/wire"
 )
 
 // PrevScripter defines an interface that provides access to scripts and their

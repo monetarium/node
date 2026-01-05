@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/decred/dcrd/database/v3"
-	_ "github.com/decred/dcrd/database/v3/ffldb"
+	"github.com/monetarium/node/database"
+	_ "github.com/monetarium/node/database/ffldb"
 )
 
 // checkDbError ensures the passed error is an Error that matches the passed

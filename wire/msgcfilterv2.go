@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg/chainhash"
 )
 
 // MaxHeaderProofHashes is the maximum number of header commitment inclusion

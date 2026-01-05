@@ -10,7 +10,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/cointype"
 )
 
 // AmountUnit describes a method of converting an Amount to something

@@ -1,10 +1,10 @@
-module github.com/decred/dcrd/dcrec/edwards/v2
+module github.com/monetarium/node/dcrec/edwards
 
 go 1.18
 
 require (
 	github.com/agl/ed25519 v0.0.0-20170116200512-5312a6153412
-	github.com/decred/dcrd/crypto/rand v1.0.0
+	github.com/monetarium/node/crypto/rand v1.0.0
 )
 
 require (

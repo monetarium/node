@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/decred/dcrd/dcrutil/v4/txsort"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/dcrutil/txsort"
+	"github.com/monetarium/node/wire"
 )
 
 func main() {

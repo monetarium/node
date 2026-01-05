@@ -8,9 +8,9 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database/v3"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/database"
 )
 
 // maybeFetchNewTickets loads the list of newly maturing tickets for a given

@@ -10,8 +10,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/wire"
 )
 
 // parseTxWithFallback attempts to parse a transaction using protocol version fallback.

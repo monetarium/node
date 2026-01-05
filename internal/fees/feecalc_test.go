@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrutil"
 )
 
 // TestNewCoinTypeFeeCalculator tests the creation of a new fee calculator

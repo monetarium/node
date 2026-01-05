@@ -8,12 +8,12 @@ import (
 	"crypto/subtle"
 	"errors"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrutil/v4/txsort"
-	"github.com/decred/dcrd/mixing/utxoproof"
-	"github.com/decred/dcrd/txscript/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrec/secp256k1"
+	"github.com/monetarium/node/dcrutil/txsort"
+	"github.com/monetarium/node/mixing/utxoproof"
+	"github.com/monetarium/node/txscript"
+	"github.com/monetarium/node/wire"
 )
 
 // msize is the message size of a mixed message (hash160).

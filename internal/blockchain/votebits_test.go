@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/chaincfg"
 )
 
 // TestVoting ensure the overall voting of an agenda works as expected including

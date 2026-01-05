@@ -5,8 +5,8 @@
 package blockalloc
 
 import (
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrutil"
 )
 
 // GetTransactionCoinType determines the primary coin type of a transaction

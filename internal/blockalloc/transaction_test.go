@@ -7,9 +7,9 @@ package blockalloc
 import (
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/wire"
 )
 
 // createMockTransaction creates a mock transaction with the specified coin type outputs.

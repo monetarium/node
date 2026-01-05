@@ -8,8 +8,8 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrutil"
 )
 
 // NotificationType represents the type of a notification message.

@@ -5,8 +5,8 @@
 package standalone
 
 import (
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/wire"
 )
 
 // CalcMerkleRootInPlace is an in-place version of CalcMerkleRoot that reuses

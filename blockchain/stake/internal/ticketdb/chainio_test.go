@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5/internal/dbnamespace"
-	"github.com/decred/dcrd/blockchain/stake/v5/internal/tickettreap"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/database/v3"
-	_ "github.com/decred/dcrd/database/v3/ffldb"
+	"github.com/monetarium/node/blockchain/stake/internal/dbnamespace"
+	"github.com/monetarium/node/blockchain/stake/internal/tickettreap"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/database"
+	_ "github.com/monetarium/node/database/ffldb"
 )
 
 const (

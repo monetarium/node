@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/decred/dcrd/crypto/blake256"
+	"github.com/monetarium/node/crypto/blake256"
 )
 
 // This example demonstrates the simplest method of hashing an existing

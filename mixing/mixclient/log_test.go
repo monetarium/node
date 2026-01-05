@@ -7,7 +7,7 @@ package mixclient
 import (
 	"testing"
 
-	"github.com/decred/dcrd/mixing/mixpool"
+	"github.com/monetarium/node/mixing/mixpool"
 	"github.com/decred/slog"
 )
 

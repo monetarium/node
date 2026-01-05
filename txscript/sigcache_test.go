@@ -9,10 +9,10 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrec/secp256k1"
+	"github.com/monetarium/node/dcrec/secp256k1/ecdsa"
+	"github.com/monetarium/node/wire"
 )
 
 // testDataPath is the path where txscript test fixtures reside.

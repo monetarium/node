@@ -5,7 +5,7 @@
 package standalone
 
 import (
-	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg/chainhash"
 )
 
 // log2FloorMasks defines the masks to use when quickly calculating

@@ -8,8 +8,8 @@ package txscript_test
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/txscript/v4"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
+	"github.com/monetarium/node/txscript"
+	"github.com/monetarium/node/txscript/stdaddr"
 )
 
 // This example demonstrates creating a script tokenizer instance and using it

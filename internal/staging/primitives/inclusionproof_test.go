@@ -7,7 +7,7 @@ package primitives
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg/chainhash"
 )
 
 // TestGenerateInclusionProof ensures the expected proofs are produced for

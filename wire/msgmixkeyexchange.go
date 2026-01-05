@@ -9,7 +9,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg/chainhash"
 )
 
 const (

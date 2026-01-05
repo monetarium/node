@@ -13,10 +13,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/cointype"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg/chainhash"
 )
 
 // TestBlock tests the MsgBlock API.

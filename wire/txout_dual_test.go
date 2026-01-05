@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/cointype"
 )
 
 // TestNewTxOutWithCoinType tests the NewTxOutWithCoinType function.

@@ -14,7 +14,7 @@ import (
 	"crypto/sha512"
 	"errors"
 
-	"github.com/decred/dcrd/crypto/rand"
+	"github.com/monetarium/node/crypto/rand"
 )
 
 var (

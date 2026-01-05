@@ -15,7 +15,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/monetarium/node/dcrec/secp256k1"
 )
 
 // mockNetParams implements the NetworkParams interface and is used throughout

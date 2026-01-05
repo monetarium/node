@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/decred/dcrd/rpc/jsonrpc/types/v4"
+	"github.com/monetarium/node/rpc/jsonrpc/types"
 )
 
 func TestCheckAuthUserPass(t *testing.T) {

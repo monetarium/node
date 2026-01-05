@@ -23,7 +23,7 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/monetarium/node/dcrec/secp256k1"
 )
 
 // curveParams houses the secp256k1 curve parameters for convenient access.

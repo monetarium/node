@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/database/v3"
-	"github.com/decred/dcrd/internal/staging/primitives"
-	"github.com/decred/dcrd/math/uint256"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/database"
+	"github.com/monetarium/node/internal/staging/primitives"
+	"github.com/monetarium/node/math/uint256"
+	"github.com/monetarium/node/wire"
 )
 
 // hexToFinalState converts the passed hex string into an array of 6 bytes and

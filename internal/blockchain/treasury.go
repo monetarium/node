@@ -10,14 +10,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/blockchain/standalone/v2"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/database/v3"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/txscript/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/blockchain/standalone"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/database"
+	"github.com/monetarium/node/dcrec/secp256k1/schnorr"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/txscript"
+	"github.com/monetarium/node/wire"
 )
 
 // errDbTreasury signifies that a problem was encountered when fetching or

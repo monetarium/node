@@ -8,8 +8,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/cointype"
 )
 
 // TestBlockWithSSFeeDeserialization tests that blocks containing both

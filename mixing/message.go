@@ -7,8 +7,8 @@ package mixing
 import (
 	"hash"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/wire"
 )
 
 // Message is a mixing message.  In addition to implementing wire encoding,

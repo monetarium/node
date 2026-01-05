@@ -1,7 +1,7 @@
-module github.com/decred/dcrd/dcrjson/v4
+module github.com/monetarium/node/dcrjson
 
 go 1.17
 
-require github.com/decred/dcrd/chaincfg/chainhash v1.0.4
+require github.com/monetarium/node/chaincfg/chainhash v1.0.4
 
-require github.com/decred/dcrd/crypto/blake256 v1.0.1 // indirect
+require github.com/monetarium/node/crypto/blake256 v1.0.1 // indirect

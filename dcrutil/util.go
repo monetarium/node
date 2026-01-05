@@ -10,10 +10,10 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrec/secp256k1/ecdsa"
+	"github.com/monetarium/node/txscript/stdaddr"
+	"github.com/monetarium/node/wire"
 )
 
 // AddressParams defines an interface that is used to provide the parameters

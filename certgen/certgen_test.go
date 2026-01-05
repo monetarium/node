@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/certgen"
+	"github.com/monetarium/node/certgen"
 )
 
 // TestNewTLSCertPair ensures the NewTLSCertPair function works as expected.

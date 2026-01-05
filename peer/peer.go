@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/container/lru"
-	"github.com/decred/dcrd/crypto/blake256"
-	"github.com/decred/dcrd/crypto/rand"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/container/lru"
+	"github.com/monetarium/node/crypto/blake256"
+	"github.com/monetarium/node/crypto/rand"
+	"github.com/monetarium/node/wire"
 	"github.com/decred/go-socks/socks"
 	"github.com/decred/slog"
 )

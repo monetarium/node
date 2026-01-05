@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/blockchain/standalone/v2"
-	"github.com/decred/dcrd/blockchain/v5/chaingen"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/blockchain/standalone"
+	"github.com/monetarium/node/blockchain/chaingen"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/wire"
 )
 
 // TestTSpendLegacyExpendituresPolicy performs tests against the treasury

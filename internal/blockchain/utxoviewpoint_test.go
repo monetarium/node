@@ -7,11 +7,11 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/decred/dcrd/blockchain/v5/chaingen"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/chaingen"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/wire"
 )
 
 // TestFetchUtxoView ensures fetching a utxo viewpoint for the current tip block

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/wire"
 )
 
 func main() {

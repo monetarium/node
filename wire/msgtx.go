@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/cointype"
 )
 
 // FeesByType represents transaction fees collected by coin type.

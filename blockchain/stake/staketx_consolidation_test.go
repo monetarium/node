@@ -8,9 +8,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/wire"
 )
 
 // Test hash160 for consolidation address

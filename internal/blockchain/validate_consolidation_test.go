@@ -7,8 +7,8 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/txscript/v4"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/txscript"
 )
 
 // TestMakeDistributionKey tests the makeDistributionKey helper function.

@@ -11,7 +11,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/cointype"
 )
 
 // Define test constants for backward compatibility

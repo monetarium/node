@@ -11,10 +11,10 @@ import (
 	"fmt"
 
 	"github.com/decred/base58"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrec"
-	"github.com/decred/dcrd/dcrec/edwards/v2"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrec"
+	"github.com/monetarium/node/dcrec/edwards"
+	"github.com/monetarium/node/dcrec/secp256k1"
 )
 
 var (

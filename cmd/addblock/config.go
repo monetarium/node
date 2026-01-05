@@ -11,10 +11,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/database/v3"
-	_ "github.com/decred/dcrd/database/v3/ffldb"
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/database"
+	_ "github.com/monetarium/node/database/ffldb"
+	"github.com/monetarium/node/dcrutil"
 	flags "github.com/jessevdk/go-flags"
 )
 

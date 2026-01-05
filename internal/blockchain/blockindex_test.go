@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/math/uint256"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/math/uint256"
+	"github.com/monetarium/node/wire"
 )
 
 // TestBlockNodeHeader ensures that block nodes reconstruct the correct header

@@ -8,8 +8,8 @@ import (
 	"encoding/binary"
 	"math/big"
 
-	"github.com/decred/dcrd/crypto/blake256"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/crypto/blake256"
+	"github.com/monetarium/node/wire"
 )
 
 // SRMixPads creates a vector of exponential DC-net pads from a vector of

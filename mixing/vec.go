@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/decred/dcrd/mixing/internal/chacha20prng"
+	"github.com/monetarium/node/mixing/internal/chacha20prng"
 )
 
 // Msize is the size of the message being mixed.  This is the size of a

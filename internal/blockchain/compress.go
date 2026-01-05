@@ -8,9 +8,9 @@ package blockchain
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/txscript/v4"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/dcrec/secp256k1"
+	"github.com/monetarium/node/txscript"
 )
 
 // currentCompressionVersion is the current script compression version of the

@@ -15,10 +15,10 @@ import (
 	"runtime/pprof"
 	"strings"
 
-	"github.com/decred/dcrd/internal/blockchain"
-	"github.com/decred/dcrd/internal/blockchain/indexers"
-	"github.com/decred/dcrd/internal/limits"
-	"github.com/decred/dcrd/internal/version"
+	"github.com/monetarium/node/internal/blockchain"
+	"github.com/monetarium/node/internal/blockchain/indexers"
+	"github.com/monetarium/node/internal/limits"
+	"github.com/monetarium/node/internal/version"
 )
 
 var cfg *config

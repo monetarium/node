@@ -13,7 +13,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/decred/dcrd/crypto/blake256/internal/compress"
+	"github.com/monetarium/node/crypto/blake256/internal/compress"
 )
 
 const (

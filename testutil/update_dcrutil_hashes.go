@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	
-	"github.com/decred/dcrd/dcrutil/v4"
+	"github.com/monetarium/node/dcrutil"
 )
 
 func main() {

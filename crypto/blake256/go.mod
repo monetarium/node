@@ -1,3 +1,3 @@
-module github.com/decred/dcrd/crypto/blake256
+module github.com/monetarium/node/crypto/blake256
 
 go 1.17

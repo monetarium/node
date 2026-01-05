@@ -10,11 +10,11 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/decred/dcrd/blockchain/v5/fullblocktests"
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/fullblocktests"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/wire"
 )
 
 // fullBlockTestErrToLocalErr converts the provided full block test error kind

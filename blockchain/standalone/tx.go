@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/wire"
 )
 
 const (

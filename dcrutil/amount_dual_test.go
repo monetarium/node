@@ -8,7 +8,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/cointype"
 )
 
 // TestNewAmountForCoinType tests the NewAmountForCoinType function.

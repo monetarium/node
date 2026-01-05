@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/crypto/blake256"
-	"github.com/decred/dcrd/mixing"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/crypto/blake256"
+	"github.com/monetarium/node/mixing"
+	"github.com/monetarium/node/wire"
 )
 
 var (

@@ -8,7 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/decred/dcrd/txscript/v4/stdscript"
+	"github.com/monetarium/node/txscript/stdscript"
 )
 
 // hexToBytes converts the passed hex string into bytes and will panic if there

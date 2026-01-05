@@ -13,12 +13,12 @@ import (
 	"sort"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/mixing"
-	"github.com/decred/dcrd/mixing/internal/chacha20prng"
-	"github.com/decred/dcrd/mixing/mixpool"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrec/secp256k1"
+	"github.com/monetarium/node/mixing"
+	"github.com/monetarium/node/mixing/internal/chacha20prng"
+	"github.com/monetarium/node/mixing/mixpool"
+	"github.com/monetarium/node/wire"
 )
 
 var errBlameFailed = errors.New("blame failed")

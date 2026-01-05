@@ -11,14 +11,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/dcrjson/v4"
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/gcs/v4"
-	"github.com/decred/dcrd/gcs/v4/blockcf2"
-	chainjson "github.com/decred/dcrd/rpc/jsonrpc/types/v4"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/dcrjson"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/gcs"
+	"github.com/monetarium/node/gcs/blockcf2"
+	chainjson "github.com/monetarium/node/rpc/jsonrpc/types"
+	"github.com/monetarium/node/txscript/stdaddr"
+	"github.com/monetarium/node/wire"
 )
 
 // FutureGetBestBlockHashResult is a future promise to deliver the result of a

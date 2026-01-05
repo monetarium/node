@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/rpcclient/v8"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/rpcclient"
 )
 
 func main() {

@@ -12,7 +12,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/decred/dcrd/database/v3"
+	"github.com/monetarium/node/database"
 	"github.com/decred/slog"
 	flags "github.com/jessevdk/go-flags"
 )

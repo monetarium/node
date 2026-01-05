@@ -7,9 +7,9 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrec/secp256k1"
 )
 
 // TestSKAEmissionBasicValidation tests basic SKA emission validation.

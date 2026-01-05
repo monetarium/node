@@ -8,9 +8,9 @@ package hdkeychain_test
 import (
 	"fmt"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/hdkeychain/v3"
-	"github.com/decred/dcrd/txscript/v4/stdaddr"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/hdkeychain"
+	"github.com/monetarium/node/txscript/stdaddr"
 )
 
 // This example demonstrates how to generate a cryptographically random seed

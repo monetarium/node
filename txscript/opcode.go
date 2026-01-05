@@ -14,14 +14,14 @@ import (
 	"hash"
 	"strings"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/crypto/ripemd160"
-	"github.com/decred/dcrd/dcrec"
-	"github.com/decred/dcrd/dcrec/edwards/v2"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/ecdsa"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4/schnorr"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/crypto/ripemd160"
+	"github.com/monetarium/node/dcrec"
+	"github.com/monetarium/node/dcrec/edwards"
+	"github.com/monetarium/node/dcrec/secp256k1"
+	"github.com/monetarium/node/dcrec/secp256k1/ecdsa"
+	"github.com/monetarium/node/dcrec/secp256k1/schnorr"
+	"github.com/monetarium/node/wire"
 )
 
 // optimizeSigVerification is an optimization for verification of transactions

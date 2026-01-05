@@ -9,8 +9,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/wire"
 )
 
 func main() {

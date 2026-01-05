@@ -7,7 +7,7 @@ package rpcserver
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
+	"github.com/monetarium/node/chaincfg"
 )
 
 // TestSKAConfigParameterValidation tests validation of SKA configuration parameters.

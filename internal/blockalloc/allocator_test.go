@@ -7,8 +7,8 @@ package blockalloc
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
 )
 
 // mockChainParams creates a test chain parameters with configured SKA types.

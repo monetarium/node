@@ -11,8 +11,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/decred/dcrd/blockchain/stake/v5"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/blockchain/stake"
+	"github.com/monetarium/node/wire"
 )
 
 // TestUtxoSerialization ensures serializing and deserializing unspent

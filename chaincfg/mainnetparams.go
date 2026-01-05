@@ -9,10 +9,10 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/dcrec/secp256k1"
+	"github.com/monetarium/node/wire"
 )
 
 // MainNetParams returns the network parameters for the main Decred network.

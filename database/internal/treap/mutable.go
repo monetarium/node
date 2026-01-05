@@ -8,7 +8,7 @@ package treap
 import (
 	"bytes"
 
-	"github.com/decred/dcrd/crypto/rand"
+	"github.com/monetarium/node/crypto/rand"
 )
 
 // Mutable represents a treap data structure which is used to hold ordered

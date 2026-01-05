@@ -7,9 +7,9 @@ package blockchain
 import (
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/v3"
-	"github.com/decred/dcrd/cointype"
-	"github.com/decred/dcrd/database/v3"
+	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/cointype"
+	"github.com/monetarium/node/database"
 )
 
 // TestSKABurnStateConnectDisconnect tests basic connect and disconnect of burns.

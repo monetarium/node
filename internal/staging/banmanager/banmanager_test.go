@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/decred/dcrd/peer/v3"
-	"github.com/decred/dcrd/wire"
+	"github.com/monetarium/node/peer"
+	"github.com/monetarium/node/wire"
 	"github.com/decred/go-socks/socks"
 )
 

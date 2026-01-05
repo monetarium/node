@@ -1,4 +1,4 @@
-module github.com/decred/dcrd/crypto/blake256/internal/_asm
+module github.com/monetarium/node/crypto/blake256/internal/_asm
 
 go 1.18
 

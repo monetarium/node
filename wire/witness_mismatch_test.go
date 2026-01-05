@@ -9,8 +9,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/decred/dcrd/chaincfg/chainhash"
-	"github.com/decred/dcrd/cointype"
+	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/monetarium/node/cointype"
 )
 
 // TestWitnessMismatchBug reproduces the issue where transactions serialized

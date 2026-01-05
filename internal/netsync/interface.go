@@ -5,8 +5,8 @@
 package netsync
 
 import (
-	"github.com/decred/dcrd/dcrutil/v4"
-	"github.com/decred/dcrd/mixing"
+	"github.com/monetarium/node/dcrutil"
+	"github.com/monetarium/node/mixing"
 )
 
 // PeerNotifier provides an interface to notify peers of status changes related
