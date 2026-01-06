@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/wire"
 	"github.com/syndtr/goleveldb/leveldb"
 	ldberrors "github.com/syndtr/goleveldb/leveldb/errors"

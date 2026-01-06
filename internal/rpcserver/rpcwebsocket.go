@@ -18,10 +18,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/crypto/rand"
 	"github.com/monetarium/node/crypto/ripemd160"
 	"github.com/monetarium/node/dcrjson"
@@ -33,7 +34,6 @@ import (
 	"github.com/monetarium/node/txscript/stdaddr"
 	"github.com/monetarium/node/txscript/stdscript"
 	"github.com/monetarium/node/wire"
-	"github.com/gorilla/websocket"
 )
 
 const (

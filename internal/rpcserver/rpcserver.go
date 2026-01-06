@@ -34,10 +34,12 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/gorilla/websocket"
+	"github.com/jrick/bitset"
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/cointype"
 	"github.com/monetarium/node/crypto/blake256"
 	"github.com/monetarium/node/crypto/rand"
@@ -55,8 +57,6 @@ import (
 	"github.com/monetarium/node/txscript/stdaddr"
 	"github.com/monetarium/node/txscript/stdscript"
 	"github.com/monetarium/node/wire"
-	"github.com/gorilla/websocket"
-	"github.com/jrick/bitset"
 )
 
 // API version constants.

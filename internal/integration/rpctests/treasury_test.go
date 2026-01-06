@@ -20,8 +20,8 @@ import (
 
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/dcrec"
 	"github.com/monetarium/node/dcrec/secp256k1"
 	"github.com/monetarium/node/dcrutil"
@@ -30,7 +30,7 @@ import (
 	"github.com/monetarium/node/txscript/sign"
 	"github.com/monetarium/node/txscript/stdaddr"
 	"github.com/monetarium/node/wire"
-	"github.com/decred/dcrtest/dcrdtest"
+	"github.com/monetarium/test/dcrdtest"
 )
 
 // timeoutCtx returns a context with the given timeout and automatically calls

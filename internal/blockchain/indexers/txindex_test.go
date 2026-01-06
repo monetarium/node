@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/monetarium/node/blockchain/chaingen"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/database"
 	_ "github.com/monetarium/node/database/ffldb"
 	"github.com/monetarium/node/dcrutil"

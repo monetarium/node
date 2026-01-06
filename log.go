@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/decred/slog"
+	"github.com/jrick/logrotate/rotator"
 	"github.com/monetarium/node/addrmgr"
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/connmgr"
@@ -25,8 +27,6 @@ import (
 	"github.com/monetarium/node/mixing/mixpool"
 	"github.com/monetarium/node/peer"
 	"github.com/monetarium/node/txscript"
-	"github.com/decred/slog"
-	"github.com/jrick/logrotate/rotator"
 )
 
 // logWriter implements an io.Writer that outputs to both standard output and

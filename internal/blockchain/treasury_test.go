@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/monetarium/node/blockchain/chaingen"
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/blockchain/chaingen"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/container/lru"
 	"github.com/monetarium/node/database"
 	"github.com/monetarium/node/dcrec"

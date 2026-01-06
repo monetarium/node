@@ -11,8 +11,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/cointype"
 	"github.com/monetarium/node/connmgr"
 	"github.com/monetarium/node/dcrutil"

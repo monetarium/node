@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/monetarium/node/blockchain/stake"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/crypto/blake256"
 	"github.com/monetarium/node/database"
 	"github.com/monetarium/node/dcrec/secp256k1"

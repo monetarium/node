@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/crypto/blake256"
 	"github.com/monetarium/node/mixing"
 	"github.com/monetarium/node/wire"

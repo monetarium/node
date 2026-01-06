@@ -16,7 +16,7 @@ import (
 	"github.com/monetarium/node/rpc/jsonrpc/types"
 	"github.com/monetarium/node/txscript/stdscript"
 	"github.com/monetarium/node/wire"
-	"github.com/decred/dcrtest/dcrdtest"
+	"github.com/monetarium/test/dcrdtest"
 )
 
 // testBurnTransaction tests creating and mining a burn transaction and verifying

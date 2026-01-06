@@ -12,8 +12,8 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/dcrec"
 	"github.com/monetarium/node/dcrec/edwards"
 	"github.com/monetarium/node/dcrec/secp256k1"

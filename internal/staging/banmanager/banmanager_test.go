@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/decred/go-socks/socks"
 	"github.com/monetarium/node/peer"
 	"github.com/monetarium/node/wire"
-	"github.com/decred/go-socks/socks"
 )
 
 // TestBanPeer tests ban manager peer banning functionality.

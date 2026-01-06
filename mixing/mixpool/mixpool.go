@@ -14,8 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/decred/slog"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/container/lru"
 	"github.com/monetarium/node/mixing"
 	"github.com/monetarium/node/mixing/utxoproof"
@@ -23,7 +24,6 @@ import (
 	"github.com/monetarium/node/txscript/stdaddr"
 	"github.com/monetarium/node/txscript/stdscript"
 	"github.com/monetarium/node/wire"
-	"github.com/decred/slog"
 )
 
 const minconf = 1

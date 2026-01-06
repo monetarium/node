@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"decred.org/cspp/v2/solverrpc"
+	"github.com/decred/slog"
 	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/crypto/blake256"
 	"github.com/monetarium/node/crypto/rand"
@@ -30,7 +31,6 @@ import (
 	"github.com/monetarium/node/txscript"
 	"github.com/monetarium/node/txscript/stdaddr"
 	"github.com/monetarium/node/wire"
-	"github.com/decred/slog"
 	"golang.org/x/sync/errgroup"
 )
 

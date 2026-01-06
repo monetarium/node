@@ -11,11 +11,11 @@ import (
 	"os"
 	"path/filepath"
 
+	flags "github.com/jessevdk/go-flags"
 	"github.com/monetarium/node/chaincfg"
 	"github.com/monetarium/node/database"
 	_ "github.com/monetarium/node/database/ffldb"
 	"github.com/monetarium/node/dcrutil"
-	flags "github.com/jessevdk/go-flags"
 )
 
 const (

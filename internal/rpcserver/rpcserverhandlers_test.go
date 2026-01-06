@@ -28,8 +28,8 @@ import (
 	"github.com/monetarium/node/addrmgr"
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/cointype"
 	"github.com/monetarium/node/database"
 	"github.com/monetarium/node/dcrjson"
@@ -7531,24 +7531,8 @@ func TestHandleGetRawTransaction(t *testing.T) {
 	nonVerboseTx := 0
 	verboseTx := 1
 	txid := "b1a172e05df393fb5e8dd812ccdef517367f0da7abb017ae7e7adc4853b785a2"
+	// Transaction hex with CoinType=0 bytes after each output value (new wire format)
 	nonVerboseResult := "0100000002b761292042421b09196a2a9cdf56001a95df8c" +
-		"508dacf1170bba8b0c813fc8210300000001ffffffffdca0b996c9078ed14749" +
-		"774aba78d6e1df78e29486deb59d1894ed16a53b74080200000000ffffffff03" +
-		"53170b000000000000001976a914762432e9619f5ddaf122ac663684152ffe9e" +
-		"b0ec88acf747f15b0300000000001976a914762432e9619f5ddaf122ac663684" +
-		"152ffe9eb0ec88acba8656950100000000001976a914bc3c059489f447afbf54" +
-		"2ff33432adb9ded7f8e988ac000000000000000002772383e902000000e19606" +
-		"00010000006b483045022100ba5b20f9148273717deba544348f0595750e12cb" +
-		"57d7a818914c66453c9dfb930220486feb328c8f171cce5cfbf88382114282f9" +
-		"041ba53209a12ad48ac86ceb8eb2012102b9ff45cb72132bdf41cf97e96afa90" +
-		"102a4c96ef11fafe43e01983050880aab953d4cf0702000000d3970600020000" +
-		"006b483045022100b29ff29f99ae5b8e3fad72efe6dd13968b7d1c6b3fe2e0fb" +
-		"7eb7656cf7de75f202200888c36da42a0cc948770e3be29b0c75465096bc47cb" +
-		"ac27f7c19be7b33287760121039e58379edbbc239e965d7715a9834f6870d9e5" +
-		"e6bf7ebae8d12a30f7282ea5a5"
-
-	// nonVerboseResult with CoinType bytes for mempool transactions
-	nonVerboseMempoolResult := "0100000002b761292042421b09196a2a9cdf56001a95df8c" +
 		"508dacf1170bba8b0c813fc8210300000001ffffffffdca0b996c9078ed14749" +
 		"774aba78d6e1df78e29486deb59d1894ed16a53b74080200000000ffffffff03" +
 		"53170b00000000000000001976a914762432e9619f5ddaf122ac663684152ffe9e" +
@@ -7563,6 +7547,9 @@ func TestHandleGetRawTransaction(t *testing.T) {
 		"7eb7656cf7de75f202200888c36da42a0cc948770e3be29b0c75465096bc47cb" +
 		"ac27f7c19be7b33287760121039e58379edbbc239e965d7715a9834f6870d9e5" +
 		"e6bf7ebae8d12a30f7282ea5a5"
+
+	// Same format now used for all transactions (mempool and indexed)
+	nonVerboseMempoolResult := nonVerboseResult
 
 	verboseResult := types.TxRawResult{
 		Hex:      nonVerboseResult,

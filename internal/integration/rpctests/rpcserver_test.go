@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/monetarium/node/chaincfg"
-	"github.com/decred/dcrtest/dcrdtest"
+	"github.com/monetarium/test/dcrdtest"
 )
 
 func testGetBestBlock(ctx context.Context, r *dcrdtest.Harness, t *testing.T) {

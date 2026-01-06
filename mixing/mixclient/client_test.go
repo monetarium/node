@@ -13,8 +13,9 @@ import (
 	"time"
 
 	"decred.org/cspp/v2/solverrpc"
-	"github.com/monetarium/node/chaincfg/chainhash"
+	"github.com/decred/slog"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/dcrec"
 	"github.com/monetarium/node/dcrec/secp256k1"
 	"github.com/monetarium/node/mixing"
@@ -23,7 +24,6 @@ import (
 	"github.com/monetarium/node/txscript/sign"
 	"github.com/monetarium/node/txscript/stdaddr"
 	"github.com/monetarium/node/wire"
-	"github.com/decred/slog"
 	"golang.org/x/sync/errgroup"
 )
 

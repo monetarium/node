@@ -12,9 +12,9 @@ import (
 	"os"
 	"path"
 
+	flags "github.com/jessevdk/go-flags"
 	"github.com/monetarium/node/dcrutil"
 	"github.com/monetarium/node/internal/fees"
-	flags "github.com/jessevdk/go-flags"
 )
 
 type config struct {

@@ -16,8 +16,8 @@ import (
 	"testing"
 
 	"github.com/monetarium/node/blockchain/stake/internal/tickettreap"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/database"
 	_ "github.com/monetarium/node/database/ffldb"
 	"github.com/monetarium/node/dcrutil"

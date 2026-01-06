@@ -12,9 +12,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/monetarium/node/database"
 	"github.com/decred/slog"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/monetarium/node/database"
 )
 
 const (

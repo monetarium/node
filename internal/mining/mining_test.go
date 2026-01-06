@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/dcrutil"
 	"github.com/monetarium/node/internal/blockchain"
 	"github.com/monetarium/node/txscript"

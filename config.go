@@ -23,6 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/decred/go-socks/socks"
+	"github.com/decred/slog"
+	flags "github.com/jessevdk/go-flags"
 	"github.com/monetarium/node/connmgr"
 	"github.com/monetarium/node/database"
 	_ "github.com/monetarium/node/database/ffldb"
@@ -32,9 +35,6 @@ import (
 	"github.com/monetarium/node/rpc/jsonrpc/types"
 	"github.com/monetarium/node/sampleconfig"
 	"github.com/monetarium/node/txscript/stdaddr"
-	"github.com/decred/go-socks/socks"
-	"github.com/decred/slog"
-	flags "github.com/jessevdk/go-flags"
 )
 
 const (

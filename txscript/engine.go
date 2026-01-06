@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/monetarium/node/wire"
 	"github.com/decred/slog"
+	"github.com/monetarium/node/wire"
 )
 
 // ScriptFlags is a bitmask defining additional operations or tests that will be

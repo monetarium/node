@@ -18,8 +18,8 @@ import (
 
 	"github.com/monetarium/node/blockchain/stake"
 	"github.com/monetarium/node/blockchain/standalone"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/cointype"
 	"github.com/monetarium/node/dcrec"
 	"github.com/monetarium/node/dcrec/secp256k1"

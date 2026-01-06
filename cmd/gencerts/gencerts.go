@@ -22,8 +22,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/monetarium/node/crypto/rand"
 	flags "github.com/jessevdk/go-flags"
+	"github.com/monetarium/node/crypto/rand"
 	"golang.org/x/net/idna"
 )
 

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monetarium/node/wire"
 	"github.com/decred/slog"
+	"github.com/monetarium/node/wire"
 )
 
 var (

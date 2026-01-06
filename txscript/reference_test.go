@@ -187,6 +187,20 @@ func parseExpectedResult(expected string) ([]ErrorKind, error) {
 		expected)
 }
 
+// legacyTxHash computes a transaction hash using the legacy wire format
+// (without CoinType field). This is needed for backward compatibility with
+// test signatures that were created before the dual-coin wire format change.
+func legacyTxHash(tx *wire.MsgTx) chainhash.Hash {
+	// TxHash uses TxSerializeNoWitness (prefix only), so we need to do the same
+	// but with legacy protocol version (11) to exclude CoinType from the hash.
+	txCopy := *tx
+	txCopy.SerType = wire.TxSerializeNoWitness
+	buf := bytes.NewBuffer(make([]byte, 0, txCopy.SerializeSize()))
+	// Use protocol version 11 (before DualCoinVersion=12)
+	txCopy.BtcEncode(buf, 11)
+	return chainhash.HashH(buf.Bytes())
+}
+
 // createSpendTx generates a basic spending transaction given the passed
 // signature and public key scripts.
 func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
@@ -200,7 +214,8 @@ func createSpendingTx(sigScript, pkScript []byte) *wire.MsgTx {
 	coinbaseTx.AddTxOut(txOut)
 
 	spendingTx := wire.NewMsgTx()
-	coinbaseTxHash := coinbaseTx.TxHash()
+	// Use legacy hash for backward compatibility with existing test signatures
+	coinbaseTxHash := legacyTxHash(coinbaseTx)
 	outPoint = wire.NewOutPoint(&coinbaseTxHash, 0, wire.TxTreeRegular)
 	txIn = wire.NewTxIn(outPoint, 0, sigScript)
 	txOut = wire.NewTxOut(0, nil)

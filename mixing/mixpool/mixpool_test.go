@@ -18,8 +18,8 @@ import (
 
 	"decred.org/cspp/v2/solverrpc"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/crypto/blake256"
 	"github.com/monetarium/node/dcrec/secp256k1"
 	"github.com/monetarium/node/mixing"

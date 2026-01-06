@@ -12,11 +12,11 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/decred/slog"
 	"github.com/monetarium/node/database"
 	"github.com/monetarium/node/internal/blockchain"
 	"github.com/monetarium/node/internal/blockchain/indexers"
 	"github.com/monetarium/node/internal/limits"
-	"github.com/decred/slog"
 )
 
 const (

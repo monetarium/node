@@ -9,8 +9,8 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/dcrec"
 	"github.com/monetarium/node/dcrec/secp256k1"
 	"github.com/monetarium/node/txscript"

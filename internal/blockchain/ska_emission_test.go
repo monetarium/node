@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/chaincfg"
+	"github.com/monetarium/node/chaincfg/chainhash"
 	"github.com/monetarium/node/cointype"
 	"github.com/monetarium/node/dcrec/secp256k1"
 	"github.com/monetarium/node/dcrec/secp256k1/ecdsa"
