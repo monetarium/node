@@ -4631,7 +4631,7 @@ func handleGetWork(ctx context.Context, s *Server, cmd interface{}) (interface{}
 	if !s.cfg.AllowUnsyncedMining && s.cfg.ConnMgr.ConnectedCount() == 0 {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCClientNotConnected,
-			Message: "Decred is not connected",
+			Message: "Monetarium is not connected",
 		}
 	}
 
@@ -4644,7 +4644,7 @@ func handleGetWork(ctx context.Context, s *Server, cmd interface{}) (interface{}
 	if !s.cfg.AllowUnsyncedMining && !initialChainState && !chain.IsCurrent() {
 		return nil, &dcrjson.RPCError{
 			Code:    dcrjson.ErrRPCClientInInitialDownload,
-			Message: "Decred is downloading blocks...",
+			Message: "Monetarium is downloading blocks...",
 		}
 	}
 
@@ -5653,7 +5653,7 @@ func handleVerifyMessage(_ context.Context, s *Server, cmd interface{}) (interfa
 	// Validate the signature - this just shows that it was valid at all.
 	// we will compare it with the key next.
 	var buf bytes.Buffer
-	wire.WriteVarString(&buf, 0, "Decred Signed Message:\n")
+	wire.WriteVarString(&buf, 0, "Monetarium Signed Message:\n")
 	wire.WriteVarString(&buf, 0, c.Message)
 	expectedMessageHash := chainhash.HashB(buf.Bytes())
 	pk, wasCompressed, err := ecdsa.RecoverCompact(sig, expectedMessageHash)

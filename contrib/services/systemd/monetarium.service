@@ -1,27 +1,27 @@
 [Unit]
-Description=Decred Full Node
+Description=Monetarium Full Node
 Requires=local-fs.target network-online.target network.target
 After=local-fs.target network-online.target network.target
 
 [Service]
 Type=simple
 
-User=dcrd
-Group=dcrd
+User=monetarium
+Group=monetarium
 
-# dcrd appdir
-ReadWritePaths=/home/dcrd/.dcrd/
+# monetarium appdir
+ReadWritePaths=/home/monetarium/.monetarium/
 
-# dcrd datadir
-ReadWritePaths=/home/dcrd/.dcrd/data
+# monetarium datadir
+ReadWritePaths=/home/monetarium/.monetarium/data
 
-# dcrd logdir
-ReadWritePaths=/home/dcrd/.dcrd/logs
+# monetarium logdir
+ReadWritePaths=/home/monetarium/.monetarium/logs
 
-# launch dcrd
-ExecStart=/home/dcrd/decred/dcrd
+# launch monetarium
+ExecStart=/home/monetarium/monetarium/monetarium
 
-# restart dcrd
+# restart monetarium
 TimeoutStopSec=10s
 Restart=on-abnormal
 RestartSec=10s

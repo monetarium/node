@@ -8,10 +8,10 @@ import (
 	_ "embed"
 )
 
-// sampleDcrdConf is a string containing the commented example config for dcrd.
+// sampleMonetariumConf is a string containing the commented example config for monetarium.
 //
-//go:embed sample-dcrd.conf
-var sampleDcrdConf string
+//go:embed sample-monetarium.conf
+var sampleMonetariumConf string
 
 // sampleDcrctlConf is a string containing the commented example config for
 // dcrctl.
@@ -19,9 +19,9 @@ var sampleDcrdConf string
 //go:embed sample-dcrctl.conf
 var sampleDcrctlConf string
 
-// Dcrd returns a string containing the commented example config for dcrd.
+// Dcrd returns a string containing the commented example config for monetarium.
 func Dcrd() string {
-	return sampleDcrdConf
+	return sampleMonetariumConf
 }
 
 // FileContents returns a string containing the commented example config for

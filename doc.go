@@ -4,23 +4,23 @@
 // license that can be found in the LICENSE file.
 
 /*
-dcrd is a full-node Decred implementation written in Go.
+monetarium is a full-node Monetarium implementation written in Go.
 
-The default options are sane for most users.  This means dcrd will work 'out of
+The default options are sane for most users.  This means monetarium will work 'out of
 the box' for most users.  However, there are also a wide variety of flags that
 can be used to control it.
 
 The following section provides a usage overview which enumerates the flags.  An
 interesting point to note is that the long form of all of these options
 (except -C) can be specified in a configuration file that is automatically
-parsed when dcrd starts up.  By default, the configuration file is located at
-~/.dcrd/dcrd.conf on POSIX-style operating systems and %LOCALAPPDATA%\dcrd\dcrd.conf
+parsed when monetarium starts up.  By default, the configuration file is located at
+~/.monetarium/monetarium.conf on POSIX-style operating systems and %LOCALAPPDATA%\monetarium\monetarium.conf
 on Windows.  The -C (--configfile) flag, as shown below, can be used to override
 this location.
 
 Usage:
 
-	dcrd [OPTIONS]
+	monetarium [OPTIONS]
 
 Application Options:
 
@@ -115,7 +115,7 @@ Application Options:
 	    --noseeders              Disable seeding for peer discovery
 	    --nodnsseed              DEPRECATED: use --noseeders
 	    --externalip=            Add a public-facing IP to the list of local
-	                             external IPs that dcrd will advertise to other
+	                             external IPs that monetarium will advertise to other
 	                             peers
 	    --nodiscoverip           Disable automatic network address discovery of
 	                             local external IPs
