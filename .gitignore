@@ -49,7 +49,7 @@ _testmain.go
 *.exe
 dcrd
 monetarium
-node
+monetarium-node
 cmd/addblock/addblock
 cmd/findcheckpoint/findcheckpoint
 cmd/gencerts/gencerts
