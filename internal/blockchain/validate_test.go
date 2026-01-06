@@ -954,8 +954,9 @@ func TestCheckTicketExhaustion(t *testing.T) {
 
 				// Ensure the test data does not have any invalid intermediate
 				// states leading up to the final test condition.
+				// Pass true to bypass the early check and only test original logic.
 				parentHash := &node.parent.hash
-				err := bc.CheckTicketExhaustion(parentHash, ticketInfo.tickets)
+				err := bc.CheckTicketExhaustion(parentHash, ticketInfo.tickets, true)
 				if err != nil {
 					t.Errorf("%q: unexpected err: %v", test.name, err)
 				}
@@ -963,11 +964,190 @@ func TestCheckTicketExhaustion(t *testing.T) {
 		}
 
 		// Ensure the expected result is returned from ticket exhaustion check.
-		err := bc.CheckTicketExhaustion(&node.hash, test.newBlockTix)
+		// Pass true for hasStagedTicketsWithMempoolParent to bypass the early
+		// check and only test the original exhaustion logic.
+		err := bc.CheckTicketExhaustion(&node.hash, test.newBlockTix, true)
 		if !errors.Is(err, test.err) {
 			t.Errorf("%q: mismatched err -- got %v, want %v", test.name, err,
 				test.err)
 			continue
+		}
+	}
+}
+
+// TestCheckTicketExhaustionEarlyCheck ensures the early exhaustion check
+// (1 block before actual exhaustion) works correctly with staged tickets.
+func TestCheckTicketExhaustionEarlyCheck(t *testing.T) {
+	// Hardcoded values expected by the tests so they remain valid if network
+	// parameters change.
+	const (
+		coinbaseMaturity      = 16
+		ticketMaturity        = 16
+		ticketsPerBlock       = 5
+		stakeEnabledHeight    = coinbaseMaturity + ticketMaturity
+		stakeValidationHeight = 144
+	)
+
+	// Create chain params based on regnet params with the specific values
+	// overridden.
+	params := chaincfg.RegNetParams()
+	params.CoinbaseMaturity = coinbaseMaturity
+	params.TicketMaturity = ticketMaturity
+	params.TicketsPerBlock = ticketsPerBlock
+	params.StakeEnabledHeight = stakeEnabledHeight
+	params.StakeValidationHeight = stakeValidationHeight
+
+	// Create a test blockchain.
+	bc := newFakeChain(params)
+
+	// Build chain to a point where finalPoolSize is between votesPerBlock and
+	// votesPerBlock*2 (5-10 for these params). This triggers the early check
+	// but not the main exhaustion check.
+	//
+	// The finalPoolSize calculation is:
+	//   finalPoolSize = prevNode.poolSize
+	//                 + sumPurchasedTickets(prevNode, ticketMaturity+1)
+	//                 + ticketPurchases
+	//                 - votingBlocksInMaturityPeriod * votesPerBlock
+	//
+	// After svh: votingBlocksInMaturityPeriod = ticketMaturity + 2 = 18.
+	// So votes consumed = 18 * 5 = 90.
+	//
+	// To get finalPoolSize in range [5, 10), we need:
+	//   poolSize + sumPurchased + ticketPurchases - 90 = 5 to 9
+	//
+	// Strategy: Build chain with enough tickets that after reaching svh and
+	// voting, the pool is around 95-99 tickets (so finalPoolSize = 5-9).
+
+	// immatureTickets tracks which height the purchased tickets will mature.
+	immatureTickets := make(map[int64]uint8)
+	var poolSize uint32
+	node := bc.bestChain.Tip()
+	blockTime := time.Unix(node.timestamp, 0)
+
+	// We'll use a similar approach to TestCheckTicketExhaustion: define phases
+	// of block creation with specific ticket purchases.
+	//
+	// Plan:
+	// - Height 1-126: no tickets
+	// - Height 127-131: buy 20 tickets/block = 100 tickets total
+	//   These mature at heights 143-147
+	// - Continue until pool drains to target range
+	//
+	// But 100 tickets drains too fast. Let's buy more.
+	// With SVH=144, from 144 onwards we lose 5 tickets/block.
+	// To have ~97 tickets at some point after SVH+16=160:
+	// Starting pool at 144 needs to be large enough.
+	//
+	// Actually, let's use a simpler approach: buy tickets steadily so pool
+	// is maintained, then stop buying and let it drain to target.
+
+	// Phase 1: Build to height 126 with no tickets
+	for node.height < 126 {
+		blockTime = blockTime.Add(time.Second)
+		node = newFakeNode(node, 1, 1, 0, blockTime)
+		node.poolSize = poolSize
+		node.freshStake = 0
+
+		poolSize += uint32(immatureTickets[node.height])
+		delete(immatureTickets, node.height)
+
+		bc.index.AddNode(node)
+		bc.bestChain.SetTip(node)
+	}
+
+	// Phase 2: Buy 20 tickets per block for 10 blocks = 200 tickets
+	// Heights 127-136, mature at 143-152
+	for i := 0; i < 10; i++ {
+		blockTime = blockTime.Add(time.Second)
+		node = newFakeNode(node, 1, 1, 0, blockTime)
+		node.poolSize = poolSize
+		node.freshStake = 20
+
+		poolSize += uint32(immatureTickets[node.height])
+		delete(immatureTickets, node.height)
+
+		maturityHeight := node.height + ticketMaturity
+		immatureTickets[maturityHeight] = 20
+
+		bc.index.AddNode(node)
+		bc.bestChain.SetTip(node)
+	}
+
+	// Phase 3: Continue with no new tickets until pool drains to target
+	for {
+		blockTime = blockTime.Add(time.Second)
+		node = newFakeNode(node, 1, 1, 0, blockTime)
+		node.poolSize = poolSize
+		node.freshStake = 0
+
+		poolSize += uint32(immatureTickets[node.height])
+		delete(immatureTickets, node.height)
+
+		if node.height >= stakeValidationHeight {
+			if poolSize >= ticketsPerBlock {
+				poolSize -= ticketsPerBlock
+			}
+		}
+
+		bc.index.AddNode(node)
+		bc.bestChain.SetTip(node)
+
+		// Target: We need node.poolSize (which is set BEFORE votes consume tickets
+		// for this block) to be in [95, 100) so finalPoolSize = 95-99 - 90 = [5, 10).
+		//
+		// node.poolSize is set to poolSize BEFORE it's decremented by votes.
+		// After votes: poolSize = node.poolSize - 5 (when no more tickets mature).
+		// So we need poolSize (after votes) in [90, 95) to get node.poolSize in [95, 100).
+		//
+		// We also need to be past SVH+ticketMaturity+1 so all purchased tickets have
+		// matured and sumPurchasedTickets returns 0.
+		if node.height >= stakeValidationHeight+ticketMaturity+1 &&
+			poolSize >= 90 && poolSize < 95 {
+			break
+		}
+
+		// Safety exit
+		if node.height > 300 {
+			t.Fatalf("Failed to reach target pool size, current poolSize=%d at height %d",
+				poolSize, node.height)
+		}
+	}
+
+	tests := []struct {
+		name                              string
+		ticketPurchases                   uint8
+		hasStagedTicketsWithMempoolParent bool
+		wantErr                           bool
+	}{{
+		// Early check should trigger: no staged tickets, no purchases
+		name:                              "early check triggers without staged tickets",
+		ticketPurchases:                   0,
+		hasStagedTicketsWithMempoolParent: false,
+		wantErr:                           true,
+	}, {
+		// Early check should NOT trigger: staged tickets exist
+		name:                              "early check bypassed with staged tickets",
+		ticketPurchases:                   0,
+		hasStagedTicketsWithMempoolParent: true,
+		wantErr:                           false,
+	}, {
+		// Early check should NOT trigger: tickets being purchased
+		name:                              "early check bypassed with ticket purchases",
+		ticketPurchases:                   5,
+		hasStagedTicketsWithMempoolParent: false,
+		wantErr:                           false,
+	}}
+
+	for _, test := range tests {
+		tipHash := bc.bestChain.Tip().hash
+		err := bc.CheckTicketExhaustion(&tipHash, test.ticketPurchases,
+			test.hasStagedTicketsWithMempoolParent)
+
+		hasErr := err != nil
+		if hasErr != test.wantErr {
+			t.Errorf("%q: unexpected result -- got err=%v, want err=%v",
+				test.name, err, test.wantErr)
 		}
 	}
 }

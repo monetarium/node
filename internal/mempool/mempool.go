@@ -2563,6 +2563,28 @@ func (mp *TxPool) MiningView() *mining.TxMiningView {
 	return view
 }
 
+// HasStagedTicketsWithMempoolParent returns true if there are staged SStx
+// tickets whose parent split transactions are in the main mempool. These
+// tickets will become mineable once the parent transactions are confirmed.
+//
+// This function is safe for concurrent access.
+func (mp *TxPool) HasStagedTicketsWithMempoolParent() bool {
+	mp.mtx.RLock()
+	defer mp.mtx.RUnlock()
+
+	// Check the staged pool directly for SStx tickets.
+	// Tickets in staged pool with mempool dependencies will have their
+	// parent split tx either in the main pool or being included in the
+	// current block template. Either way, if staged SStx exist, we should
+	// allow mining so the parent can confirm.
+	for _, txDesc := range mp.staged {
+		if txDesc.Type == stake.TxTypeSStx {
+			return true
+		}
+	}
+	return false
+}
+
 // New returns a new memory pool for validating and storing standalone
 // transactions until they are mined into a block.
 func New(cfg *Config) *TxPool {

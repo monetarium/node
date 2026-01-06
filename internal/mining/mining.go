@@ -102,7 +102,12 @@ type Config struct {
 	// when the number of live tickets drops below the number of tickets that is
 	// needed to reach the next block at which any outstanding immature ticket
 	// purchases that would provide the necessary live tickets mature.
-	CheckTicketExhaustion func(hash *chainhash.Hash, ticketPurchases uint8) error
+	//
+	// The hasStagedTicketsWithMempoolParent parameter indicates whether there are
+	// staged SStx tickets in the mempool that depend on transactions in the main
+	// mempool. When true, these tickets will become mineable after the parent
+	// transactions are confirmed.
+	CheckTicketExhaustion func(hash *chainhash.Hash, ticketPurchases uint8, hasStagedTicketsWithMempoolParent bool) error
 
 	// CheckTransactionInputs defines the function to use to perform a series of
 	// checks on the inputs to a transaction to ensure they are valid.
@@ -2758,9 +2763,14 @@ nextPriorityQueueItem:
 		}
 	}
 
+	// Check if there are staged tickets waiting for their parent split
+	// transactions to be confirmed. This is used by the exhaustion check
+	// to allow mining when staged tickets exist (they'll be available next block).
+	hasStagedTickets := g.cfg.TxSource.HasStagedTicketsWithMempoolParent()
+
 	// Ensure that mining the block would not cause the chain to become
 	// unrecoverable due to ticket exhaustion.
-	err = g.cfg.CheckTicketExhaustion(&best.Hash, uint8(freshStake))
+	err = g.cfg.CheckTicketExhaustion(&best.Hash, uint8(freshStake), hasStagedTickets)
 	if err != nil {
 		log.Debug(err)
 		return nil, makeError(ErrTicketExhaustion, err.Error())

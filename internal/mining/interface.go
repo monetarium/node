@@ -57,4 +57,9 @@ type TxSource interface {
 
 	// MiningView returns a snapshot of the underlying TxSource.
 	MiningView() *TxMiningView
+
+	// HasStagedTicketsWithMempoolParent returns true if there are staged
+	// SStx tickets that depend on transactions currently in the main mempool.
+	// These tickets will become mineable once the parent txs are confirmed.
+	HasStagedTicketsWithMempoolParent() bool
 }

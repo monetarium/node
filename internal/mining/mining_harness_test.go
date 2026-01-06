@@ -136,7 +136,7 @@ func (c *fakeChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 // extending the block associated with the provided hash with a block that
 // contains the specified number of ticket purchases will not result in a chain
 // that is unrecoverable due to inevitable ticket exhaustion.
-func (c *fakeChain) CheckTicketExhaustion(hash *chainhash.Hash, ticketPurchases uint8) error {
+func (c *fakeChain) CheckTicketExhaustion(hash *chainhash.Hash, ticketPurchases uint8, hasStagedTicketsWithMempoolParent bool) error {
 	return c.checkTicketExhaustionErr
 }
 
@@ -928,6 +928,14 @@ func (p *fakeTxSource) miningDescs() []*TxDesc {
 // MiningView returns a snapshot of the underlying TxSource.
 func (p *fakeTxSource) MiningView() *TxMiningView {
 	return p.miningView.Clone(p.miningDescs(), p.findTx)
+}
+
+// HasStagedTicketsWithMempoolParent returns true if there are staged SStx
+// tickets whose parent split transactions are in the main pool.
+func (p *fakeTxSource) HasStagedTicketsWithMempoolParent() bool {
+	// For testing purposes, just return false. Tests can override this
+	// behavior if needed by modifying the staged/pool maps.
+	return false
 }
 
 // fetchInputUtxos loads utxo details about the input transactions referenced by

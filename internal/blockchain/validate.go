@@ -5460,8 +5460,13 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *dcrutil.Block) error {
 // immature ticket purchases that would provide the necessary live tickets
 // mature.
 //
+// The hasStagedTicketsWithMempoolParent parameter indicates whether there are
+// staged SStx tickets in the mempool that depend on transactions in the main
+// mempool pool. When true, these tickets will become mineable after the parent
+// transactions are confirmed, allowing the early check to pass.
+//
 // This function is safe for concurrent access.
-func (b *BlockChain) checkTicketExhaustion(prevNode *blockNode, ticketPurchases uint8) error {
+func (b *BlockChain) checkTicketExhaustion(prevNode *blockNode, ticketPurchases uint8, hasStagedTicketsWithMempoolParent bool) error {
 	// Nothing to do if the chain is not far enough along where ticket
 	// exhaustion could be an issue.
 	//
@@ -5505,6 +5510,33 @@ func (b *BlockChain) checkTicketExhaustion(prevNode *blockNode, ticketPurchases 
 	votesPerBlock := int64(b.chainParams.TicketsPerBlock)
 	finalPoolSize -= votingBlocksInMaturityPeriod * votesPerBlock
 
+	// Early check (1 block before exhaustion): If the pool is getting low and
+	// there are no staged tickets with mempool parents, halt early to give users
+	// time to buy tickets.
+	//
+	// If staged tickets exist, allow mining - the split tx will confirm in this
+	// block, and the staged tickets will become available for the next block.
+	//
+	// This addresses a deadlock scenario where:
+	// 1. User tries to buy tickets when exhaustion is imminent
+	// 2. Wallet creates split tx (regular) + SStx (ticket purchase)
+	// 3. SStx depends on unconfirmed split tx, so it goes to stage pool
+	// 4. Without this early check, miner would block at exhaustion level
+	// 5. With this check, we halt 1 block earlier IF no staged tickets exist
+	// 6. If staged tickets exist, we allow mining so splits can confirm
+	if finalPoolSize < votesPerBlock*2 && finalPoolSize >= votesPerBlock {
+		if ticketPurchases == 0 && !hasStagedTicketsWithMempoolParent {
+			purchasesNeeded := votesPerBlock*2 - finalPoolSize
+			str := fmt.Sprintf("extending block %s (height %d) would leave "+
+				"insufficient tickets in the pool. Purchase at least %d ticket(s) "+
+				"to continue mining. No staged tickets with pending parent "+
+				"transactions detected.", prevNode.hash, prevNode.height,
+				purchasesNeeded)
+			return ruleError(ErrTicketExhaustion, str)
+		}
+		// If staged tickets exist or tickets are being purchased, allow mining
+	}
+
 	// Ensure that the final pool of live tickets after the ticket maturity
 	// period will have enough tickets to prevent becoming unrecoverable.
 	if finalPoolSize < votesPerBlock {
@@ -5527,12 +5559,17 @@ func (b *BlockChain) checkTicketExhaustion(prevNode *blockNode, ticketPurchases 
 // which any outstanding immature ticket purchases that would provide the
 // necessary live tickets mature.
 //
+// The hasStagedTicketsWithMempoolParent parameter indicates whether there are
+// staged SStx tickets in the mempool that depend on transactions in the main
+// mempool. When true, these tickets will become mineable after the parent
+// transactions are confirmed, allowing the early check to pass.
+//
 // This function is safe for concurrent access.
-func (b *BlockChain) CheckTicketExhaustion(hash *chainhash.Hash, ticketPurchases uint8) error {
+func (b *BlockChain) CheckTicketExhaustion(hash *chainhash.Hash, ticketPurchases uint8, hasStagedTicketsWithMempoolParent bool) error {
 	node := b.index.LookupNode(hash)
 	if node == nil {
 		return unknownBlockError(hash)
 	}
 
-	return b.checkTicketExhaustion(node, ticketPurchases)
+	return b.checkTicketExhaustion(node, ticketPurchases, hasStagedTicketsWithMempoolParent)
 }
