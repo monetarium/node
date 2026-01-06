@@ -30,9 +30,9 @@ func main() {
 		},
 	}
 
-	// Connect to local dcrd RPC server using websockets.
-	dcrdHomeDir := dcrutil.AppDataDir("dcrd", false)
-	certs, err := os.ReadFile(filepath.Join(dcrdHomeDir, "rpc.cert"))
+	// Connect to local monetarium RPC server using websockets.
+	monetariumHomeDir := dcrutil.AppDataDir("monetarium", false)
+	certs, err := os.ReadFile(filepath.Join(monetariumHomeDir, "rpc.cert"))
 	if err != nil {
 		log.Fatal(err)
 	}
