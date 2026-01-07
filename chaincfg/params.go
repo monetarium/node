@@ -853,28 +853,6 @@ func (p *Params) TicketExpiryBlocks() uint32 {
 	return p.TicketExpiry
 }
 
-// newHashFromStr converts the passed big-endian hex string into a
-// chainhash.Hash.  It only differs from the one available in chainhash in that
-// it panics on an error since it will only (and must only) be called with
-// hard-coded, and therefore known good, hashes.
-func newHashFromStr(hexStr string) *chainhash.Hash {
-	hash, err := chainhash.NewHashFromStr(hexStr)
-	if err != nil {
-		// Log critical error instead of just panicking
-		fmt.Printf("CRITICAL: Invalid hardcoded hash in chaincfg: %s, error: %v\n", hexStr, err)
-
-		// Ordinarily I don't like panics in library code since it
-		// can take applications down without them having a chance to
-		// recover which is extremely annoying, however an exception is
-		// being made in this case because the only way this can panic
-		// is if there is an error in the hard-coded hashes.  Thus it
-		// will only ever potentially panic on init and therefore is
-		// 100% predictable.
-		panic(err)
-	}
-	return hash
-}
-
 // hexDecode decodes the passed hex string and returns the resulting bytes.  It
 // logs critical errors instead of panicking. This is only provided for the hard-coded constants
 // so errors in the source code can be detected. It will only (and must only) be
@@ -892,19 +870,6 @@ func hexDecode(hexStr string) []byte {
 // It decodes the passed hex string and panics if an error occurs.
 func mustParseHex(hexStr string) []byte {
 	return hexDecode(hexStr)
-}
-
-// hexToBigInt converts the passed hex string into a big integer and will log
-// critical errors instead of panicking.  This is only provided for the hard-coded constants so
-// errors in the source code can be detected. It will only (and must only) be
-// called with hard-coded values.
-func hexToBigInt(hexStr string) *big.Int {
-	val, ok := new(big.Int).SetString(hexStr, 16)
-	if !ok {
-		fmt.Printf("CRITICAL: Failed to parse hardcoded big integer from hex in chaincfg: %s\n", hexStr)
-		panic("failed to parse big integer from hex: " + hexStr)
-	}
-	return val
 }
 
 // BlockOneSubsidy returns the total subsidy of block height 1 for the

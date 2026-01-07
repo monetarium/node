@@ -17,11 +17,11 @@ import (
 
 // TestNet3Params return the network parameters for the test currency network.
 // This network is sometimes simply called "testnet".
-// This is the third public iteration of testnet.
+// This is the Monetarium testnet, starting fresh with mainnet-compatible parameters.
 func TestNet3Params() *Params {
-	// testNetPowLimit is the highest proof of work value a Decred block
-	// can have for the test network.  It is the value 2^232 - 1.
-	testNetPowLimit := new(big.Int).Sub(new(big.Int).Lsh(bigOne, 232), bigOne)
+	// testNetPowLimit is the highest proof of work value a Monetarium block
+	// can have for the test network.  It is the value 2^224 - 1 (same as mainnet).
+	testNetPowLimit := new(big.Int).Sub(new(big.Int).Lsh(bigOne, 224), bigOne)
 
 	// testNetPowLimitBits is the test network proof of work limit in its
 	// compact representation.
@@ -29,21 +29,22 @@ func TestNet3Params() *Params {
 	// Note that due to the limited precision of the compact representation,
 	// this is not exactly equal to the pow limit.  It is the value:
 	//
-	// 0x000000ffff000000000000000000000000000000000000000000000000000000
-	const testNetPowLimitBits = 0x1e00ffff // 503382015
+	// 0x00000000ffff0000000000000000000000000000000000000000000000000000
+	const testNetPowLimitBits = 0x1d00ffff // 486604799 (Difficulty 1, same as mainnet)
 
 	// genesisBlock defines the genesis block of the block chain which serves as
-	// the public transaction ledger for the test network (version 3).
+	// the public transaction ledger for the Monetarium test network.
 	genesisBlock := wire.MsgBlock{
 		Header: wire.BlockHeader{
-			Version:   6,
-			PrevBlock: chainhash.Hash{},
+			Version:   1,
+			PrevBlock: chainhash.Hash{}, // All zero.
 			// MerkleRoot: Calculated below.
-			Timestamp:    time.Unix(1533513600, 0), // 2018-08-06 00:00:00 +0000 UTC
+			StakeRoot:    chainhash.Hash{},
+			Timestamp:    time.Unix(1760649600, 0), // Thu, 16 Oct 2025 00:00:00 GMT (same as mainnet)
 			Bits:         testNetPowLimitBits,      // Difficulty 1
-			SBits:        20000000,
-			Nonce:        0x18aea41a,
-			StakeVersion: 6,
+			SBits:        2 * 1e8,                  // 2 Coin (same as mainnet)
+			Nonce:        0x00000000,
+			StakeVersion: 0,
 		},
 		Transactions: []*wire.MsgTx{{
 			SerType: wire.TxSerializeFull,
@@ -67,13 +68,7 @@ func TestNet3Params() *Params {
 			Expiry:   0,
 		}},
 	}
-	// NOTE: This really should be TxHashFull, but it was defined incorrectly.
-	//
-	// Since the field is not used in any validation code, it does not have any
-	// adverse effects, but correcting it would result in changing the block
-	// hash which would invalidate the entire test network.  The next test
-	// network should set the value properly.
-	genesisBlock.Header.MerkleRoot = genesisBlock.Transactions[0].TxHash()
+	genesisBlock.Header.MerkleRoot = genesisBlock.Transactions[0].TxHashFull()
 
 	return &Params{
 		Name:        "testnet3",
@@ -126,17 +121,14 @@ func TestNet3Params() *Params {
 		// forks rejection checkpoint.  This is intended to be updated
 		// periodically with new releases.
 		//
-		// Block 88d61d7609c06c8e171f050789f6649d21525a144b820026f7b396476a05a44b
-		// Height: 1377455
-		AssumeValid: *newHashFromStr("88d61d7609c06c8e171f050789f6649d21525a144b820026f7b396476a05a44b"),
+		// Not set for Monetarium testnet to allow bootstrap from genesis.
+		AssumeValid: chainhash.Hash{},
 
 		// MinKnownChainWork is the minimum amount of known total work for the
-		// chain at a given point in time.  This is intended to be updated
-		// periodically with new releases.
+		// chain at a given point in time.
 		//
-		// Block 50f244d269a61de438a9075f7f5477a785f3f2060d2c7127f000093176a386fa
-		// Height: 1387535
-		MinKnownChainWork: hexToBigInt("000000000000000000000000000000000000000000000000f376ddb1ab3a5a2e"),
+		// Not set for Monetarium testnet to allow bootstrap from genesis.
+		MinKnownChainWork: nil,
 
 		// Consensus rule change deployments.
 		//
@@ -147,7 +139,7 @@ func TestNet3Params() *Params {
 		RuleChangeActivationDivisor:    4,
 		RuleChangeActivationInterval:   5040, // 1 week
 		Deployments: map[uint32][]ConsensusDeployment{
-			5: {{
+			4: {{
 				Vote: Vote{
 					Id:          VoteIDSDiffAlgorithm,
 					Description: "Change stake difficulty algorithm as defined in DCP0001",
@@ -175,8 +167,35 @@ func TestNet3Params() *Params {
 				ForcedChoiceID: "yes",
 				StartTime:      1493164800, // Apr 26th, 2017
 				ExpireTime:     1524700800, // Apr 26th, 2018
+			}, {
+				Vote: Vote{
+					Id:          VoteIDLNSupport,
+					Description: "Request developers begin work on Lightning Network (LN) integration",
+					Mask:        0x0018, // Bits 3 and 4
+					Choices: []Choice{{
+						Id:          "abstain",
+						Description: "abstain from voting",
+						Bits:        0x0000,
+						IsAbstain:   true,
+						IsNo:        false,
+					}, {
+						Id:          "no",
+						Description: "no, do not work on integrating LN support",
+						Bits:        0x0008, // Bit 3
+						IsAbstain:   false,
+						IsNo:        true,
+					}, {
+						Id:          "yes",
+						Description: "yes, begin work on integrating LN support",
+						Bits:        0x0010, // Bit 4
+						IsAbstain:   false,
+						IsNo:        false,
+					}},
+				},
+				StartTime:  1493164800, // Apr 26th, 2017
+				ExpireTime: 1508976000, // Oct 26th, 2017
 			}},
-			6: {{
+			5: {{
 				Vote: Vote{
 					Id:          VoteIDLNFeatures,
 					Description: "Enable features defined in DCP0002 and DCP0003 necessary to support Lightning Network (LN)",
@@ -205,7 +224,7 @@ func TestNet3Params() *Params {
 				StartTime:      1505260800, // Sep 13th, 2017
 				ExpireTime:     1536796800, // Sep 13th, 2018
 			}},
-			7: {{
+			6: {{
 				Vote: Vote{
 					Id:          VoteIDFixLNSeqLocks,
 					Description: "Modify sequence lock handling as defined in DCP0004",
@@ -230,10 +249,11 @@ func TestNet3Params() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1548633600, // Jan 28th, 2019
-				ExpireTime: 1580169600, // Jan 28th, 2020
+				ForcedChoiceID: "yes",
+				StartTime:      1548633600, // Jan 28th, 2019
+				ExpireTime:     1580169600, // Jan 28th, 2020
 			}},
-			8: {{
+			7: {{
 				Vote: Vote{
 					Id:          VoteIDHeaderCommitments,
 					Description: "Enable header commitments as defined in DCP0005",
@@ -258,10 +278,11 @@ func TestNet3Params() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1567641600, // Sep 5th, 2019
-				ExpireTime: 1599264000, // Sep 5th, 2020
+				ForcedChoiceID: "yes",
+				StartTime:      1567641600, // Sep 5th, 2019
+				ExpireTime:     1599264000, // Sep 5th, 2020
 			}},
-			9: {{
+			8: {{
 				Vote: Vote{
 					Id:          VoteIDTreasury,
 					Description: "Enable decentralized Treasury opcodes as defined in DCP0006",
@@ -289,7 +310,7 @@ func TestNet3Params() *Params {
 				StartTime:  1596240000, // Aug 1st, 2020
 				ExpireTime: 1627776000, // Aug 1st, 2021
 			}},
-			10: {{
+			9: {{
 				Vote: Vote{
 					Id:          VoteIDRevertTreasuryPolicy,
 					Description: "Change maximum treasury expenditure policy as defined in DCP0007",
@@ -341,8 +362,9 @@ func TestNet3Params() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1631750400, // Sep 16th, 2021
-				ExpireTime: 1694822400, // Sep 16th, 2023
+				ForcedChoiceID: "yes",
+				StartTime:      1631750400, // Sep 16th, 2021
+				ExpireTime:     1694822400, // Sep 16th, 2023
 			}, {
 				Vote: Vote{
 					Id:          VoteIDAutoRevocations,
@@ -368,8 +390,9 @@ func TestNet3Params() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1631750400, // Sep 16th, 2021
-				ExpireTime: 1694822400, // Sep 16th, 2023
+				ForcedChoiceID: "yes",
+				StartTime:      1631750400, // Sep 16th, 2021
+				ExpireTime:     1694822400, // Sep 16th, 2023
 			}, {
 				Vote: Vote{
 					Id:          VoteIDChangeSubsidySplit,
@@ -398,7 +421,7 @@ func TestNet3Params() *Params {
 				StartTime:  1631750400, // Sep 16th, 2021
 				ExpireTime: 1694822400, // Sep 16th, 2023
 			}},
-			11: {{
+			10: {{
 				Vote: Vote{
 					Id:          VoteIDBlake3Pow,
 					Description: "Change proof of work hashing algorithm to BLAKE3 as defined in DCP0011",
@@ -423,8 +446,9 @@ func TestNet3Params() *Params {
 						IsNo:        false,
 					}},
 				},
-				StartTime:  1682294400, // Apr 24th, 2023
-				ExpireTime: 1745452800, // Apr 24th, 2025
+				ForcedChoiceID: "yes",
+				StartTime:      1682294400, // Apr 24th, 2023
+				ExpireTime:     1745452800, // Apr 24th, 2025
 			}, {
 				Vote: Vote{
 					Id:          VoteIDChangeSubsidySplitR2,
@@ -488,7 +512,7 @@ func TestNet3Params() *Params {
 		LegacyCoinType:   11, // for backwards compatibility
 
 		// Decred PoS parameters
-		MinimumStakeDiff:        20000000, // 0.2 Coin
+		MinimumStakeDiff:        2 * 1e8, // 2 Coin (same as mainnet)
 		TicketPoolSize:          1024,
 		TicketsPerBlock:         5,
 		TicketMaturity:          16,
@@ -512,11 +536,8 @@ func TestNet3Params() *Params {
 		OrganizationPkScriptVersion: 0,
 		BlockOneLedger:              nil, // Monetarium has no premine
 
-		// Sanctioned Politeia keys.
-		PiKeys: [][]byte{
-			hexDecode("03beca9bbd227ca6bb5a58e03a36ba2b52fff09093bd7a50aee1193bccd257fb8a"),
-			hexDecode("03e647c014f55265da506781f0b2d67674c35cb59b873d9926d483c4ced9a7bbd3"),
-		},
+		// Monetarium has no Politeia/treasury system
+		PiKeys: [][]byte{},
 
 		// ~2 hours for tspend inclusion
 		TreasuryVoteInterval: 60,
@@ -572,7 +593,7 @@ func TestNet3Params() *Params {
 				MaxSupply:      5e6 * 1e8, // 5 million SKA-2
 				EmissionHeight: 64,        // Fast emission for testing
 				EmissionWindow: 100,       // 100 block window for testing
-				Active:         true,      // Active on testnet for testing
+				Active:         false,
 				Description:    "Secondary SKA coin type for testnet testing",
 				EmissionAddresses: []string{
 					"TsPlaceholderAddressForTestnetSKA2Emission", // REPLACE with real testnet address

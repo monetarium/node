@@ -122,10 +122,11 @@ func assertStakeDiffParamsMainNet(t *testing.T, params *chaincfg.Params, expecte
 // assertStakeDiffParamsTestNet ensure the passed params have the values used in
 // the tests related to testnet stake difficulty calculation.
 func assertStakeDiffParamsTestNet(t *testing.T, params *chaincfg.Params) {
-	if params.MinimumStakeDiff != 20000000 {
+	// Monetarium testnet uses same MinimumStakeDiff as mainnet (2 Coin)
+	if params.MinimumStakeDiff != 200000000 {
 		_, file, line, _ := runtime.Caller(1)
 		t.Fatalf("%s:%d -- expect params with minimum stake diff of "+
-			"%d, got %d", file, line, 20000000,
+			"%d, got %d", file, line, 200000000,
 			params.MinimumStakeDiff)
 	}
 	if params.TicketMaturity != 16 {
@@ -777,6 +778,7 @@ func TestEstimateNextStakeDiffV2(t *testing.T) {
 		},
 		{
 			// Next retarget is at 432.
+			// Values scaled 10x for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "3rd retarget interval, 100% demand, 1st block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
@@ -784,91 +786,96 @@ func TestEstimateNextStakeDiffV2(t *testing.T) {
 				{256, 20, minStakeDiffTestNet}, // 288
 			},
 			useMaxTickets: true,
-			expectedDiff:  44505494,
+			expectedDiff:  445054945,
 		},
 		{
 			// Next retarget is at 432.
 			//
 			// None of the nodes being estimated will mature during the
 			// interval.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "3rd retarget interval - 11, 100% demand",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{271, 20, minStakeDiffTestNet}, // 287
-				{134, 20, 44505494},            // 421
+				{134, 20, 445054945},           // 421
 			},
 			useMaxTickets: true,
-			expectedDiff:  108661875,
+			expectedDiff:  1086618765,
 		},
 		{
 			// Next retarget is at 576.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "4th retarget interval, 100% demand, 1st block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{271, 20, minStakeDiffTestNet}, // 287
-				{144, 20, 44505494},            // 431
-				{1, 20, 108661875},             // 432
+				{144, 20, 445054945},           // 431
+				{1, 20, 1086618765},            // 432
 			},
 			useMaxTickets: true,
-			expectedDiff:  314319918,
+			expectedDiff:  3143199230,
 		},
 		{
 			// Next retarget is at 576.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "4th retarget interval, 100% demand, 2nd block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{271, 20, minStakeDiffTestNet}, // 287
-				{144, 20, 44505494},            // 431
-				{2, 20, 108661875},             // 433
+				{144, 20, 445054945},           // 431
+				{2, 20, 1086618765},            // 433
 			},
 			useMaxTickets: true,
-			expectedDiff:  314319918,
+			expectedDiff:  3143199230,
 		},
 		{
 			// Next retarget is at 576.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "4th retarget interval, 100% demand, final block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{271, 20, minStakeDiffTestNet}, // 287
-				{144, 20, 44505494},            // 431
-				{144, 20, 108661875},           // 575
+				{144, 20, 445054945},           // 431
+				{144, 20, 1086618765},          // 575
 			},
 			useMaxTickets: true,
-			expectedDiff:  314319918,
+			expectedDiff:  3143199230,
 		},
 		{
 			// Next retarget is at 1152.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "9th retarget interval, varying demand, 137th block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{127, 20, minStakeDiffTestNet}, // 143
 				{144, 10, minStakeDiffTestNet}, // 287
-				{144, 20, 24055097},            // 431
-				{144, 10, 54516186},            // 575
-				{144, 20, 105335577},           // 719
-				{144, 10, 304330579},           // 863
-				{144, 20, 772249463},           // 1007
-				{76, 10, 2497324513},           // 1083
-				{9, 0, 2497324513},             // 1092
-				{1, 10, 2497324513},            // 1093
-				{8, 0, 2497324513},             // 1101
-				{1, 10, 2497324513},            // 1102
-				{12, 0, 2497324513},            // 1114
-				{1, 10, 2497324513},            // 1115
-				{9, 0, 2497324513},             // 1124
-				{1, 10, 2497324513},            // 1125
-				{8, 0, 2497324513},             // 1133
-				{1, 10, 2497324513},            // 1134
-				{10, 0, 2497324513},            // 1144
+				{144, 20, 240550976},           // 431
+				{144, 10, 545161874},           // 575
+				{144, 20, 1053355801},          // 719
+				{144, 10, 3043305888},          // 863
+				{144, 20, 5393750000},          // 1007
+				{76, 10, 6293750000},           // 1083
+				{9, 0, 6293750000},             // 1092
+				{1, 10, 6293750000},            // 1093
+				{8, 0, 6293750000},             // 1101
+				{1, 10, 6293750000},            // 1102
+				{12, 0, 6293750000},            // 1114
+				{1, 10, 6293750000},            // 1115
+				{9, 0, 6293750000},             // 1124
+				{1, 10, 6293750000},            // 1125
+				{8, 0, 6293750000},             // 1133
+				{1, 10, 6293750000},            // 1134
+				{10, 0, 6293750000},            // 1144
 			},
 			useMaxTickets: false,
 			newTickets:    10,
-			expectedDiff:  6976183842,
+			expectedDiff:  7193750000,
 		},
 		{
 			// Next retarget is at 1440.  The estimated number of
@@ -879,23 +886,24 @@ func TestEstimateNextStakeDiffV2(t *testing.T) {
 			// because it results in a different number of maturing
 			// tickets depending on how they are allocated on each
 			// side of the maturity floor.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "11th retarget interval, 50% demand, 127th block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{271, 10, minStakeDiffTestNet}, // 287
-				{144, 10, 22252747},            // 431
-				{144, 10, 27165468},            // 575
-				{144, 10, 39289988},            // 719
-				{144, 10, 66729608},            // 863
-				{144, 10, 116554208},           // 1007
-				{144, 10, 212709675},           // 1151
-				{144, 10, 417424410},           // 1295
-				{127, 10, 876591473},           // 1422
+				{144, 10, 222527472},           // 431
+				{144, 10, 271654690},           // 575
+				{144, 10, 392899901},           // 719
+				{144, 10, 667296122},           // 863
+				{144, 10, 1165542156},          // 1007
+				{144, 10, 2127096890},          // 1151
+				{144, 10, 4174244381},          // 1295
+				{127, 10, 8093750000},          // 1422
 			},
 			useMaxTickets: false,
 			newTickets:    170, // 17 * 10
-			expectedDiff:  1965171141,
+			expectedDiff:  8993750000,
 		},
 		{
 			// Next retarget is at 1440.  This is similar to the
@@ -903,23 +911,24 @@ func TestEstimateNextStakeDiffV2(t *testing.T) {
 			// after the ticket maturity floor, so the estimate is
 			// the same as if each remaining node only had 10 ticket
 			// purchases.
+			// Values for Monetarium testnet (MinimumStakeDiff = 2 Coin)
 			name:   "11th retarget interval, 50% demand, 128th block",
 			params: testNetParams,
 			ticketInfo: []ticketInfo{
 				{16, 0, minStakeDiffTestNet},   // 16
 				{271, 10, minStakeDiffTestNet}, // 287
-				{144, 10, 22252747},            // 431
-				{144, 10, 27165468},            // 575
-				{144, 10, 39289988},            // 719
-				{144, 10, 66729608},            // 863
-				{144, 10, 116554208},           // 1007
-				{144, 10, 212709675},           // 1151
-				{144, 10, 417424410},           // 1295
-				{128, 10, 876591473},           // 1423
+				{144, 10, 222527472},           // 431
+				{144, 10, 271654690},           // 575
+				{144, 10, 392899901},           // 719
+				{144, 10, 667296122},           // 863
+				{144, 10, 1165542156},          // 1007
+				{144, 10, 2127096890},          // 1151
+				{144, 10, 4174244381},          // 1295
+				{128, 10, 8093750000},          // 1423
 			},
 			useMaxTickets: false,
 			newTickets:    160, // 16 * 10
-			expectedDiff:  1961558695,
+			expectedDiff:  8993750000,
 		},
 	}
 

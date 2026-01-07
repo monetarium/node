@@ -13,9 +13,14 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-// TestTestNetGenesisBlock tests the genesis block of the test network (version
-// 3) for validity by checking the encoded bytes and hashes.
+// TestTestNetGenesisBlock tests the genesis block of the test network for
+// validity by checking the encoded bytes and hashes.
 func TestTestNetGenesisBlock(t *testing.T) {
+	// Genesis block bytes with timestamp (Oct 16, 2025 = 0x68f16180)
+	// and CPU-friendly difficulty (0x1d00ffff) matching mainnet
+	// Transaction format includes CoinType field (VAR = 0x00)
+	testNetGenesisBlockBytes, _ := hex.DecodeString("010000000000000000000000000000000000000000000000000000000000000000000000f1adbc0fe2cebd070208a804f4c8e98ed464a4fd07b55d18164552d84be12165000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff001d00c2eb0b0000000000000000000000008061f168000000000000000000000000000000000000000000000000000000000000000000000000000000000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff00ffffffff01000000000000000000000020801679e98561ada96caec2949a5d41c4cab3851eb740d951c10ecbcf265c1fd90000000000000000010000000000000000000000000000000002000000")
+
 	// Encode the genesis block to raw bytes.
 	params := TestNet3Params()
 	var buf bytes.Buffer
@@ -23,10 +28,6 @@ func TestTestNetGenesisBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TestTestNetGenesisBlock: %v", err)
 	}
-
-	// Transaction format includes CoinType field (VAR = 0x00)
-	// Use actual serialized bytes for validation
-	testNetGenesisBlockBytes, _ := hex.DecodeString(hex.EncodeToString(buf.Bytes()))
 
 	// Ensure the encoded block matches the expected bytes.
 	if !bytes.Equal(buf.Bytes(), testNetGenesisBlockBytes) {
